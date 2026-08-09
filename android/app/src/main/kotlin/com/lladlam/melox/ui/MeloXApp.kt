@@ -175,6 +175,10 @@ fun MeloXApp(
                         )
                         AppTab.Library -> LibraryScreen(
                             session = neteaseSession,
+                            // Back ownership is state-based instead of relying on
+                            // composition order. The full player exclusively owns
+                            // back while it is visible.
+                            playlistBackEnabled = !fullPlayerVisible,
                             onLogin = {
                                 loginReturnTab = AppTab.Library
                                 showNeteaseLogin = true

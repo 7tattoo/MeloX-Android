@@ -90,6 +90,7 @@ private enum class MeloXLibraryPage(val title: String) {
 fun LibraryScreen(
     session: NeteaseSessionStore,
     onLogin: () -> Unit,
+    playlistBackEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
@@ -125,7 +126,7 @@ fun LibraryScreen(
         }
     }
 
-    BackHandler(enabled = selectedPlaylist != null) {
+    BackHandler(enabled = playlistBackEnabled && selectedPlaylist != null) {
         selectedPlaylist = null
     }
 
@@ -141,19 +142,27 @@ fun LibraryScreen(
             targetState = selectedPlaylist,
             modifier = Modifier.fillMaxSize(),
             transitionSpec = {
-                fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 320,
-                        delayMillis = 55,
-                        easing = FastOutSlowInEasing,
-                    ),
-                ) togetherWith fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 240,
-                        easing = FastOutSlowInEasing,
-                    ),
-                )
+                val openingDetail = targetState != null
+                (
+                    fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 320,
+                            delayMillis = 55,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    ) togetherWith fadeOut(
+                        animationSpec = tween(
+                            durationMillis = 360,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    )
+                ).apply {
+                    // The newest target must stay above any retained outgoing
+                    // playlist content while an interrupted reverse animation finishes.
+                    targetContentZIndex = if (openingDetail) 2f else 0f
+                }
             },
+            contentKey = { playlist -> playlist?.id ?: Long.MIN_VALUE },
             label = "library-playlist-detail-transition",
         ) { targetPlaylist ->
             val playlistTransitionVisibilityScope = this
@@ -163,7 +172,7 @@ fun LibraryScreen(
                     client = client,
                     onBack = { selectedPlaylist = null },
                     sharedTransitionScope = sharedScope,
-                    animatedVisibilityScope = this,
+                    animatedVisibilityScope = playlistTransitionVisibilityScope,
                 )
             } else {
                 Column(
