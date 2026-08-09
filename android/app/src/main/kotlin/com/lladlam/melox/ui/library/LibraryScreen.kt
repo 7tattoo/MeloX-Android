@@ -76,6 +76,9 @@ import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
+import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
 import kotlinx.coroutines.launch
 
@@ -318,6 +321,11 @@ private fun MeloXLibraryLoginUnavailable(onLogin: () -> Unit) {
                 Surface(
                     modifier = Modifier
                         .padding(top = 18.dp)
+                        .meloXLiquidButton(
+                            shape = RoundedCornerShape(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                            surfaceColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f),
+                        )
                         .clickable(onClick = onLogin),
                     shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.primary,
@@ -345,7 +353,11 @@ private fun MeloXLibrarySegmentedPicker(
             .fillMaxWidth()
             .height(30.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.075f)),
+            .meloXLiquidBottomBar(
+                shape = RoundedCornerShape(16.dp),
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.10f),
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MeloXLibraryPage.entries.forEach { page ->
@@ -356,9 +368,10 @@ private fun MeloXLibrarySegmentedPicker(
                     .height(28.dp)
                     .padding(horizontal = 1.dp)
                     .clip(RoundedCornerShape(15.dp))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.surface
-                        else Color.Transparent,
+                    .meloXLiquidTabSelection(
+                        shape = RoundedCornerShape(15.dp),
+                        selected = isSelected,
+                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.74f),
                     )
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -800,7 +813,11 @@ private fun MeloXPlaylistToolbar(
             modifier = Modifier
                 .height(44.dp)
                 .clip(RoundedCornerShape(22.dp))
-                .background(glassColor(foreground))
+                .meloXLiquidBottomBar(
+                    shape = RoundedCornerShape(22.dp),
+                    tint = glassColor(foreground).copy(alpha = 0.18f),
+                    surfaceColor = glassColor(foreground).copy(alpha = 0.42f),
+                )
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -980,7 +997,18 @@ private fun MeloXStandardPlaylistHero(
                         .width(140.dp)
                         .height(50.dp)
                         .clip(RoundedCornerShape(25.dp))
-                        .background(if (foreground == Color.White) Color.White else Color.Black)
+                        .meloXLiquidButton(
+                            shape = RoundedCornerShape(25.dp),
+                            enabled = tracks.isNotEmpty(),
+                            tint = if (foreground == Color.White) Color.White else Color.Black,
+                            surfaceColor = if (foreground == Color.White) {
+                                Color.White.copy(alpha = 0.82f)
+                            } else {
+                                Color.Black.copy(alpha = 0.82f)
+                            },
+                            lensRadius = 12.dp,
+                            refractionHeight = 20.dp,
+                        )
                         .clickable(enabled = tracks.isNotEmpty(), onClick = onPlay),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1090,7 +1118,13 @@ private fun MeloXGlassCircleButton(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(glassColor(foreground))
+            .meloXLiquidButton(
+                shape = CircleShape,
+                enabled = enabled,
+                surfaceColor = glassColor(foreground).copy(alpha = 0.48f),
+                lensRadius = 11.dp,
+                refractionHeight = 18.dp,
+            )
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
