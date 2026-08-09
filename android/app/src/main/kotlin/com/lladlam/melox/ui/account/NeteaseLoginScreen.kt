@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,11 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
 
 private const val NETEASE_LOGIN_URL = "https://music.163.com/#"
@@ -106,6 +109,14 @@ fun NeteaseLoginScreen(
             Text(
                 text = "取消",
                 modifier = Modifier
+                    .clip(RoundedCornerShape(18.dp))
+                    .meloXLiquidButton(
+                        shape = RoundedCornerShape(18.dp),
+                        tint = Color(0xFFFF3147),
+                        surfaceColor = Color(0xFFFF3147).copy(alpha = 0.08f),
+                        lensRadius = 7.dp,
+                        refractionHeight = 11.dp,
+                    )
                     .clickable(onClick = onDismiss)
                     .padding(8.dp),
                 color = Color(0xFFFF3147),
