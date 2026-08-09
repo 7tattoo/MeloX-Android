@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.model.SearchSong
+import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.glass.meloXLiquidButton
@@ -194,7 +195,9 @@ fun SearchScreen() {
             else -> {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 100.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        bottom = MeloXBottomContentClearance,
+                    ),
                 ) {
                     items(
                         items = results,
