@@ -71,6 +71,7 @@ import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.audio.SongAudioAvailability
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
@@ -537,7 +538,12 @@ private fun MeloXQualityChipV3(
                 }
                 .height(24.dp)
                 .clip(RoundedCornerShape(7.dp))
-                .background(Color.White.copy(alpha = 0.12f))
+                .meloXLiquidButton(
+                    shape = RoundedCornerShape(7.dp),
+                    surfaceColor = Color.White.copy(alpha = 0.10f),
+                    lensRadius = 6.dp,
+                    refractionHeight = 9.dp,
+                )
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
@@ -639,6 +645,12 @@ private fun CupertinoPlayPauseButton(state: MeloXPlaybackUiState) {
                 scaleY = scale
             }
             .clip(CircleShape)
+            .meloXLiquidButton(
+                shape = CircleShape,
+                surfaceColor = Color.White.copy(alpha = 0.035f),
+                lensRadius = 12.dp,
+                refractionHeight = 20.dp,
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -695,6 +707,12 @@ private fun CupertinoTransportButton(
                 scaleY = scale
             }
             .clip(CircleShape)
+            .meloXLiquidButton(
+                shape = CircleShape,
+                surfaceColor = Color.White.copy(alpha = 0.025f),
+                lensRadius = 10.dp,
+                refractionHeight = 18.dp,
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -892,7 +910,13 @@ private fun CupertinoPageButton(
                 scaleY = s
             }
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = backgroundAlpha))
+            .meloXLiquidButton(
+                shape = CircleShape,
+                enabled = enabled,
+                surfaceColor = Color.White.copy(alpha = 0.035f + backgroundAlpha * 0.42f),
+                lensRadius = if (selected) 11.dp else 8.dp,
+                refractionHeight = if (selected) 18.dp else 12.dp,
+            )
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,
