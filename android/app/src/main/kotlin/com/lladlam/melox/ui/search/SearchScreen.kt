@@ -2,6 +2,7 @@ package com.lladlam.melox.ui.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,11 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +27,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +37,7 @@ import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.launch
 
 @Composable
@@ -125,11 +130,35 @@ fun SearchScreen() {
                 label = { Text("歌曲") },
                 placeholder = { Text("输入歌曲或歌手") },
             )
-            Button(
-                onClick = ::submitSearch,
-                enabled = query.isNotBlank() && !isLoading,
+            val searchEnabled = query.isNotBlank() && !isLoading
+            Surface(
+                modifier = Modifier
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .meloXLiquidButton(
+                        shape = RoundedCornerShape(24.dp),
+                        enabled = searchEnabled,
+                        tint = MaterialTheme.colorScheme.primary,
+                        surfaceColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.58f),
+                    )
+                    .clickable(enabled = searchEnabled, onClick = ::submitSearch),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.Transparent,
             ) {
-                Text("搜索")
+                Box(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "搜索",
+                        color = if (searchEnabled) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
 
