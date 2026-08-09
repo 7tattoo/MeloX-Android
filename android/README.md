@@ -1,49 +1,46 @@
-# MeloX Android
+# MeloX Android 开发目录
 
-This directory contains the native Android port of MeloX.
+这里是 MeloX Android 的原生 Android 工程。
 
-## Goals
+完整的项目介绍、功能状态、许可证、第三方项目与构建说明请参阅仓库根目录的 [`README.md`](../README.md)。
 
-- Preserve the visual language and interaction model of the SwiftUI app as closely as practical.
-- Keep the Android client native: Kotlin + Jetpack Compose.
-- Use Android platform media APIs instead of emulating Apple-only system features.
-- Keep Xiaomi HyperOS enhancements optional so the app remains usable on other Android devices.
+## 设计目标
 
-## Current stack
+- 尽可能保留 MeloX SwiftUI 版本的视觉语言与交互逻辑；
+- Android 客户端保持原生实现：Kotlin + Jetpack Compose；
+- 使用 Android 平台媒体能力替代 Apple 私有或平台专属 API；
+- HyperOS 增强能力保持可选，普通 Android 设备仍可正常使用；
+- Root 权限不是应用正常运行的必要条件。
 
-- Kotlin (AGP built-in Kotlin)
+## 当前技术栈
+
+- Kotlin
 - Jetpack Compose
 - Navigation Compose
 - AndroidX Media3 / ExoPlayer
 - MediaSessionService
-- HyperOS focus-notification bridge (optional platform adapter)
+- Coil
+- OkHttp
+- Kotlin Coroutines
+- Miuix `miuix-blur`（实验性玻璃 / Backdrop）
+- HyperOS 焦点通知桥接（可选）
 
-## Platform mapping
+## 构建
 
-| iOS | Android |
-| --- | --- |
-| SwiftUI | Jetpack Compose |
-| NavigationStack | Navigation Compose |
-| AVPlayer / AVFoundation | Media3 ExoPlayer |
-| MPNowPlayingInfoCenter / remote commands | MediaSession |
-| Live Activity / Dynamic Island | Standard media notification + optional HyperOS focus notification / Super Island |
-| Core ML AutoMix model | Planned ONNX/TFLite path |
+需要：
 
-## Porting milestones
+- JDK 17
+- Android SDK 37
+- Gradle 9.5.0
 
-1. **Bootstrap**: buildable Compose shell, theme, navigation shell, Media3 service.
-2. **Core data**: models, NetEase request client, login/session persistence.
-3. **Usable player**: home/search/playlist/song playback, mini player, full player, MediaSession metadata.
-4. **Lyrics**: LRC/YRC parsing, translation/romanization, timed lyric rendering.
-5. **Offline**: download queue, cache, local playback.
-6. **Advanced UI**: landscape player, Apple Music-style lyrics, EVA/skyline views.
-7. **Advanced playback**: equalizer, crossfade, dual-deck AutoMix and on-device beat analysis.
-8. **Platform polish**: HyperOS Super Island extras and other OEM-specific integrations behind adapters.
+在当前目录运行：
 
-## Important design rule
+```bash
+gradle :app:assembleDebug --stacktrace
+```
 
-Root access must never be required by the application. A rooted device may be useful for development and diagnostics, but production behavior should use documented Android and OEM APIs with graceful fallback.
+APK 输出位置：
 
-## Build
-
-Open the `android/` directory in a current Android Studio version, install Android SDK 37, and build the `app` module with JDK 17.
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
