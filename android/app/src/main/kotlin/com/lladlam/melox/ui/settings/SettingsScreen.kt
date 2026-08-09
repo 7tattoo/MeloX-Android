@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 
 @Composable
 fun SettingsScreen(
@@ -65,9 +66,16 @@ fun SettingsScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
+                .meloXLiquidButton(
+                    shape = RoundedCornerShape(28.dp),
+                    enabled = !session.isLoggedIn,
+                    surfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                    lensRadius = 10.dp,
+                    refractionHeight = 18.dp,
+                )
                 .clickable(enabled = !session.isLoggedIn, onClick = onLogin),
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f),
+            color = androidx.compose.ui.graphics.Color.Transparent,
             tonalElevation = 0.dp,
         ) {
             when {
@@ -190,9 +198,16 @@ fun SettingsScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .meloXLiquidButton(
+                        shape = RoundedCornerShape(26.dp),
+                        tint = MaterialTheme.colorScheme.error,
+                        surfaceColor = MaterialTheme.colorScheme.error.copy(alpha = 0.10f),
+                        lensRadius = 9.dp,
+                        refractionHeight = 16.dp,
+                    )
                     .clickable { session.clear() },
                 shape = RoundedCornerShape(26.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f),
+                color = androidx.compose.ui.graphics.Color.Transparent,
                 tonalElevation = 0.dp,
             ) {
                 Text(
