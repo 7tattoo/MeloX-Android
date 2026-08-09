@@ -1,0 +1,66 @@
+name: Apply Playlist Layer Fix
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'chore/trigger-playlist-layer-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply playlist background and back-stack fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          library = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt')
+          text = library.read_text()
+
+          import_anchor = 'import com.lladlam.melox.playback.PlaybackCommands\n'
+          import_line = 'import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop\n'
+          if import_line not in text:
+              if import_anchor not in text:
+                  raise SystemExit('Library import anchor not found')
+              text = text.replace(import_anchor, import_anchor + import_line, 1)
+
+          old_background = '''    Box(\n        modifier = Modifier\n            .fillMaxSize()\n            .background(palette.background),\n    ) {\n        if (!displayed.coverUrl.isNullOrBlank()) {\n            AsyncImage(\n                model = optimized160Artwork(displayed.coverUrl),\n                contentDescription = null,\n                contentScale = ContentScale.Crop,\n                modifier = Modifier\n                    .fillMaxSize()\n                    .blur(\n                        radius = 18.dp,\n                        edgeTreatment = BlurredEdgeTreatment.Unbounded,\n                    )\n                    .background(Color.Transparent),\n                alpha = 0.22f,\n            )\n        }\n\n        Box(\n            modifier = Modifier\n                .fillMaxSize()\n                .background(\n                    Brush.verticalGradient(\n                        if (palette.prefersDarkAppearance) {\n                            listOf(\n                                Color.Black.copy(alpha = 0.08f),\n                                Color.Black.copy(alpha = 0.24f),\n                                Color.Black.copy(alpha = 0.40f),\n                            )\n                        } else {\n                            listOf(\n                                Color.White.copy(alpha = 0.06f),\n                                Color.White.copy(alpha = 0.16f),\n                                Color.White.copy(alpha = 0.30f),\n                            )\n                        },\n                    ),\n                ),\n        )\n'''
+          new_background = '''    Box(\n        modifier = Modifier\n            .fillMaxSize()\n            .background(Color.Black),\n    ) {\n        // Use the exact same artwork-driven background renderer as the full\n        // now-playing artwork page: 160px artwork -> 3x3 palette -> flowing fields.\n        MeloXFlowingLightBackdrop(\n            artworkUrl = displayed.coverUrl,\n            isPlaying = false,\n            modifier = Modifier.fillMaxSize(),\n        )\n'''
+          if old_background not in text:
+              raise SystemExit('Playlist background block not found')
+          text = text.replace(old_background, new_background, 1)
+          library.write_text(text)
+
+          app = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt')
+          text = app.read_text()
+          old_handler = '''    BackHandler(enabled = showNowPlaying && !showNeteaseLogin) {\n        showNowPlaying = false\n    }\n\n'''
+          if old_handler not in text:
+              raise SystemExit('Old full-player BackHandler not found')
+          text = text.replace(old_handler, '', 1)
+
+          anchor = '''            AnimatedVisibility(\n                visible = fullPlayerVisible,\n                enter = EnterTransition.None,\n                exit = ExitTransition.None,\n                modifier = Modifier.fillMaxSize(),\n            ) {\n                MeloXIOSNowPlayingSharedHost(\n                    state = playbackState,\n                    onDismiss = { showNowPlaying = false },\n                    sharedTransitionScope = sharedScope,\n                    animatedVisibilityScope = this,\n                )\n            }\n'''
+          replacement = anchor + '''\n            // Compose dispatches back to the last composed enabled handler. Keep\n            // the full player handler after LibraryScreen so a player opened from\n            // playlist detail is dismissed before the playlist itself is popped.\n            BackHandler(enabled = fullPlayerVisible && !showNeteaseLogin) {\n                showNowPlaying = false\n            }\n'''
+          if anchor not in text:
+              raise SystemExit('Full-player AnimatedVisibility anchor not found')
+          text = text.replace(anchor, replacement, 1)
+          app.write_text(text)
+
+      - name: Commit fixes to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt
+          git commit -m "fix: align playlist backdrop and back-stack layering"
+          git push origin HEAD:main
