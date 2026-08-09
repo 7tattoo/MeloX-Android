@@ -8,6 +8,7 @@
 package com.lladlam.melox.ui.glass
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +31,11 @@ import top.yukonga.miuix.kmp.blur.runtimeShaderEffect
  *
  * Android RuntimeShader is available from API 33. Older Android versions keep the same
  * geometry and interaction but fall back to a translucent surface instead of crashing.
+ *
+ * Small circular controls deliberately use the fallback surface even when RuntimeShader is
+ * available. Miuix drawBackdrop currently produces a visible polygon/mask artifact on the
+ * compact search button on affected devices; avoiding that experimental mask path removes
+ * the artifact without changing the larger pill-shaped backdrop surfaces.
  */
 internal fun Modifier.meloXLiquidGlass(
     backdrop: LayerBackdrop?,
@@ -41,9 +47,17 @@ internal fun Modifier.meloXLiquidGlass(
     refractionHeight: Dp = 24.dp,
     refractionAmount: Dp = 24.dp,
     chromaticAberration: Float = 0.12f,
+    vibrancySaturation: Float = 1.5f,
+    vibrancyContrast: Float = 1f,
 ): Modifier {
     val effectAlpha = alpha.coerceIn(0f, 1f)
-    if (backdrop == null || !isRuntimeShaderSupported()) {
+
+    // CircleShape is used by the compact search control. On affected Android/HyperOS
+    // devices, drawBackdrop's small circular mask composites as a polygon/hexagon.
+    // Do not send circles through that experimental shader path until the upstream
+    // implementation is stable for this geometry.
+    val useStableFallback = shape == CircleShape
+    if (backdrop == null || !isRuntimeShaderSupported() || useStableFallback) {
         return this.background(
             color = fallbackTint.copy(alpha = fallbackTint.alpha * effectAlpha),
             shape = shape,
@@ -57,7 +71,10 @@ internal fun Modifier.meloXLiquidGlass(
             // Matches the padding used by Miuix's LiquidGlassNavigationBar so the
             // refracted rim never samples outside the captured layer.
             padding = maxOf(padding, 40.dp.toPx())
-            meloXVibrancy()
+            meloXVibrancy(
+                saturation = vibrancySaturation,
+                contrast = vibrancyContrast,
+            )
             blur(blurRadius.toPx(), blurRadius.toPx())
             meloXLens(
                 refractionHeight = refractionHeight.toPx(),
@@ -75,11 +92,14 @@ internal fun Modifier.meloXLiquidGlass(
 }
 
 /** Lightweight counterpart of the Miuix example's vibrancy(). */
-private fun BackdropEffectScope.meloXVibrancy() {
+private fun BackdropEffectScope.meloXVibrancy(
+    saturation: Float,
+    contrast: Float,
+) {
     colorControls(
         brightness = 0f,
-        contrast = 1f,
-        saturation = 1.5f,
+        contrast = contrast,
+        saturation = saturation,
     )
 }
 
