@@ -144,10 +144,6 @@ fun MeloXApp(
         scrollAccumulator = 0f
     }
 
-    BackHandler(enabled = showNowPlaying && !showNeteaseLogin) {
-        showNowPlaying = false
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
@@ -249,6 +245,13 @@ fun MeloXApp(
                     sharedTransitionScope = sharedScope,
                     animatedVisibilityScope = this,
                 )
+            }
+
+            // Compose dispatches back to the last composed enabled handler. Keep
+            // the full player handler after LibraryScreen so a player opened from
+            // playlist detail is dismissed before the playlist itself is popped.
+            BackHandler(enabled = fullPlayerVisible && !showNeteaseLogin) {
+                showNowPlaying = false
             }
         }
 

@@ -76,6 +76,7 @@ import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
 import kotlinx.coroutines.launch
 
 private enum class MeloXLibraryPage(val title: String) {
@@ -618,44 +619,14 @@ private fun MeloXPlaylistDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.background),
+            .background(Color.Black),
     ) {
-        if (!displayed.coverUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = optimized160Artwork(displayed.coverUrl),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(
-                        radius = 18.dp,
-                        edgeTreatment = BlurredEdgeTreatment.Unbounded,
-                    )
-                    .background(Color.Transparent),
-                alpha = 0.22f,
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        if (palette.prefersDarkAppearance) {
-                            listOf(
-                                Color.Black.copy(alpha = 0.08f),
-                                Color.Black.copy(alpha = 0.24f),
-                                Color.Black.copy(alpha = 0.40f),
-                            )
-                        } else {
-                            listOf(
-                                Color.White.copy(alpha = 0.06f),
-                                Color.White.copy(alpha = 0.16f),
-                                Color.White.copy(alpha = 0.30f),
-                            )
-                        },
-                    ),
-                ),
+        // Use the exact same artwork-driven background renderer as the full
+        // now-playing artwork page: 160px artwork -> 3x3 palette -> flowing fields.
+        MeloXFlowingLightBackdrop(
+            artworkUrl = displayed.coverUrl,
+            isPlaying = false,
+            modifier = Modifier.fillMaxSize(),
         )
 
         Column(
