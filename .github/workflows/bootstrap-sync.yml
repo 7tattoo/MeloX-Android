@@ -1,21 +1,22 @@
 name: Bootstrap Android Sync
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
-    paths:
-      - '.github/workflows/bootstrap-sync.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   sync:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout target repository
+      - name: Checkout target main branch
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Checkout current MeloX Android port
