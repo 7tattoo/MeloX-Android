@@ -1,0 +1,89 @@
+name: Apply Playlist Interrupt Fix
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'fix/playlist-interrupt-back-stack'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply playlist interruption and back-stack fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          library = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt')
+          text = library.read_text()
+
+          old = '''fun LibraryScreen(\n    session: NeteaseSessionStore,\n    onLogin: () -> Unit,\n) {'''
+          new = '''fun LibraryScreen(\n    session: NeteaseSessionStore,\n    onLogin: () -> Unit,\n    playlistBackEnabled: Boolean = true,\n) {'''
+          if old not in text:
+              raise SystemExit('LibraryScreen signature anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    BackHandler(enabled = selectedPlaylist != null) {\n        selectedPlaylist = null\n    }'''
+          new = '''    BackHandler(enabled = playlistBackEnabled && selectedPlaylist != null) {\n        selectedPlaylist = null\n    }'''
+          if old not in text:
+              raise SystemExit('Library BackHandler anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''            transitionSpec = {\n                fadeIn(\n                    animationSpec = tween(\n                        durationMillis = 320,\n                        delayMillis = 55,\n                        easing = FastOutSlowInEasing,\n                    ),\n                ) togetherWith fadeOut(\n                    animationSpec = tween(\n                        durationMillis = 240,\n                        easing = FastOutSlowInEasing,\n                    ),\n                )\n            },'''
+          new = '''            transitionSpec = {\n                val openingDetail = targetState != null\n                (\n                    fadeIn(\n                        animationSpec = tween(\n                            durationMillis = 320,\n                            delayMillis = 55,\n                            easing = FastOutSlowInEasing,\n                        ),\n                    ) togetherWith fadeOut(\n                        animationSpec = tween(\n                            durationMillis = 360,\n                            easing = FastOutSlowInEasing,\n                        ),\n                    )\n                ).apply {\n                    // A newly opened playlist always sits above any older detail\n                    // that is still finishing its reverse/exit animation.\n                    targetContentZIndex = if (openingDetail) 2f else 0f\n                }\n            },\n            contentKey = { playlist -> playlist?.id ?: Long.MIN_VALUE },'''
+          if old not in text:
+              raise SystemExit('Playlist AnimatedContent transition anchor not found')
+          text = text.replace(old, new, 1)
+
+          # Capture AnimatedContentScope once and use it everywhere inside nested layouts.
+          old = '''                    sharedTransitionScope = sharedScope,\n                    animatedVisibilityScope = this,\n                )'''
+          new = '''                    sharedTransitionScope = sharedScope,\n                    animatedVisibilityScope = playlistTransitionVisibilityScope,\n                )'''
+          if old not in text:
+              raise SystemExit('Playlist detail AnimatedVisibilityScope anchor not found')
+          text = text.replace(old, new, 1)
+
+          library.write_text(text)
+
+          app = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt')
+          text = app.read_text()
+          old = '''                        AppTab.Library -> LibraryScreen(\n                            session = neteaseSession,\n                            onLogin = {'''
+          new = '''                        AppTab.Library -> LibraryScreen(\n                            session = neteaseSession,\n                            // Back ownership is state-based, not composition-order based:\n                            // while the full player is open, playlist detail cannot consume back.\n                            playlistBackEnabled = !fullPlayerVisible,\n                            onLogin = {'''
+          if old not in text:
+              raise SystemExit('MeloXApp LibraryScreen anchor not found')
+          text = text.replace(old, new, 1)
+          app.write_text(text)
+
+      - name: Build debug APK
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Compile patched project
+        working-directory: android
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Commit validated fixes to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt
+          git commit -m "fix: preserve interrupted playlist transitions and back ownership"
+          git push origin HEAD:main
