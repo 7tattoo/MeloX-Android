@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import androidx.media3.common.Player
 
 @Composable
@@ -199,12 +200,16 @@ private fun QueueModeButton(
         modifier = modifier
             .height(44.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(
-                if (selected) {
-                    Color.White.copy(alpha = 0.70f)
+            .meloXLiquidButton(
+                shape = RoundedCornerShape(22.dp),
+                enabled = enabled,
+                surfaceColor = if (selected) {
+                    Color.White.copy(alpha = 0.62f)
                 } else {
-                    Color.White.copy(alpha = 0.12f)
+                    Color.White.copy(alpha = 0.10f)
                 },
+                lensRadius = if (selected) 11.dp else 8.dp,
+                refractionHeight = 16.dp,
             )
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
