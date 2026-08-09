@@ -107,7 +107,7 @@ Root 权限不是应用正常运行的必要条件；平台增强功能应尽量
 | 网络请求 | OkHttp |
 | 图片 / 封面加载 | Coil 3 |
 | 异步任务 | Kotlin Coroutines |
-| 玻璃 / Backdrop 实验 | Miuix `miuix-blur` |
+| 玻璃 / Backdrop | Kyant0 `AndroidLiquidGlass` / `backdrop` |
 | 小米平台增强 | HyperOS Focus Notification 适配层 |
 
 ## iOS → Android 平台映射
@@ -120,7 +120,7 @@ Root 权限不是应用正常运行的必要条件；平台增强功能应尽量
 | MPNowPlayingInfoCenter / Remote Commands | MediaSession |
 | Live Activity / Dynamic Island | 标准媒体通知 + 可选 HyperOS 焦点通知 / 超级岛 |
 | SwiftUI Mesh / Flowing Light | Compose Canvas / 动态取色背景 |
-| Apple Liquid Glass | Android Backdrop / Miuix 实验性玻璃效果与降级实现 |
+| Apple Liquid Glass | AndroidLiquidGlass Backdrop 折射、模糊与降级实现 |
 
 ## 运行环境
 
@@ -203,10 +203,7 @@ MeloX Android 的主体代码来自 MeloX 的 Android 迁移工作，同时直�
 
 ### Liquid Glass / Backdrop 实现来源
 
-`MeloXLiquidGlass.kt` 中的部分 lens / backdrop 实现沿用了以下 Apache-2.0 开源实现的思路与代码来源，并在源码文件头保留对应说明：
-
-- [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix)
-- [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)
+Android 版直接依赖 [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) 的 `backdrop` 组件；`MeloXBackdropComponents.kt` 基于其官方 `LiquidButton` 与 `LiquidBottomTabs` 示例适配，在保留 MeloX iOS 尺寸和布局的前提下提供折射、模糊、按压高光与底栏选中透镜。
 
 当前玻璃效果仍属于实验性实现，视觉与兼容性会继续调整。
 
