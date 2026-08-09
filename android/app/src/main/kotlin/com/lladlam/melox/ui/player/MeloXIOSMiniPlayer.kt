@@ -147,7 +147,7 @@ fun MeloXIOSMiniPlayer(
         Surface(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
-                .height(52.dp)
+                .height(58.dp)
                 .graphicsLayer { alpha = miniSurfaceAlpha }
                 .meloXLiquidBottomBar(
                     shape = miniShape,
@@ -164,8 +164,8 @@ fun MeloXIOSMiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .padding(start = 9.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                .height(58.dp)
+                .padding(start = 9.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -193,7 +193,7 @@ fun MeloXIOSMiniPlayer(
                 Artwork(
                     url = state.artworkUrl,
                     modifier = sharedArtworkModifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(10.dp)),
                 )
 
@@ -207,6 +207,8 @@ fun MeloXIOSMiniPlayer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontSize = 14.sp,
+                        lineHeight = 17.sp,
+                        softWrap = false,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface.copy(
                             alpha = miniChromeAlpha,
@@ -217,6 +219,8 @@ fun MeloXIOSMiniPlayer(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontSize = 12.sp,
+                        lineHeight = 15.sp,
+                        softWrap = false,
                         color = MaterialTheme.colorScheme.onSurface.copy(
                             alpha = 0.54f * miniChromeAlpha,
                         ),
