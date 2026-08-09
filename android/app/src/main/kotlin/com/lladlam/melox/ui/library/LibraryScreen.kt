@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,11 +72,13 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseLibraryClient
+import com.lladlam.melox.core.library.NeteaseLibraryCache
 import com.lladlam.melox.core.library.NeteaseLibrarySnapshot
 import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
@@ -103,6 +106,7 @@ fun LibraryScreen(
             cookieProvider = { NeteaseSessionStore.readCookie(appContext) },
         )
     }
+    val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
 
     var selectedPage by remember { mutableStateOf(MeloXLibraryPage.Songs) }
     var selectedPlaylist by remember(session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
@@ -118,13 +122,18 @@ fun LibraryScreen(
         loading = true
         errorMessage = null
         runCatching { client.snapshot(userId) }
-            .onSuccess { snapshot = it }
+            .onSuccess {
+                snapshot = it
+                cache.saveSnapshot(userId, it)
+            }
             .onFailure { errorMessage = it.message ?: "音乐库加载失败" }
         loading = false
     }
 
     LaunchedEffect(session.cookie, session.profile?.userId) {
-        if (session.isLoggedIn && snapshot == null && !loading) {
+        val userId = session.profile?.userId ?: return@LaunchedEffect
+        cache.loadSnapshot(userId)?.let { snapshot = it }
+        if (NeteaseLibraryCache.beginLibraryColdStartRefresh(userId)) {
             refreshLibrary()
         }
     }
@@ -138,8 +147,13 @@ fun LibraryScreen(
         return
     }
 
-    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-        val sharedScope = this
+    PullToRefreshBox(
+        isRefreshing = loading && snapshot != null,
+        onRefresh = { scope.launch { refreshLibrary() } },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+      SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+          val sharedScope = this
 
         AnimatedContent(
             targetState = selectedPlaylist,
@@ -285,6 +299,7 @@ fun LibraryScreen(
                 }
             }
         }
+      }
     }
 }
 
@@ -409,7 +424,7 @@ private fun MeloXLibrarySongsPage(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 8.dp),
+        contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
     ) {
         item {
             MeloXPlayAllRow(onPlayAll)
@@ -522,7 +537,7 @@ private fun MeloXLibraryPlaylistsPage(
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 8.dp),
+        contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
     ) {
         item {
             Text(
@@ -604,20 +619,33 @@ private fun MeloXPlaylistDetailScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
+    val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
     var detail by remember(initialPlaylist.id) { mutableStateOf<NeteasePlaylistDetail?>(null) }
     var loading by remember(initialPlaylist.id) { mutableStateOf(true) }
     var errorMessage by remember(initialPlaylist.id) { mutableStateOf<String?>(null) }
     var searchQuery by remember(initialPlaylist.id) { mutableStateOf("") }
     var palette by remember(initialPlaylist.coverUrl) { mutableStateOf(MeloXDetailPalette.LightFallback) }
 
-    LaunchedEffect(initialPlaylist.id) {
+    suspend fun refreshPlaylist() {
         loading = true
         errorMessage = null
         runCatching { client.playlistDetail(initialPlaylist.id) }
-            .onSuccess { detail = it }
+            .onSuccess {
+                detail = it
+                cache.savePlaylistDetail(initialPlaylist.id, it)
+            }
             .onFailure { errorMessage = it.message ?: "歌单加载失败" }
         loading = false
+    }
+
+    LaunchedEffect(initialPlaylist.id) {
+        cache.loadPlaylistDetail(initialPlaylist.id)?.let { detail = it }
+        loading = detail == null
+        if (NeteaseLibraryCache.beginPlaylistColdStartRefresh(initialPlaylist.id)) {
+            refreshPlaylist()
+        }
     }
 
     val displayed = detail?.summary ?: initialPlaylist
@@ -638,7 +666,9 @@ private fun MeloXPlaylistDetailScreen(
         }
     }
 
-    Box(
+    PullToRefreshBox(
+        isRefreshing = loading && detail != null,
+        onRefresh = { scope.launch { refreshPlaylist() } },
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black),
@@ -669,7 +699,7 @@ private fun MeloXPlaylistDetailScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp),
+                contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
             ) {
                 item {
                     MeloXStandardPlaylistHero(
@@ -733,12 +763,7 @@ private fun MeloXPlaylistDetailScreen(
                                     .padding(top = 12.dp)
                                     .clickable {
                                         scope.launch {
-                                            loading = true
-                                            errorMessage = null
-                                            runCatching { client.playlistDetail(initialPlaylist.id) }
-                                                .onSuccess { detail = it }
-                                                .onFailure { errorMessage = it.message ?: "歌单加载失败" }
-                                            loading = false
+                                            refreshPlaylist()
                                         }
                                     }
                                     .padding(8.dp),
