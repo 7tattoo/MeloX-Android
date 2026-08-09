@@ -5,12 +5,15 @@ on:
     branches: [ main ]
     paths:
       - '.playlist-interrupt-trigger'
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: write
 
 jobs:
   patch:
+    if: github.event_name == 'push' || github.head_ref == 'fix/playlist-interrupt-back-stack'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
