@@ -1,0 +1,53 @@
+name: Bootstrap Android Sync
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/bootstrap-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout current MeloX Android port
+        uses: actions/checkout@v4
+        with:
+          repository: lladlam/MeloX
+          ref: android-port
+          path: _melox_source
+
+      - name: Sync Android project and CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          cp -a _melox_source/android ./android
+          mkdir -p .github/workflows
+          cp _melox_source/.github/workflows/android.yml .github/workflows/android.yml
+          cp _melox_source/.github/workflows/android-release.yml .github/workflows/android-release.yml
+          cp _melox_source/LICENSE ./LICENSE
+          rm -rf _melox_source
+          rm -f .github/workflows/bootstrap-sync.yml
+
+      - name: Commit synchronized code
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "sync: import current MeloX Android port"
+          git push origin HEAD:main
