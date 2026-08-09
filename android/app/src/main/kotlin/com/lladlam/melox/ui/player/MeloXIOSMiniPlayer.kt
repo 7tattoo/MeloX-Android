@@ -36,13 +36,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lladlam.melox.ui.glass.meloXLiquidGlass
-import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -51,7 +52,6 @@ fun MeloXIOSMiniPlayer(
     onExpand: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    glassBackdrop: LayerBackdrop? = null,
 ) {
     if (!state.hasMedia) return
 
@@ -148,22 +148,11 @@ fun MeloXIOSMiniPlayer(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
                 .height(52.dp)
-                .meloXLiquidGlass(
-                    backdrop = glassBackdrop,
+                .graphicsLayer { alpha = miniSurfaceAlpha }
+                .meloXLiquidBottomBar(
                     shape = miniShape,
                     tint = glassTint,
-                    fallbackTint = fallbackTint,
-                    alpha = miniSurfaceAlpha,
-                    // The mini player sits directly over list rows. A 6dp blur left
-                    // 1px dividers recognizable as white horizontal bars. A larger
-                    // sampling blur plus reduced contrast/saturation dissolves those
-                    // high-frequency list edges while still preserving backdrop color.
-                    blurRadius = 14.dp,
-                    refractionHeight = 0.dp,
-                    refractionAmount = 0.dp,
-                    chromaticAberration = 0f,
-                    vibrancySaturation = 1.12f,
-                    vibrancyContrast = 0.90f,
+                    surfaceColor = fallbackTint.copy(alpha = fallbackTint.alpha * 0.40f),
                 ),
             shape = miniShape,
             color = Color.Transparent,
@@ -271,6 +260,13 @@ private fun MiniVectorButton(
         modifier = modifier
             .size(36.dp)
             .clip(CircleShape)
+            .meloXLiquidButton(
+                shape = CircleShape,
+                enabled = enabled && visualAlpha > 0.05f,
+                surfaceColor = Color.White.copy(alpha = 0.035f * visualAlpha),
+                lensRadius = 8.dp,
+                refractionHeight = 12.dp,
+            )
             .clickable(
                 enabled = enabled && visualAlpha > 0.05f,
                 onClick = onClick,
