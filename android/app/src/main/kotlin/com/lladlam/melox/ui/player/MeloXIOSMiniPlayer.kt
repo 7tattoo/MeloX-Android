@@ -134,14 +134,14 @@ fun MeloXIOSMiniPlayer(
         val miniShape = RoundedCornerShape(22.dp)
         val dark = isSystemInDarkTheme()
         val glassTint = if (dark) {
-            Color.Black.copy(alpha = 0.08f)
+            Color.Black.copy(alpha = 0.12f)
         } else {
-            Color.White.copy(alpha = 0.10f)
+            Color.White.copy(alpha = 0.16f)
         }
         val fallbackTint = if (dark) {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.56f)
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)
         } else {
-            Color.White.copy(alpha = 0.54f)
+            Color.White.copy(alpha = 0.66f)
         }
 
         Surface(
@@ -154,10 +154,16 @@ fun MeloXIOSMiniPlayer(
                     tint = glassTint,
                     fallbackTint = fallbackTint,
                     alpha = miniSurfaceAlpha,
-                    blurRadius = 6.dp,
+                    // The mini player sits directly over list rows. A 6dp blur left
+                    // 1px dividers recognizable as white horizontal bars. A larger
+                    // sampling blur plus reduced contrast/saturation dissolves those
+                    // high-frequency list edges while still preserving backdrop color.
+                    blurRadius = 14.dp,
                     refractionHeight = 0.dp,
                     refractionAmount = 0.dp,
                     chromaticAberration = 0f,
+                    vibrancySaturation = 1.12f,
+                    vibrancyContrast = 0.90f,
                 ),
             shape = miniShape,
             color = Color.Transparent,
