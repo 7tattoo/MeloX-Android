@@ -26,18 +26,14 @@ jobs:
           ref: android-port
           path: _melox_source
 
-      - name: Sync Android project and CI
+      - name: Sync Android source and license
         shell: bash
         run: |
           set -euo pipefail
           rm -rf android
           cp -a _melox_source/android ./android
-          mkdir -p .github/workflows
-          cp _melox_source/.github/workflows/android.yml .github/workflows/android.yml
-          cp _melox_source/.github/workflows/android-release.yml .github/workflows/android-release.yml
           cp _melox_source/LICENSE ./LICENSE
           rm -rf _melox_source
-          rm -f .github/workflows/bootstrap-sync.yml
 
       - name: Commit synchronized code
         shell: bash
@@ -45,7 +41,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A android LICENSE
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
