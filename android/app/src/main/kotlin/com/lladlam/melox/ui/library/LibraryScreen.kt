@@ -1,6 +1,16 @@
 package com.lladlam.melox.ui.library
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,8 +30,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -72,6 +84,7 @@ private enum class MeloXLibraryPage(val title: String) {
     History("最近播放"),
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LibraryScreen(
     session: NeteaseSessionStore,
@@ -91,6 +104,7 @@ fun LibraryScreen(
     var snapshot by remember(session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
     var loading by remember(session.cookie) { mutableStateOf(false) }
     var errorMessage by remember(session.cookie) { mutableStateOf<String?>(null) }
+    val playlistListState = rememberLazyListState()
 
     suspend fun refreshLibrary() {
         if (!session.isLoggedIn) return
@@ -110,15 +124,8 @@ fun LibraryScreen(
         }
     }
 
-    val playlist = selectedPlaylist
-    if (playlist != null) {
-        BackHandler { selectedPlaylist = null }
-        MeloXPlaylistDetailScreen(
-            initialPlaylist = playlist,
-            client = client,
-            onBack = { selectedPlaylist = null },
-        )
-        return
+    BackHandler(enabled = selectedPlaylist != null) {
+        selectedPlaylist = null
     }
 
     if (!session.isLoggedIn) {
@@ -126,105 +133,142 @@ fun LibraryScreen(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding(),
-    ) {
-        Text(
-            text = "音乐库",
-            modifier = Modifier.padding(start = 20.dp, top = 46.dp),
-            fontSize = 36.sp,
-            lineHeight = 42.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+        val sharedScope = this
 
-        MeloXLibrarySegmentedPicker(
-            selected = selectedPage,
-            onSelected = { selectedPage = it },
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 24.dp),
-        )
+        AnimatedContent(
+            targetState = selectedPlaylist,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 320,
+                        delayMillis = 55,
+                        easing = FastOutSlowInEasing,
+                    ),
+                ) togetherWith fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 240,
+                        easing = FastOutSlowInEasing,
+                    ),
+                )
+            },
+            label = "library-playlist-detail-transition",
+        ) { targetPlaylist ->
+            if (targetPlaylist != null) {
+                MeloXPlaylistDetailScreen(
+                    initialPlaylist = targetPlaylist,
+                    client = client,
+                    onBack = { selectedPlaylist = null },
+                    sharedTransitionScope = sharedScope,
+                    animatedVisibilityScope = this,
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .statusBarsPadding(),
+                ) {
+                    Text(
+                        text = "音乐库",
+                        modifier = Modifier.padding(start = 20.dp, top = 46.dp),
+                        fontSize = 36.sp,
+                        lineHeight = 42.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
 
-        if (errorMessage != null && snapshot == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = errorMessage.orEmpty(),
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-                        textAlign = TextAlign.Center,
+                    MeloXLibrarySegmentedPicker(
+                        selected = selectedPage,
+                        onSelected = { selectedPage = it },
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 24.dp),
                     )
-                    Text(
-                        text = "重新载入",
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable { scope.launch { refreshLibrary() } }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-        } else if (loading && snapshot == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            val data = snapshot ?: NeteaseLibrarySnapshot(emptyList(), emptyList(), emptyList())
-            when (selectedPage) {
-                MeloXLibraryPage.Songs -> MeloXLibrarySongsPage(
-                    songs = data.likedSongs,
-                    onPlay = { song ->
-                        PlaybackCommands.playQueue(
-                            context = context,
-                            songs = data.likedSongs,
-                            selectedSongId = song.id,
-                            onFailure = { errorMessage = it.message ?: "播放失败" },
-                        )
-                    },
-                    onPlayAll = {
-                        data.likedSongs.firstOrNull()?.let { first ->
-                            PlaybackCommands.playQueue(
-                                context = context,
+
+                    if (errorMessage != null && snapshot == null) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = errorMessage.orEmpty(),
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                                    textAlign = TextAlign.Center,
+                                )
+                                Text(
+                                    text = "重新载入",
+                                    modifier = Modifier
+                                        .padding(top = 12.dp)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .clickable { scope.launch { refreshLibrary() } }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    } else if (loading && snapshot == null) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        val data = snapshot ?: NeteaseLibrarySnapshot(emptyList(), emptyList(), emptyList())
+                        when (selectedPage) {
+                            MeloXLibraryPage.Songs -> MeloXLibrarySongsPage(
                                 songs = data.likedSongs,
-                                selectedSongId = first.id,
-                                onFailure = { errorMessage = it.message ?: "播放失败" },
+                                onPlay = { song ->
+                                    PlaybackCommands.playQueue(
+                                        context = context,
+                                        songs = data.likedSongs,
+                                        selectedSongId = song.id,
+                                        onFailure = { errorMessage = it.message ?: "播放失败" },
+                                    )
+                                },
+                                onPlayAll = {
+                                    data.likedSongs.firstOrNull()?.let { first ->
+                                        PlaybackCommands.playQueue(
+                                            context = context,
+                                            songs = data.likedSongs,
+                                            selectedSongId = first.id,
+                                            onFailure = { errorMessage = it.message ?: "播放失败" },
+                                        )
+                                    }
+                                },
                             )
-                        }
-                    },
-                )
 
-                MeloXLibraryPage.Playlists -> MeloXLibraryPlaylistsPage(
-                    playlists = data.playlists,
-                    onPlaylistClick = { selectedPlaylist = it },
-                )
+                            MeloXLibraryPage.Playlists -> MeloXLibraryPlaylistsPage(
+                                playlists = data.playlists,
+                                onPlaylistClick = { selectedPlaylist = it },
+                                listState = playlistListState,
+                                sharedTransitionScope = sharedScope,
+                                animatedVisibilityScope = this,
+                            )
 
-                MeloXLibraryPage.History -> MeloXLibrarySongsPage(
-                    songs = data.recentSongs,
-                    onPlay = { song ->
-                        PlaybackCommands.playQueue(
-                            context = context,
-                            songs = data.recentSongs,
-                            selectedSongId = song.id,
-                            onFailure = { errorMessage = it.message ?: "播放失败" },
-                        )
-                    },
-                    onPlayAll = {
-                        data.recentSongs.firstOrNull()?.let { first ->
-                            PlaybackCommands.playQueue(
-                                context = context,
+                            MeloXLibraryPage.History -> MeloXLibrarySongsPage(
                                 songs = data.recentSongs,
-                                selectedSongId = first.id,
-                                onFailure = { errorMessage = it.message ?: "播放失败" },
+                                onPlay = { song ->
+                                    PlaybackCommands.playQueue(
+                                        context = context,
+                                        songs = data.recentSongs,
+                                        selectedSongId = song.id,
+                                        onFailure = { errorMessage = it.message ?: "播放失败" },
+                                    )
+                                },
+                                onPlayAll = {
+                                    data.recentSongs.firstOrNull()?.let { first ->
+                                        PlaybackCommands.playQueue(
+                                            context = context,
+                                            songs = data.recentSongs,
+                                            selectedSongId = first.id,
+                                            onFailure = { errorMessage = it.message ?: "播放失败" },
+                                        )
+                                    }
+                                },
                             )
                         }
-                    },
-                )
+                    }
+                }
             }
         }
     }
@@ -431,10 +475,14 @@ private fun MeloXLibraryTrackRow(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MeloXLibraryPlaylistsPage(
     playlists: List<NeteasePlaylistSummary>,
     onPlaylistClick: (NeteasePlaylistSummary) -> Unit,
+    listState: LazyListState,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     if (playlists.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -448,6 +496,7 @@ private fun MeloXLibraryPlaylistsPage(
     }
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 8.dp),
     ) {
@@ -468,11 +517,20 @@ private fun MeloXLibraryPlaylistsPage(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                val sharedArtworkModifier = with(sharedTransitionScope) {
+                    Modifier.sharedElement(
+                        sharedContentState = rememberSharedContentState(
+                            key = playlistArtworkSharedKey(playlist.id),
+                        ),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                }
+
                 AsyncImage(
                     model = playlist.coverUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
+                    modifier = sharedArtworkModifier
                         .size(54.dp)
                         .clip(RoundedCornerShape(7.dp)),
                 )
@@ -512,11 +570,14 @@ private fun MeloXInsetDivider(leading: androidx.compose.ui.unit.Dp) {
     )
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MeloXPlaylistDetailScreen(
     initialPlaylist: NeteasePlaylistSummary,
     client: NeteaseLibraryClient,
     onBack: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -643,6 +704,8 @@ private fun MeloXPlaylistDetailScreen(
                                 )
                             }
                         },
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                 }
 
@@ -840,6 +903,7 @@ private fun MeloXPlaylistSearchField(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MeloXStandardPlaylistHero(
     playlist: NeteasePlaylistSummary,
@@ -848,6 +912,8 @@ private fun MeloXStandardPlaylistHero(
     secondary: Color,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val artworkSize = minOf(maxWidth * 0.68f, 300.dp)
@@ -857,11 +923,20 @@ private fun MeloXStandardPlaylistHero(
                 .padding(top = 26.dp, bottom = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val sharedArtworkModifier = with(sharedTransitionScope) {
+                Modifier.sharedElement(
+                    sharedContentState = rememberSharedContentState(
+                        key = playlistArtworkSharedKey(playlist.id),
+                    ),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
+
             AsyncImage(
                 model = playlist.coverUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
+                modifier = sharedArtworkModifier
                     .size(artworkSize)
                     .shadow(
                         elevation = 18.dp,
@@ -1160,6 +1235,9 @@ private fun MeloXShuffleGlyph(modifier: Modifier, color: Color) {
         drawPath(a2, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
     }
 }
+
+private fun playlistArtworkSharedKey(playlistId: Long): String =
+    "library-playlist-artwork-$playlistId"
 
 private fun formatDuration(milliseconds: Long): String {
     val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000L
