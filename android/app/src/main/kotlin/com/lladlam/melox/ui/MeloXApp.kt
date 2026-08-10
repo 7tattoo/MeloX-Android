@@ -429,6 +429,7 @@ private fun MeloXBottomChrome(
                         }
                     },
             ) {
+                val tabBarMaxWidthPx = constraints.maxWidth
                 Box(Modifier.fillMaxSize()) {
                     // Mirror the official LiquidBottomTabs scene graph: record
                     // a complete invisible copy (including the tab content),
@@ -481,7 +482,7 @@ private fun MeloXBottomChrome(
                             .offset {
                                 IntOffset(
                                     x = (
-                                        lensPosition * constraints.maxWidth / 4f
+                                        lensPosition * tabBarMaxWidthPx / 4f
                                         ).roundToInt(),
                                     y = 0,
                                 )
