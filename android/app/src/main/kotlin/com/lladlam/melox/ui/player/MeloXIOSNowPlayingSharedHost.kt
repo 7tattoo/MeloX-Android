@@ -12,7 +12,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -76,10 +75,11 @@ fun MeloXIOSNowPlayingSharedHost(
         if (visibility == EnterExitState.Visible) 1f else 0f
     }
 
-    // The palette is part of the transforming container itself. It starts becoming
-    // visible on the very first frames instead of waiting for the full-player chrome.
-    val backdropAlpha = smoothStep(expansionProgress, 0.00f, 0.42f)
-    val fullPlayerAlpha = smoothStep(expansionProgress, 0.62f, 0.96f)
+    // Background, full-player chrome, corner radius and drag recovery are all
+    // derived from the same reversible progress. There is no separate collapse
+    // animation: returning simply drives this exact scene from 1f back to 0f.
+    val backdropAlpha = smoothStep(expansionProgress, 0.08f, 0.58f)
+    val fullPlayerAlpha = smoothStep(expansionProgress, 0.46f, 0.90f)
     val cornerRadius = (22f * (1f - smoothStep(expansionProgress, 0.00f, 0.94f))).dp
 
     LaunchedEffect(expansionProgress) {
@@ -105,10 +105,6 @@ fun MeloXIOSNowPlayingSharedHost(
             animatedVisibilityScope = animatedVisibilityScope,
             enter = EnterTransition.None,
             exit = ExitTransition.None,
-            // This container changes from a 52dp pill to a full-screen surface.
-            // Remeasuring the backdrop on every animated bound keeps the actual
-            // mask attached to the mini-player rectangle instead of scaling a
-            // premeasured full-screen layer inside it.
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
         )
     }
@@ -120,7 +116,11 @@ fun MeloXIOSNowPlayingSharedHost(
       val dismissThreshold = with(density) { 132.dp.toPx() }
       val maxDrag = constraints.maxHeight.toFloat().coerceAtLeast(1f)
       val dragProgress = (dragOffset.value / maxDrag).coerceIn(0f, 1f)
-      val dragScale = 1f - dragProgress * 0.035f
+      // Once collapse begins, unwind the interactive drag transform with the same
+      // expansion progress instead of leaving the player translated/scaled while
+      // the shared bounds are already shrinking toward the mini player.
+      val effectiveDragProgress = dragProgress * fullPlayerAlpha
+      val dragScale = 1f - effectiveDragProgress * 0.035f
 
       Box(
         modifier = sharedContainerModifier
@@ -133,7 +133,7 @@ fun MeloXIOSNowPlayingSharedHost(
             }
             .clip(
                 RoundedCornerShape(
-                    cornerRadius + (30.dp - cornerRadius) * dragProgress,
+                    cornerRadius + (30.dp - cornerRadius) * effectiveDragProgress,
                 ),
             )
             .draggable(
@@ -142,14 +142,12 @@ fun MeloXIOSNowPlayingSharedHost(
                 enabled = page == MeloXNowPlayingPage.Artwork && expansionProgress >= 0.995f,
                 onDragStopped = { velocity ->
                     if (dragOffset.value >= dismissThreshold || velocity >= 1350f) {
+                        // Do not run a second downward dismiss animation first.
+                        // Changing visibility immediately makes SharedTransition
+                        // reverse the exact expansion while the drag transform is
+                        // simultaneously attenuated by fullPlayerAlpha.
                         committingDismiss = true
-                        scope.launch {
-                            dragOffset.animateTo(
-                                targetValue = maxOf(dragOffset.value, maxDrag * 0.24f),
-                                animationSpec = tween(150),
-                            )
-                            onDismiss()
-                        }
+                        onDismiss()
                     } else {
                         scope.launch {
                             dragOffset.animateTo(
@@ -191,9 +189,6 @@ fun MeloXIOSNowPlayingSharedHost(
             )
         }
 
-        // This is the only full-player artwork. The mini-player endpoint uses the
-        // same sharedElement key, so the visual identity is continuous across the
-        // mini player, artwork page, interruptions, and the collapse transition.
         SharedArtworkDestination(
             state = state,
             page = page,
@@ -240,17 +235,12 @@ private fun SharedArtworkDestination(
         label = "shared-artwork-shadow",
     )
 
-    // On lyrics/queue, keep that page in place while collapsing. The artwork fades
-    // in as the player starts shrinking instead of forcing the page back to Artwork.
     val artworkAlpha = if (page == MeloXNowPlayingPage.Artwork) {
         1f
     } else {
         1f - smoothStep(expansionProgress, 0.72f, 0.985f)
     }
 
-    // At the mini-player endpoint the artwork fills its 40dp rect. The paused
-    // artwork shrink gradually applies only as the player approaches full-screen,
-    // so reversing the transition at any point remains continuous.
     val fullScreenScaleBlend = smoothStep(expansionProgress, 0.30f, 0.88f)
     val effectiveScale = 1f + (playbackScale - 1f) * fullScreenScaleBlend
 
@@ -310,7 +300,6 @@ private fun SharedArtworkDestination(
 
                 Spacer(Modifier.height(20.dp))
 
-                // Reserve exactly the same metadata space as the artwork page.
                 Column(Modifier.fillMaxWidth()) {
                     Text(
                         text = state.title.ifBlank { "正在播放" },
