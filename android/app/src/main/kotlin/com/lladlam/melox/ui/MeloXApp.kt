@@ -31,11 +31,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -72,6 +69,7 @@ import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.shapes.Capsule
 import com.lladlam.melox.ui.library.LibraryScreen
 import com.lladlam.melox.ui.discovery.MeloXExploreScreen
 import com.lladlam.melox.ui.discovery.MeloXHomeScreen
@@ -374,8 +372,7 @@ private fun MeloXBottomChrome(
             val compactGap = 6.dp
             val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 56.dp
             val navWidth = lerpDp(expandedNavWidth, compactSize, shrinkStage)
-            val navRadius = lerpDp(28.dp, 26.dp, shrinkStage)
-            val navShape = RoundedCornerShape(navRadius)
+            val navShape = Capsule()
             val primaryTabs = listOf(
                 AppTab.Home to RootGlyph.Home,
                 AppTab.Explore to RootGlyph.Explore,
@@ -409,7 +406,7 @@ private fun MeloXBottomChrome(
 
             val dark = isSystemInDarkTheme()
 
-            Surface(
+            BoxWithConstraints(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .offset(x = horizontalMargin, y = -3.dp)
@@ -431,17 +428,13 @@ private fun MeloXBottomChrome(
                             }
                         }
                     },
-                shape = navShape,
-                color = Color.Transparent,
-                border = null,
-                shadowElevation = lerpDp(2.dp, 4.dp, progress),
-                tonalElevation = 0.dp,
             ) {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize()) {
                     // Mirror the official LiquidBottomTabs scene graph: record
-                    // an invisible panel layer so the selection can sample the
-                    // combined page + Dock glass instead of raw page pixels.
-                    Box(
+                    // a complete invisible copy (including the tab content),
+                    // not an empty layer. The moving selection then samples the
+                    // same combined page + panel scene as the upstream demo.
+                    Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .alpha(0f)
@@ -450,8 +443,20 @@ private fun MeloXBottomChrome(
                                 shape = navShape,
                                 tint = bottomLiquidGlassTint(),
                                 surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.18f),
-                            ),
-                    )
+                            )
+                            .padding(horizontal = 5.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        primaryTabs.forEach { (tab, glyph) ->
+                            RootTabButton(
+                                tab = tab,
+                                glyph = glyph,
+                                selected = selectedTab == tab,
+                                labelAlpha = labelAlpha,
+                                dark = dark,
+                            )
+                        }
+                    }
                     val selectedIndex = primaryTabs.indexOfFirst { it.first == selectedTab }
                     val lensPosition by animateFloatAsState(
                         targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
@@ -482,17 +487,14 @@ private fun MeloXBottomChrome(
                                 )
                             }
                             .padding(4.dp)
-                            .graphicsLayer {
-                                alpha = lensAlpha * expandedLayerAlpha
-                            }
                             .meloXLiquidTabSelection(
-                                shape = RoundedCornerShape(24.dp),
-                                selected = lensAlpha > 0.001f,
+                                shape = Capsule(),
+                                selected = lensAlpha * expandedLayerAlpha > 0.001f,
                                 panelBackdrop = tabsBackdrop,
                                 tint = if (dark) {
-                                    Color.White.copy(alpha = 0.18f)
+                                    Color.White.copy(alpha = 0.18f * lensAlpha * expandedLayerAlpha)
                                 } else {
-                                    Color.White.copy(alpha = 0.32f)
+                                    Color.White.copy(alpha = 0.32f * lensAlpha * expandedLayerAlpha)
                                 },
                             ),
                     )
@@ -535,13 +537,13 @@ private fun MeloXBottomChrome(
                 }
             }
 
-            Surface(
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .offset(x = -horizontalMargin, y = -3.dp)
                     .size(searchSize)
                     .meloXLiquidButton(
-                        shape = CircleShape,
+                        shape = Capsule(),
                         tint = bottomLiquidGlassTint(),
                         blurRadius = 6.dp,
                         lensRadius = 12.dp,
@@ -549,23 +551,17 @@ private fun MeloXBottomChrome(
                         surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.16f),
                     )
                     .clickable { onSelect(AppTab.Search) },
-                shape = CircleShape,
-                color = Color.Transparent,
-                border = null,
-                shadowElevation = lerpDp(2.dp, 4.dp, progress),
-                tonalElevation = 0.dp,
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    RootGlyphIcon(
-                        glyph = RootGlyph.Search,
-                        modifier = Modifier.size(lerpDp(28.dp, 27.dp, sizeStage)),
-                        color = if (selectedTab == AppTab.Search) {
-                            MeloXAccent
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
+                RootGlyphIcon(
+                    glyph = RootGlyph.Search,
+                    modifier = Modifier.size(lerpDp(28.dp, 27.dp, sizeStage)),
+                    color = if (selectedTab == AppTab.Search) {
+                        MeloXAccent
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
             }
         }
     }
