@@ -11,6 +11,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -108,9 +109,6 @@ fun MeloXApp(
     val playbackState = rememberMeloXPlaybackUiState()
     val neteaseSession = rememberNeteaseSessionStore()
     val darkGlass = isSystemInDarkTheme()
-    // Page controls use a stable, non-recursive scene. The Dock samples the
-    // live page layer separately below. Keeping both scenes isolated prevents
-    // descendants from reading a LayerBackdrop while that same layer records.
     val screenControlBackdrop = rememberCanvasBackdrop {
         drawRect(
             brush = Brush.linearGradient(
@@ -195,9 +193,6 @@ fun MeloXApp(
                         AppTab.Explore -> MeloXExploreScreen()
                         AppTab.Library -> LibraryScreen(
                             session = neteaseSession,
-                            // Back ownership is state-based instead of relying on
-                            // composition order. The full player exclusively owns
-                            // back while it is visible.
                             playlistBackEnabled = !fullPlayerVisible,
                             onLogin = {
                                 loginReturnTab = AppTab.Library
@@ -225,7 +220,7 @@ fun MeloXApp(
                     hasMedia = playbackState.hasMedia,
                     minimized = tabBarMinimized,
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    miniPlayer = {
+                    miniPlayer = { compactProgress ->
                         AnimatedVisibility(
                             visible = !fullPlayerVisible,
                             enter = EnterTransition.None,
@@ -234,7 +229,7 @@ fun MeloXApp(
                             MeloXIOSMiniPlayer(
                                 state = playbackState,
                                 onExpand = { showNowPlaying = true },
-                                inline = tabBarMinimized,
+                                compactProgress = compactProgress,
                                 dynamicGlassEnabled = true,
                                 sharedTransitionScope = sharedScope,
                                 animatedVisibilityScope = this,
@@ -273,9 +268,6 @@ fun MeloXApp(
                 )
             }
 
-            // Compose dispatches back to the last composed enabled handler. Keep
-            // the full player handler after LibraryScreen so a player opened from
-            // playlist detail is dismissed before the playlist itself is popped.
             BackHandler(enabled = fullPlayerVisible && !showNeteaseLogin) {
                 showNowPlaying = false
             }
@@ -328,7 +320,7 @@ private fun MeloXBottomChrome(
     hasMedia: Boolean,
     minimized: Boolean,
     modifier: Modifier = Modifier,
-    miniPlayer: @Composable () -> Unit,
+    miniPlayer: @Composable (compactProgress: Float) -> Unit,
 ) {
     val tabsBackdrop = rememberLayerBackdrop()
     val rawProgress by animateFloatAsState(
@@ -400,11 +392,21 @@ private fun MeloXBottomChrome(
                         )
                         .width(miniWrapperWidth),
                 ) {
-                    miniPlayer()
+                    miniPlayer(progress)
                 }
             }
 
             val dark = isSystemInDarkTheme()
+            val selectionTint = if (dark) {
+                MeloXAccent.copy(alpha = 0.28f)
+            } else {
+                MeloXAccent.copy(alpha = 0.16f)
+            }
+            val selectionBorder = if (dark) {
+                Color.White.copy(alpha = 0.42f)
+            } else {
+                MeloXAccent.copy(alpha = 0.34f)
+            }
 
             BoxWithConstraints(
                 modifier = Modifier
@@ -431,10 +433,6 @@ private fun MeloXBottomChrome(
             ) {
                 val tabBarMaxWidthPx = constraints.maxWidth
                 Box(Modifier.fillMaxSize()) {
-                    // Mirror the official LiquidBottomTabs scene graph: record
-                    // a complete invisible copy (including the tab content),
-                    // not an empty layer. The moving selection then samples the
-                    // same combined page + panel scene as the upstream demo.
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -462,8 +460,6 @@ private fun MeloXBottomChrome(
                     val lensPosition by animateFloatAsState(
                         targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
                         animationSpec = spring(
-                            // No overshoot: the selection glides between tabs
-                            // without the fractional-layer lean seen on device.
                             dampingRatio = 1f,
                             stiffness = 460f,
                             visibilityThreshold = 0.001f,
@@ -475,6 +471,7 @@ private fun MeloXBottomChrome(
                         animationSpec = spring(dampingRatio = 0.86f, stiffness = 440f),
                         label = "melox-tab-selection-alpha",
                     )
+                    val lensVisibility = lensAlpha * expandedLayerAlpha
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(0.25f)
@@ -490,13 +487,18 @@ private fun MeloXBottomChrome(
                             .padding(4.dp)
                             .meloXLiquidTabSelection(
                                 shape = Capsule(),
-                                selected = lensAlpha * expandedLayerAlpha > 0.001f,
+                                selected = lensVisibility > 0.001f,
                                 panelBackdrop = tabsBackdrop,
-                                tint = if (dark) {
-                                    Color.White.copy(alpha = 0.18f * lensAlpha * expandedLayerAlpha)
-                                } else {
-                                    Color.White.copy(alpha = 0.32f * lensAlpha * expandedLayerAlpha)
-                                },
+                                tint = selectionTint.copy(
+                                    alpha = selectionTint.alpha * lensVisibility,
+                                ),
+                            )
+                            .border(
+                                width = if (dark) 0.9.dp else 0.8.dp,
+                                color = selectionBorder.copy(
+                                    alpha = selectionBorder.alpha * lensVisibility,
+                                ),
+                                shape = Capsule(),
                             ),
                     )
                     Row(
