@@ -1,0 +1,74 @@
+name: Apply player seek fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Patch seekable player transition
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt')
+          text = app.read_text()
+          replacements = {
+              '''playerTransitionState.animateTo(\n                    targetState = true,\n                    animationSpec = playerTransitionSpec(),\n                )''': '''playerTransitionState.animateTo(targetState = true)''',
+              '''playerTransitionState.animateTo(\n                targetState = false,\n                animationSpec = playerTransitionSpec(),\n            )''': '''playerTransitionState.animateTo(targetState = false)''',
+              '''playerTransitionState.animateTo(\n                targetState = true,\n                animationSpec = playerTransitionSpec(),\n            )''': '''playerTransitionState.animateTo(targetState = true)''',
+              '''playerTransitionState.animateTo(\n                            targetState = !collapse,\n                            animationSpec = playerTransitionSpec(),\n                        )''': '''playerTransitionState.animateTo(targetState = !collapse)''',
+              '''\nprivate fun playerTransitionSpec() = spring<Float>(\n    dampingRatio = 0.90f,\n    stiffness = 320f,\n    visibilityThreshold = 0.001f,\n)\n''': '\n',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'MeloXApp patch target missing:\n{old}')
+              text = text.replace(old, new, 1)
+          app.write_text(text)
+
+          host = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXIOSNowPlayingSharedHost.kt')
+          text = host.read_text()
+          old = 'enabled = page == MeloXNowPlayingPage.Artwork && expansionProgress >= 0.995f,'
+          new = 'enabled = page == MeloXNowPlayingPage.Artwork,'
+          if old not in text:
+              raise SystemExit('draggable enabled target missing')
+          text = text.replace(old, new, 1)
+
+          old = '''onDragStarted = {\n                        gestureCollapseProgress = 0f\n                    },'''
+          new = '''onDragStarted = {\n                        // Establish Full -> Mini as the seek direction before the first\n                        // drag delta. Subsequent seekTo calls keep the same target and\n                        // therefore snap directly to the finger-controlled fraction.\n                        gestureCollapseProgress = 0f\n                        onSeekCollapse(0f)\n                    },'''
+          if old not in text:
+              raise SystemExit('onDragStarted target missing')
+          text = text.replace(old, new, 1)
+
+          old = '''onDragStopped = { velocity ->\n                        val releaseProgress = gestureCollapseProgress\n                        val shouldCollapse = releaseProgress >= 0.42f || velocity >= 1200f\n                        scope.launch {\n                            onSettleCollapse(shouldCollapse)\n                            if (!shouldCollapse) gestureCollapseProgress = 0f\n                        }\n                    },'''
+          new = '''onDragStopped = { velocity ->\n                        val releaseProgress = gestureCollapseProgress\n                        val shouldCollapse = releaseProgress >= 0.42f || velocity >= 1200f\n                        // draggable already gives us a suspend callback. Settle inline\n                        // from the exact fraction where the finger was released.\n                        onSettleCollapse(shouldCollapse)\n                        if (!shouldCollapse) gestureCollapseProgress = 0f\n                    },'''
+          if old not in text:
+              raise SystemExit('onDragStopped target missing')
+          text = text.replace(old, new, 1)
+          host.write_text(text)
+          PY
+      - name: Verify source diff
+        run: |
+          git diff --check
+          git diff -- android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXIOSNowPlayingSharedHost.kt
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-player-seek-fix.yml
+          git add android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXIOSNowPlayingSharedHost.kt
+          git commit -m "fix(player): preserve interactive seek gesture and transition timing"
+          git push origin HEAD:main
