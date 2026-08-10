@@ -1,14 +1,14 @@
-# MeloX Android
+# MeloX Android V5
 
 [![Android](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml/badge.svg)](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 <p align="center">
-  使用 Kotlin + Jetpack Compose 构建的 MeloX 原生 Android 迁移版
+  MeloX V5 反编译源代码（基于 MeloX Android 项目结构重组）
 </p>
 
 > [!IMPORTANT]
-> **MeloX Android 仍处于开发阶段。** 当前界面、接口、动画和平台适配仍在持续调整，部分功能可能不完整或随网易云音乐接口变化而失效。
+> **此分支包含 MeloX V5 的反编译源代码。** 代码已按照 MeloX Android 项目结构重新组织，但未经编译验证。反编译代码可能存在语法错误或不完整，需要手动修复才能编译通过。
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
 
@@ -171,12 +171,14 @@ GitHub Actions 会在 `main` 分支代码更新时自动构建 Debug APK；以 `
 ├── android/
 │   ├── app/
 │   │   └── src/main/
-│   │       ├── kotlin/com/lladlam/melox/
+│   │       ├── java/com/lladlam/melox/
 │   │       │   ├── core/          # 账号、网络、音质、歌词、音乐库模型
 │   │       │   ├── playback/      # Media3 播放服务与播放资源解析
 │   │       │   ├── platform/      # HyperOS 等平台适配
 │   │       │   └── ui/            # Compose 页面、播放器、音乐库、玻璃效果
-│   │       └── res/
+│   │       ├── res/
+│   │       ├── assets/
+│   │       └── jniLibs/           # 原生库
 │   ├── build.gradle.kts
 │   └── settings.gradle.kts
 ├── .github/workflows/             # Android CI / Release

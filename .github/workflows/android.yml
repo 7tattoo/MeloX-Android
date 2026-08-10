@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - V5
     paths:
       - "android/**"
       - ".github/workflows/android.yml"
