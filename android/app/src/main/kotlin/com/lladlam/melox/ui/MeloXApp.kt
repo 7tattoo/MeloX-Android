@@ -119,19 +119,13 @@ fun MeloXApp(
     val openPlayer: () -> Unit = {
         if (playbackState.hasMedia) {
             playerScope.launch {
-                playerTransitionState.animateTo(
-                    targetState = true,
-                    animationSpec = playerTransitionSpec(),
-                )
+                playerTransitionState.animateTo(targetState = true)
             }
         }
     }
     val closePlayer: () -> Unit = {
         playerScope.launch {
-            playerTransitionState.animateTo(
-                targetState = false,
-                animationSpec = playerTransitionSpec(),
-            )
+            playerTransitionState.animateTo(targetState = false)
         }
     }
     val neteaseSession = rememberNeteaseSessionStore()
@@ -181,10 +175,7 @@ fun MeloXApp(
 
     LaunchedEffect(openNowPlayingRequest, playbackState.hasMedia) {
         if (openNowPlayingRequest > 0 && playbackState.hasMedia) {
-            playerTransitionState.animateTo(
-                targetState = true,
-                animationSpec = playerTransitionSpec(),
-            )
+            playerTransitionState.animateTo(targetState = true)
         }
     }
 
@@ -307,10 +298,7 @@ fun MeloXApp(
                         )
                     },
                     onSettleCollapse = { collapse ->
-                        playerTransitionState.animateTo(
-                            targetState = !collapse,
-                            animationSpec = playerTransitionSpec(),
-                        )
+                        playerTransitionState.animateTo(targetState = !collapse)
                     },
                     sharedTransitionScope = sharedScope,
                     animatedVisibilityScope = this,
@@ -775,11 +763,6 @@ private fun RootGlyphIcon(
     }
 }
 
-private fun playerTransitionSpec() = spring<Float>(
-    dampingRatio = 0.90f,
-    stiffness = 320f,
-    visibilityThreshold = 0.001f,
-)
 
 private fun smoothStep(value: Float, start: Float, end: Float): Float {
     if (end <= start) return if (value >= end) 1f else 0f

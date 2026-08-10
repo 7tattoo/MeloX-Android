@@ -109,17 +109,21 @@ fun MeloXIOSNowPlayingSharedHost(
                 .draggable(
                     state = dragState,
                     orientation = Orientation.Vertical,
-                    enabled = page == MeloXNowPlayingPage.Artwork && expansionProgress >= 0.995f,
+                    enabled = page == MeloXNowPlayingPage.Artwork,
                     onDragStarted = {
+                        // Establish Full -> Mini as the seek direction before the first
+                        // drag delta. Subsequent seekTo calls keep the same target and
+                        // therefore snap directly to the finger-controlled fraction.
                         gestureCollapseProgress = 0f
+                        onSeekCollapse(0f)
                     },
                     onDragStopped = { velocity ->
                         val releaseProgress = gestureCollapseProgress
                         val shouldCollapse = releaseProgress >= 0.42f || velocity >= 1200f
-                        scope.launch {
-                            onSettleCollapse(shouldCollapse)
-                            if (!shouldCollapse) gestureCollapseProgress = 0f
-                        }
+                        // draggable already gives us a suspend callback. Settle inline
+                        // from the exact fraction where the finger was released.
+                        onSettleCollapse(shouldCollapse)
+                        if (!shouldCollapse) gestureCollapseProgress = 0f
                     },
                 ),
         ) {
