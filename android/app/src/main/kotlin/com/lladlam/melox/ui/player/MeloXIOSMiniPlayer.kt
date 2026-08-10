@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -88,7 +89,8 @@ fun MeloXIOSMiniPlayer(
     val artworkSize = lerpDp(40.dp, 30.dp, compact)
     val artworkRadius = lerpDp(9.dp, 7.dp, compact)
     val compactArtistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
-    val compactNextAlpha = 1f - smoothStep(compact, 0.08f, 0.68f)
+    val compactNextAlpha = 1f - smoothStep(compact, 0.04f, 0.50f)
+    val controlStageWidth = lerpDp(82.dp, 36.dp, smoothStep(compact, 0.08f, 0.84f))
     val artistHeight = lerpDp(15.dp, 0.dp, smoothStep(compact, 0.04f, 0.72f))
 
     // The shared bounds itself is rendered in SharedTransitionScope's overlay.
@@ -241,19 +243,27 @@ fun MeloXIOSMiniPlayer(
                 }
             }
 
-            MiniVectorButton(
-                kind = if (state.isPlaying) MiniGlyph.Pause else MiniGlyph.Play,
-                enabled = true,
-                onClick = state::togglePlayPause,
-                modifier = chromeOverlayModifier,
-                visualAlpha = miniChromeAlpha,
-            )
-            if (compact < 0.999f) {
+            Box(
+                modifier = Modifier
+                    .width(controlStageWidth)
+                    .height(40.dp),
+            ) {
+                MiniVectorButton(
+                    kind = if (state.isPlaying) MiniGlyph.Pause else MiniGlyph.Play,
+                    enabled = true,
+                    onClick = state::togglePlayPause,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .then(chromeOverlayModifier),
+                    visualAlpha = miniChromeAlpha,
+                )
                 MiniVectorButton(
                     kind = MiniGlyph.Forward,
                     enabled = state.hasNext || state.repeatMode != 0,
                     onClick = state::next,
-                    modifier = chromeOverlayModifier,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .then(chromeOverlayModifier),
                     visualAlpha = miniChromeAlpha * compactNextAlpha,
                 )
             }

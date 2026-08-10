@@ -7,6 +7,8 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +17,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,9 +25,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -53,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -67,6 +73,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -83,7 +90,10 @@ import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private enum class MeloXLibraryPage(val title: String) {
     Songs("歌曲"),
@@ -363,43 +373,108 @@ private fun MeloXLibrarySegmentedPicker(
     onSelected: (MeloXLibraryPage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val pages = MeloXLibraryPage.entries
+    val panelShape = RoundedCornerShape(16.dp)
+    val lensShape = RoundedCornerShape(15.dp)
+    val panelBackdrop = rememberLayerBackdrop()
+    val dark = isSystemInDarkTheme()
+    val selectedIndex = pages.indexOf(selected).coerceAtLeast(0)
+    val lensPosition by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(
+            dampingRatio = 1f,
+            stiffness = 460f,
+            visibilityThreshold = 0.001f,
+        ),
+        label = "library-segment-lens-position",
+    )
+    val panelTint = MaterialTheme.colorScheme.surface.copy(alpha = 0.10f)
+    val panelSurface = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f)
+    val selectionTint = if (dark) {
+        Color.White.copy(alpha = 0.22f)
+    } else {
+        Color.White.copy(alpha = 0.72f)
+    }
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(30.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(panelShape)
             .meloXLiquidBottomBar(
-                shape = RoundedCornerShape(16.dp),
-                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.10f),
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+                shape = panelShape,
+                tint = panelTint,
+                surfaceColor = panelSurface,
             ),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        MeloXLibraryPage.entries.forEach { page ->
-            val isSelected = page == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(28.dp)
-                    .padding(horizontal = 1.dp)
-                    .clip(RoundedCornerShape(15.dp))
-                    .meloXLiquidTabSelection(
-                        shape = RoundedCornerShape(15.dp),
-                        selected = isSelected,
-                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.74f),
+        val panelWidthPx = constraints.maxWidth
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(0f)
+                .layerBackdrop(panelBackdrop)
+                .meloXLiquidBottomBar(
+                    shape = panelShape,
+                    tint = panelTint,
+                    surfaceColor = panelSurface,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            pages.forEach { page ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(page.title, fontSize = 13.sp)
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(1f / pages.size)
+                .fillMaxHeight()
+                .offset {
+                    IntOffset(
+                        x = (lensPosition * panelWidthPx / pages.size).roundToInt(),
+                        y = 0,
                     )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelected(page) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = page.title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
+                }
+                .padding(horizontal = 1.dp, vertical = 1.dp)
+                .meloXLiquidTabSelection(
+                    shape = lensShape,
+                    selected = true,
+                    tint = selectionTint,
+                    panelBackdrop = panelBackdrop,
+                ),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            pages.forEach { page ->
+                val isSelected = page == selected
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelected(page) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = page.title,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
             }
         }
     }

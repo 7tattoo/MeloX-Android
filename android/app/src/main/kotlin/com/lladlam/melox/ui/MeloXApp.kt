@@ -7,7 +7,9 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +86,7 @@ import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.search.SearchScreen
 import com.lladlam.melox.ui.settings.SettingsScreen
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 enum class AppTab(val title: String) {
@@ -101,12 +105,35 @@ fun MeloXApp(
     openNowPlayingRequest: Int = 0,
 ) {
     var selectedTab by remember { mutableStateOf(AppTab.Home) }
-    var showNowPlaying by remember { mutableStateOf(false) }
     var showNeteaseLogin by remember { mutableStateOf(false) }
     var loginReturnTab by remember { mutableStateOf(AppTab.Settings) }
     var tabBarMinimized by remember { mutableStateOf(false) }
     var scrollAccumulator by remember { mutableFloatStateOf(0f) }
     val playbackState = rememberMeloXPlaybackUiState()
+    val playerTransitionState = remember { SeekableTransitionState(false) }
+    val playerTransition = rememberTransition(
+        transitionState = playerTransitionState,
+        label = "melox-player-transition",
+    )
+    val playerScope = rememberCoroutineScope()
+    val openPlayer: () -> Unit = {
+        if (playbackState.hasMedia) {
+            playerScope.launch {
+                playerTransitionState.animateTo(
+                    targetState = true,
+                    animationSpec = playerTransitionSpec(),
+                )
+            }
+        }
+    }
+    val closePlayer: () -> Unit = {
+        playerScope.launch {
+            playerTransitionState.animateTo(
+                targetState = false,
+                animationSpec = playerTransitionSpec(),
+            )
+        }
+    }
     val neteaseSession = rememberNeteaseSessionStore()
     val darkGlass = isSystemInDarkTheme()
     val screenControlBackdrop = rememberCanvasBackdrop {
@@ -154,7 +181,16 @@ fun MeloXApp(
 
     LaunchedEffect(openNowPlayingRequest, playbackState.hasMedia) {
         if (openNowPlayingRequest > 0 && playbackState.hasMedia) {
-            showNowPlaying = true
+            playerTransitionState.animateTo(
+                targetState = true,
+                animationSpec = playerTransitionSpec(),
+            )
+        }
+    }
+
+    LaunchedEffect(playbackState.hasMedia) {
+        if (!playbackState.hasMedia) {
+            playerTransitionState.snapTo(false)
         }
     }
 
@@ -173,7 +209,8 @@ fun MeloXApp(
       Box(modifier = Modifier.fillMaxSize()) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
-            val fullPlayerVisible = showNowPlaying && playbackState.hasMedia
+            val fullPlayerVisible = playbackState.hasMedia &&
+                (playerTransitionState.currentState || playerTransitionState.targetState)
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
@@ -221,14 +258,14 @@ fun MeloXApp(
                     minimized = tabBarMinimized,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     miniPlayer = { compactProgress ->
-                        AnimatedVisibility(
-                            visible = !fullPlayerVisible,
+                        playerTransition.AnimatedVisibility(
+                            visible = { value -> !value },
                             enter = EnterTransition.None,
                             exit = ExitTransition.None,
                         ) {
                             MeloXIOSMiniPlayer(
                                 state = playbackState,
-                                onExpand = { showNowPlaying = true },
+                                onExpand = openPlayer,
                                 compactProgress = compactProgress,
                                 dynamicGlassEnabled = true,
                                 sharedTransitionScope = sharedScope,
@@ -254,22 +291,34 @@ fun MeloXApp(
                 )
             }
 
-            AnimatedVisibility(
-                visible = fullPlayerVisible,
+            playerTransition.AnimatedVisibility(
+                visible = { value -> value },
                 enter = EnterTransition.None,
                 exit = ExitTransition.None,
                 modifier = Modifier.fillMaxSize(),
             ) {
                 MeloXIOSNowPlayingSharedHost(
                     state = playbackState,
-                    onDismiss = { showNowPlaying = false },
+                    onDismiss = closePlayer,
+                    onSeekCollapse = { fraction ->
+                        playerTransitionState.seekTo(
+                            fraction = fraction.coerceIn(0f, 0.999f),
+                            targetState = false,
+                        )
+                    },
+                    onSettleCollapse = { collapse ->
+                        playerTransitionState.animateTo(
+                            targetState = !collapse,
+                            animationSpec = playerTransitionSpec(),
+                        )
+                    },
                     sharedTransitionScope = sharedScope,
                     animatedVisibilityScope = this,
                 )
             }
 
             BackHandler(enabled = fullPlayerVisible && !showNeteaseLogin) {
-                showNowPlaying = false
+                closePlayer()
             }
         }
 
@@ -725,6 +774,12 @@ private fun RootGlyphIcon(
         }
     }
 }
+
+private fun playerTransitionSpec() = spring<Float>(
+    dampingRatio = 0.90f,
+    stiffness = 320f,
+    visibilityThreshold = 0.001f,
+)
 
 private fun smoothStep(value: Float, start: Float, end: Float): Float {
     if (end <= start) return if (value >= end) 1f else 0f
