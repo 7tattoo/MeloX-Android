@@ -1,7 +1,10 @@
 package com.lladlam.melox.ui.player
 
+import android.content.ContentResolver
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
@@ -10,7 +13,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import kotlin.math.abs
 
 internal data class ArtworkDynamicPalette(
     val cells: List<Color>,
@@ -42,33 +44,24 @@ internal object ArtworkDynamicPaletteProvider {
     private val cache = ConcurrentHashMap<String, ArtworkDynamicPalette>()
     private val http = OkHttpClient()
 
-    suspend fun paletteFor(url: String?): ArtworkDynamicPalette {
+    suspend fun paletteFor(context: Context, url: String?): ArtworkDynamicPalette {
         val source = url?.takeIf(String::isNotBlank) ?: return ArtworkDynamicPalette.Fallback
         cache[source]?.let { return it }
 
         return withContext(Dispatchers.IO) {
             cache[source]?.let { return@withContext it }
             val palette = runCatching {
-                val request = Request.Builder()
-                    .url(optimizedArtworkUrl(source))
-                    .header("User-Agent", "MeloX-Android/0.1")
-                    .build()
-                http.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) error("Artwork HTTP ${response.code}")
-                    val bytes = response.body.bytes()
-                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        ?: error("Unable to decode artwork")
-                    val scaled = if (decoded.width == TARGET_SIZE && decoded.height == TARGET_SIZE) {
-                        decoded
-                    } else {
-                        Bitmap.createScaledBitmap(decoded, TARGET_SIZE, TARGET_SIZE, true)
-                    }
-                    try {
-                        makePalette(scaled)
-                    } finally {
-                        if (scaled !== decoded) scaled.recycle()
-                        decoded.recycle()
-                    }
+                val decoded = decodeArtwork(context, source)
+                val scaled = if (decoded.width == TARGET_SIZE && decoded.height == TARGET_SIZE) {
+                    decoded
+                } else {
+                    Bitmap.createScaledBitmap(decoded, TARGET_SIZE, TARGET_SIZE, true)
+                }
+                try {
+                    makePalette(scaled)
+                } finally {
+                    if (scaled !== decoded) scaled.recycle()
+                    decoded.recycle()
                 }
             }.getOrNull()
 
@@ -77,6 +70,82 @@ internal object ArtworkDynamicPaletteProvider {
             // colors to this artwork URL for the entire process lifetime.
             if (palette != null) cache[source] = palette
             palette ?: ArtworkDynamicPalette.Fallback
+        }
+    }
+
+    private fun decodeArtwork(context: Context, source: String): Bitmap {
+        val uri = Uri.parse(source)
+        return when (uri.scheme?.lowercase()) {
+            "http", "https" -> decodeNetworkArtwork(source)
+            ContentResolver.SCHEME_CONTENT,
+            ContentResolver.SCHEME_FILE,
+            ContentResolver.SCHEME_ANDROID_RESOURCE -> decodeLocalArtwork(context, uri)
+            null -> decodeFileArtwork(source)
+            else -> error("Unsupported artwork URI scheme: ${uri.scheme}")
+        }
+    }
+
+    private fun decodeNetworkArtwork(source: String): Bitmap {
+        val request = Request.Builder()
+            .url(optimizedArtworkUrl(source))
+            .header("User-Agent", "MeloX-Android/0.1")
+            .build()
+        return http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("Artwork HTTP ${response.code}")
+            decodeBytes(response.body.bytes())
+        }
+    }
+
+    private fun decodeLocalArtwork(context: Context, uri: Uri): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val boundsStream = context.contentResolver.openInputStream(uri)
+            ?: error("Unable to open local artwork")
+        boundsStream.use { stream ->
+            BitmapFactory.decodeStream(stream, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            error("Unable to read local artwork bounds")
+        }
+        val options = decodeOptions(bounds.outWidth, bounds.outHeight)
+        return context.contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, options)
+        } ?: error("Unable to decode local artwork")
+    }
+
+    private fun decodeFileArtwork(path: String): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            error("Unable to read artwork file bounds")
+        }
+        return BitmapFactory.decodeFile(path, decodeOptions(bounds.outWidth, bounds.outHeight))
+            ?: error("Unable to decode artwork file")
+    }
+
+    private fun decodeBytes(bytes: ByteArray): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            error("Unable to read artwork bounds")
+        }
+        return BitmapFactory.decodeByteArray(
+            bytes,
+            0,
+            bytes.size,
+            decodeOptions(bounds.outWidth, bounds.outHeight),
+        ) ?: error("Unable to decode artwork")
+    }
+
+    private fun decodeOptions(width: Int, height: Int): BitmapFactory.Options {
+        var sampleSize = 1
+        while (width / (sampleSize * 2) >= TARGET_SIZE &&
+            height / (sampleSize * 2) >= TARGET_SIZE
+        ) {
+            sampleSize *= 2
+        }
+        return BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
         }
     }
 
@@ -96,10 +165,9 @@ internal object ArtworkDynamicPaletteProvider {
                 }
             }
         }
-        val displayCells = displayColors(cells)
         return ArtworkDynamicPalette(
-            cells = displayCells,
-            average = average(displayCells),
+            cells = cells,
+            average = averageColor(bitmap, 0, 0, width, height),
         )
     }
 
@@ -136,92 +204,6 @@ internal object ArtworkDynamicPaletteProvider {
             red = (red.toFloat() / count / 255f).coerceIn(0f, 1f),
             green = (green.toFloat() / count / 255f).coerceIn(0f, 1f),
             blue = (blue.toFloat() / count / 255f).coerceIn(0f, 1f),
-            alpha = 1f,
-        )
-    }
-
-    /** Port of ArtworkFlowingLightPalette.displayColorsRGB from MeloX. */
-    private fun displayColors(source: List<Color>): List<Color> {
-        val hsv = source.map(::toHsv)
-        val anchor = hsv.maxByOrNull { it.saturation * (0.38f + it.value * 0.62f) }
-            ?: Hsv(0.62f, 0.72f, 0.48f)
-        val averageValue = hsv.map(Hsv::value).average().toFloat()
-        val chromaticStrength = (anchor.saturation / 0.34f).coerceIn(0f, 1f)
-        val targetValues = floatArrayOf(
-            0.34f, 0.46f, 0.28f,
-            0.27f, 0.50f, 0.36f,
-            0.17f, 0.30f, 0.15f,
-        )
-        val targetSaturations = floatArrayOf(
-            0.76f, 0.64f, 0.82f,
-            0.84f, 0.66f, 0.78f,
-            0.90f, 0.80f, 0.92f,
-        )
-        return hsv.indices.map { index ->
-            val item = hsv[index]
-            val hue = if (item.saturation >= 0.16f && item.value >= 0.08f) {
-                blendedHue(anchor.hue, item.hue, 0.62f)
-            } else {
-                anchor.hue
-            }
-            val artworkSaturation = item.saturation * 0.58f + anchor.saturation * 0.42f
-            val roleSaturation = 0.16f + (targetSaturations[index] - 0.16f) * chromaticStrength
-            val saturation = maxOf(roleSaturation, artworkSaturation).coerceIn(0.12f, 0.96f)
-            val offset = (item.value - averageValue).coerceIn(-0.12f, 0.12f) * 0.24f
-            fromHsv(Hsv(hue, saturation, (targetValues[index] + offset).coerceIn(0.12f, 0.54f)))
-        }
-    }
-
-    private data class Hsv(val hue: Float, val saturation: Float, val value: Float)
-
-    private fun toHsv(color: Color): Hsv {
-        val maximum = maxOf(color.red, color.green, color.blue)
-        val minimum = minOf(color.red, color.green, color.blue)
-        val delta = maximum - minimum
-        val saturation = if (maximum > 0f) delta / maximum else 0f
-        if (delta <= 0.00001f) return Hsv(0f, saturation, maximum)
-        val raw = when (maximum) {
-            color.red -> ((color.green - color.blue) / delta) % 6f
-            color.green -> (color.blue - color.red) / delta + 2f
-            else -> (color.red - color.green) / delta + 4f
-        }
-        val normalized = raw / 6f
-        return Hsv(if (normalized >= 0f) normalized else normalized + 1f, saturation, maximum)
-    }
-
-    private fun fromHsv(hsv: Hsv): Color {
-        val chroma = hsv.value * hsv.saturation
-        val sector = hsv.hue * 6f
-        val secondary = chroma * (1f - abs(sector % 2f - 1f))
-        val offset = hsv.value - chroma
-        val (red, green, blue) = when {
-            sector < 1f -> Triple(chroma, secondary, 0f)
-            sector < 2f -> Triple(secondary, chroma, 0f)
-            sector < 3f -> Triple(0f, chroma, secondary)
-            sector < 4f -> Triple(0f, secondary, chroma)
-            sector < 5f -> Triple(secondary, 0f, chroma)
-            else -> Triple(chroma, 0f, secondary)
-        }
-        return Color(red + offset, green + offset, blue + offset, 1f)
-    }
-
-    private fun blendedHue(source: Float, destination: Float, weight: Float): Float {
-        var delta = destination - source
-        if (delta > 0.5f) delta -= 1f else if (delta < -0.5f) delta += 1f
-        val result = source + delta * weight
-        return when {
-            result < 0f -> result + 1f
-            result >= 1f -> result - 1f
-            else -> result
-        }
-    }
-
-    private fun average(colors: List<Color>): Color {
-        if (colors.isEmpty()) return ArtworkDynamicPalette.Fallback.average
-        return Color(
-            red = colors.map { it.red }.average().toFloat(),
-            green = colors.map { it.green }.average().toFloat(),
-            blue = colors.map { it.blue }.average().toFloat(),
             alpha = 1f,
         )
     }
