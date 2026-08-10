@@ -35,9 +35,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
@@ -48,7 +50,7 @@ import com.kyant.shapes.Capsule
 fun MeloXIOSMiniPlayer(
     state: MeloXPlaybackUiState,
     onExpand: () -> Unit,
-    inline: Boolean = false,
+    compactProgress: Float = 0f,
     dynamicGlassEnabled: Boolean = true,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
@@ -75,15 +77,24 @@ fun MeloXIOSMiniPlayer(
         0f
     }
 
-    // Keep #286 geometry untouched. Fade source chrome over most of the morph.
-    // These values are actual draw alpha below, not a parent graphics layer, so
-    // they remain effective after the chrome is lifted into SharedTransitionScope's overlay.
-    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.05f, 0.72f)
-    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.04f, 0.42f)
+    // All source chrome is driven by the same reversible expansion progress as
+    // the full-player destination. The source fades as real composited content,
+    // rather than only lowering text/icon colors, so the reverse transition is
+    // equally visible when returning to the mini player.
+    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.10f, 0.58f)
+    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.02f, 0.48f)
+
+    val compact = compactProgress.coerceIn(0f, 1f)
+    val artworkSize = lerpDp(40.dp, 30.dp, compact)
+    val artworkRadius = lerpDp(9.dp, 7.dp, compact)
+    val compactArtistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
+    val compactNextAlpha = 1f - smoothStep(compact, 0.08f, 0.68f)
+    val artistHeight = lerpDp(15.dp, 0.dp, smoothStep(compact, 0.04f, 0.72f))
 
     // The shared bounds itself is rendered in SharedTransitionScope's overlay.
     // Lift source chrome into the same overlay so it is not abruptly covered by
-    // the growing container. Its visual fade is applied to the child draw content.
+    // the growing container. Component-level alpha below keeps the fade visible
+    // even while the overlay owns the actual draw pass.
     val chromeOverlayModifier =
         if (sharedTransitionScope != null) {
             with(sharedTransitionScope) {
@@ -148,11 +159,12 @@ fun MeloXIOSMiniPlayer(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
                 .height(50.dp)
+                .graphicsLayer { alpha = miniSurfaceAlpha }
                 .meloXLiquidBottomBar(
                     shape = miniShape,
                     tint = glassTint,
                     surfaceColor = fallbackTint.copy(
-                        alpha = fallbackTint.alpha * 0.40f * miniSurfaceAlpha,
+                        alpha = fallbackTint.alpha * 0.40f,
                     ),
                 ),
         )
@@ -186,17 +198,20 @@ fun MeloXIOSMiniPlayer(
                         Modifier
                     }
 
+                // Artwork is the persistent identity element: resize it smoothly
+                // for compact Dock mode, but do not fade it during full expansion.
                 Artwork(
                     url = state.artworkUrl,
                     modifier = sharedArtworkModifier
-                        .size(if (inline) 30.dp else 40.dp)
-                        .clip(RoundedCornerShape(if (inline) 7.dp else 9.dp)),
+                        .size(artworkSize)
+                        .clip(RoundedCornerShape(artworkRadius)),
                 )
 
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .then(chromeOverlayModifier),
+                        .then(chromeOverlayModifier)
+                        .graphicsLayer { alpha = miniChromeAlpha },
                 ) {
                     Text(
                         text = state.title.ifBlank { "正在播放" },
@@ -206,11 +221,13 @@ fun MeloXIOSMiniPlayer(
                         lineHeight = 17.sp,
                         softWrap = false,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = miniChromeAlpha,
-                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                    if (!inline) {
+                    Box(
+                        modifier = Modifier
+                            .height(artistHeight)
+                            .graphicsLayer { alpha = compactArtistAlpha },
+                    ) {
                         Text(
                             text = state.artist,
                             maxLines = 1,
@@ -218,9 +235,7 @@ fun MeloXIOSMiniPlayer(
                             fontSize = 12.sp,
                             lineHeight = 15.sp,
                             softWrap = false,
-                            color = MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.54f * miniChromeAlpha,
-                            ),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.54f),
                         )
                     }
                 }
@@ -233,13 +248,13 @@ fun MeloXIOSMiniPlayer(
                 modifier = chromeOverlayModifier,
                 visualAlpha = miniChromeAlpha,
             )
-            if (!inline) {
+            if (compact < 0.999f) {
                 MiniVectorButton(
                     kind = MiniGlyph.Forward,
                     enabled = state.hasNext || state.repeatMode != 0,
                     onClick = state::next,
                     modifier = chromeOverlayModifier,
-                    visualAlpha = miniChromeAlpha,
+                    visualAlpha = miniChromeAlpha * compactNextAlpha,
                 )
             }
         }
@@ -257,15 +272,15 @@ private fun MiniVectorButton(
     visualAlpha: Float = 1f,
 ) {
     val baseAlpha = if (enabled) 0.94f else 0.26f
-    val color = MaterialTheme.colorScheme.onSurface.copy(
-        alpha = baseAlpha * visualAlpha.coerceIn(0f, 1f),
-    )
+    val drawAlpha = visualAlpha.coerceIn(0f, 1f)
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = baseAlpha)
     Box(
         modifier = modifier
+            .graphicsLayer { alpha = drawAlpha }
             .size(36.dp)
             .clip(CircleShape)
             .clickable(
-                enabled = enabled && visualAlpha > 0.05f,
+                enabled = enabled && drawAlpha > 0.05f,
                 onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
@@ -321,3 +336,6 @@ private fun smoothStep(value: Float, start: Float, end: Float): Float {
     val t = ((value - start) / (end - start)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
 }
+
+private fun lerpDp(start: Dp, end: Dp, progress: Float): Dp =
+    (start.value + (end.value - start.value) * progress.coerceIn(0f, 1f)).dp
