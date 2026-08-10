@@ -53,6 +53,7 @@ dependencies {
     // ui/glass are adapted from the project's official LiquidButton and
     // LiquidBottomTabs examples while preserving MeloX's iOS geometry.
     implementation("io.github.kyant0:backdrop:2.0.0")
+    implementation("io.github.kyant0:shapes:1.2.0")
 
     implementation("androidx.media3:media3-common:1.10.1")
     implementation("androidx.media3:media3-datasource:1.10.1")

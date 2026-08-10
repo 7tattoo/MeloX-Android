@@ -87,6 +87,7 @@ fun MeloXIOSNowPlayingV2(
     drawBackdrop: Boolean = true,
     drawArtwork: Boolean = true,
 ) {
+    var showActions by remember(state.mediaId) { mutableStateOf(false) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -121,6 +122,7 @@ fun MeloXIOSNowPlayingV2(
                     MeloXNowPlayingPage.Artwork -> MeloXArtworkPageV3(
                         state = state,
                         drawArtwork = drawArtwork,
+                        onMore = { showActions = true },
                     )
                     MeloXNowPlayingPage.Lyrics -> MeloXIOSLyricsPanel(
                         state = state,
@@ -147,6 +149,12 @@ fun MeloXIOSNowPlayingV2(
                 },
             )
         }
+
+        MeloXNowPlayingActionsSheet(
+            state = state,
+            visible = showActions,
+            onDismiss = { showActions = false },
+        )
     }
 }
 
@@ -261,6 +269,7 @@ private fun pageTransform(
 private fun MeloXArtworkPageV3(
     state: MeloXPlaybackUiState,
     drawArtwork: Boolean,
+    onMore: () -> Unit,
 ) {
     val artworkScale by animateFloatAsState(
         targetValue = if (state.isPlaying) 1f else 0.74f,
@@ -336,25 +345,44 @@ private fun MeloXArtworkPageV3(
 
             Spacer(Modifier.height(20.dp))
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = state.title.ifBlank { "正在播放" },
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    lineHeight = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = state.artist,
-                    color = Color.White.copy(alpha = 0.64f),
-                    fontSize = 20.sp,
-                    lineHeight = 24.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.title.ifBlank { "正在播放" },
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = state.artist,
+                        color = Color.White.copy(alpha = 0.64f),
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onMore),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "•••",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -645,12 +673,6 @@ private fun CupertinoPlayPauseButton(state: MeloXPlaybackUiState) {
                 scaleY = scale
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                surfaceColor = Color.White.copy(alpha = 0.035f),
-                lensRadius = 12.dp,
-                refractionHeight = 20.dp,
-            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -707,12 +729,6 @@ private fun CupertinoTransportButton(
                 scaleY = scale
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                surfaceColor = Color.White.copy(alpha = 0.025f),
-                lensRadius = 10.dp,
-                refractionHeight = 18.dp,
-            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -910,13 +926,7 @@ private fun CupertinoPageButton(
                 scaleY = s
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                enabled = enabled,
-                surfaceColor = Color.White.copy(alpha = 0.035f + backgroundAlpha * 0.42f),
-                lensRadius = if (selected) 11.dp else 8.dp,
-                refractionHeight = if (selected) 18.dp else 12.dp,
-            )
+            .background(Color.White.copy(alpha = backgroundAlpha * 0.16f))
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,

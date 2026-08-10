@@ -7,10 +7,15 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -24,18 +29,25 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -46,6 +58,10 @@ fun MeloXIOSNowPlayingSharedHost(
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     var page by remember(state.mediaId) { mutableStateOf(MeloXNowPlayingPage.Artwork) }
+    val dragOffset = remember(state.mediaId) { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var committingDismiss by remember(state.mediaId) { mutableStateOf(false) }
 
     val expansionProgress by animatedVisibilityScope.transition.animateFloat(
         transitionSpec = {
@@ -66,6 +82,21 @@ fun MeloXIOSNowPlayingSharedHost(
     val fullPlayerAlpha = smoothStep(expansionProgress, 0.62f, 0.96f)
     val cornerRadius = (22f * (1f - smoothStep(expansionProgress, 0.00f, 0.94f))).dp
 
+    LaunchedEffect(expansionProgress) {
+        if (expansionProgress <= 0.01f) {
+            dragOffset.snapTo(0f)
+            committingDismiss = false
+        }
+    }
+
+    val dragState = rememberDraggableState { delta ->
+        if (!committingDismiss) {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                dragOffset.snapTo((dragOffset.value + delta).coerceAtLeast(0f))
+            }
+        }
+    }
+
     val sharedContainerModifier = with(sharedTransitionScope) {
         Modifier.sharedBounds(
             sharedContentState = rememberSharedContentState(
@@ -82,11 +113,58 @@ fun MeloXIOSNowPlayingSharedHost(
         )
     }
 
-    Box(
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+      val dismissThreshold = with(density) { 132.dp.toPx() }
+      val maxDrag = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+      val dragProgress = (dragOffset.value / maxDrag).coerceIn(0f, 1f)
+      val dragScale = 1f - dragProgress * 0.035f
+
+      Box(
         modifier = sharedContainerModifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(cornerRadius)),
-    ) {
+            .graphicsLayer {
+                translationY = dragOffset.value * fullPlayerAlpha
+                scaleX = dragScale
+                scaleY = dragScale
+                transformOrigin = TransformOrigin(0.5f, 0f)
+            }
+            .clip(
+                RoundedCornerShape(
+                    cornerRadius + (30.dp - cornerRadius) * dragProgress,
+                ),
+            )
+            .draggable(
+                state = dragState,
+                orientation = Orientation.Vertical,
+                enabled = page == MeloXNowPlayingPage.Artwork && expansionProgress >= 0.995f,
+                onDragStopped = { velocity ->
+                    if (dragOffset.value >= dismissThreshold || velocity >= 1350f) {
+                        committingDismiss = true
+                        scope.launch {
+                            dragOffset.animateTo(
+                                targetValue = maxOf(dragOffset.value, maxDrag * 0.24f),
+                                animationSpec = tween(150),
+                            )
+                            onDismiss()
+                        }
+                    } else {
+                        scope.launch {
+                            dragOffset.animateTo(
+                                targetValue = 0f,
+                                initialVelocity = velocity,
+                                animationSpec = spring(
+                                    dampingRatio = 0.82f,
+                                    stiffness = 430f,
+                                ),
+                            )
+                        }
+                    }
+                },
+            ),
+      ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -123,6 +201,7 @@ fun MeloXIOSNowPlayingSharedHost(
             sharedTransitionScope = sharedTransitionScope,
             animatedVisibilityScope = animatedVisibilityScope,
         )
+      }
     }
 }
 

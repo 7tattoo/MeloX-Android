@@ -30,6 +30,35 @@ class NeteaseLibraryCache(context: Context) {
         writeJson(File(directory, "playlist_$playlistId.json"), encodePlaylistDetail(detail))
     }
 
+    suspend fun loadHomeContent(): NeteaseHomeContent? = readJson(
+        File(directory, "home.json"),
+    ) { value ->
+        NeteaseHomeContent(
+            playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()),
+            newSongs = decodeSongs(value.optJSONArray("newSongs") ?: JSONArray()),
+        )
+    }
+
+    suspend fun saveHomeContent(content: NeteaseHomeContent) {
+        writeJson(
+            File(directory, "home.json"),
+            JSONObject()
+                .put("playlists", encodePlaylists(content.playlists))
+                .put("newSongs", encodeSongs(content.newSongs)),
+        )
+    }
+
+    suspend fun loadExplore(category: String): List<NeteasePlaylistSummary>? = readJson(
+        File(directory, "explore_${category.hashCode()}.json"),
+    ) { value -> decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()) }
+
+    suspend fun saveExplore(category: String, playlists: List<NeteasePlaylistSummary>) {
+        writeJson(
+            File(directory, "explore_${category.hashCode()}.json"),
+            JSONObject().put("playlists", encodePlaylists(playlists)),
+        )
+    }
+
     private suspend fun <T> readJson(file: File, decode: (JSONObject) -> T): T? =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -51,6 +80,8 @@ class NeteaseLibraryCache(context: Context) {
     companion object {
         private val refreshedLibraries = mutableSetOf<Long>()
         private val refreshedPlaylists = mutableSetOf<Long>()
+        private var refreshedHome = false
+        private val refreshedExplore = mutableSetOf<String>()
 
         /** Returns true only for the first automatic refresh in this app process. */
         @Synchronized
@@ -61,6 +92,16 @@ class NeteaseLibraryCache(context: Context) {
         @Synchronized
         fun beginPlaylistColdStartRefresh(playlistId: Long): Boolean =
             refreshedPlaylists.add(playlistId)
+
+        @Synchronized
+        fun beginHomeColdStartRefresh(): Boolean {
+            if (refreshedHome) return false
+            refreshedHome = true
+            return true
+        }
+
+        @Synchronized
+        fun beginExploreColdStartRefresh(category: String): Boolean = refreshedExplore.add(category)
     }
 }
 

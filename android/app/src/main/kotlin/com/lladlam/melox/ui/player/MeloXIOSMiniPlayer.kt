@@ -43,13 +43,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
-import com.lladlam.melox.ui.glass.meloXLiquidButton
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MeloXIOSMiniPlayer(
     state: MeloXPlaybackUiState,
     onExpand: () -> Unit,
+    inline: Boolean = false,
+    dynamicGlassEnabled: Boolean = true,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -115,7 +116,7 @@ fun MeloXIOSMiniPlayer(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 3.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .pointerInput(state.mediaId) {
                 detectHorizontalDragGestures(
                     onDragStart = { accumulatedDrag = 0f },
@@ -131,7 +132,7 @@ fun MeloXIOSMiniPlayer(
                 )
             },
     ) {
-        val miniShape = RoundedCornerShape(22.dp)
+        val miniShape = RoundedCornerShape(25.dp)
         val dark = isSystemInDarkTheme()
         val glassTint = if (dark) {
             Color.Black.copy(alpha = 0.12f)
@@ -147,7 +148,7 @@ fun MeloXIOSMiniPlayer(
         Surface(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(50.dp)
                 .graphicsLayer { alpha = miniSurfaceAlpha }
                 .meloXLiquidBottomBar(
                     shape = miniShape,
@@ -158,14 +159,14 @@ fun MeloXIOSMiniPlayer(
             color = Color.Transparent,
             border = null,
             tonalElevation = 0.dp,
-            shadowElevation = (2f * miniSurfaceAlpha).dp,
+            shadowElevation = if (dynamicGlassEnabled) (2f * miniSurfaceAlpha).dp else 0.dp,
         ) {}
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
-                .padding(start = 9.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
+                .height(50.dp)
+                .padding(start = 7.dp, end = 7.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -193,8 +194,8 @@ fun MeloXIOSMiniPlayer(
                 Artwork(
                     url = state.artworkUrl,
                     modifier = sharedArtworkModifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp)),
+                        .size(if (inline) 30.dp else 40.dp)
+                        .clip(RoundedCornerShape(if (inline) 7.dp else 9.dp)),
                 )
 
                 Column(
@@ -214,17 +215,19 @@ fun MeloXIOSMiniPlayer(
                             alpha = miniChromeAlpha,
                         ),
                     )
-                    Text(
-                        text = state.artist,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 12.sp,
-                        lineHeight = 15.sp,
-                        softWrap = false,
-                        color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.54f * miniChromeAlpha,
-                        ),
-                    )
+                    if (!inline) {
+                        Text(
+                            text = state.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            softWrap = false,
+                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                alpha = 0.54f * miniChromeAlpha,
+                            ),
+                        )
+                    }
                 }
             }
 
@@ -235,13 +238,15 @@ fun MeloXIOSMiniPlayer(
                 modifier = chromeOverlayModifier,
                 visualAlpha = miniChromeAlpha,
             )
-            MiniVectorButton(
-                kind = MiniGlyph.Forward,
-                enabled = state.hasNext || state.repeatMode != 0,
-                onClick = state::next,
-                modifier = chromeOverlayModifier,
-                visualAlpha = miniChromeAlpha,
-            )
+            if (!inline) {
+                MiniVectorButton(
+                    kind = MiniGlyph.Forward,
+                    enabled = state.hasNext || state.repeatMode != 0,
+                    onClick = state::next,
+                    modifier = chromeOverlayModifier,
+                    visualAlpha = miniChromeAlpha,
+                )
+            }
         }
     }
 }
@@ -264,13 +269,6 @@ private fun MiniVectorButton(
         modifier = modifier
             .size(36.dp)
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                enabled = enabled && visualAlpha > 0.05f,
-                surfaceColor = Color.White.copy(alpha = 0.035f * visualAlpha),
-                lensRadius = 8.dp,
-                refractionHeight = 12.dp,
-            )
             .clickable(
                 enabled = enabled && visualAlpha > 0.05f,
                 onClick = onClick,
