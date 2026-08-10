@@ -2,6 +2,7 @@ package com.lladlam.melox.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -207,7 +208,7 @@ fun MeloXApp(
                 hasMedia = playbackState.hasMedia,
                 minimized = tabBarMinimized,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                miniPlayer = {
+                miniPlayer = { compactProgress ->
                     AnimatedVisibility(
                         visible = !fullPlayerVisible,
                         enter = EnterTransition.None,
@@ -216,6 +217,7 @@ fun MeloXApp(
                         MeloXIOSMiniPlayer(
                             state = playbackState,
                             onExpand = { showNowPlaying = true },
+                            compactProgress = compactProgress,
                             sharedTransitionScope = sharedScope,
                             animatedVisibilityScope = this,
                         )
@@ -307,7 +309,7 @@ private fun MeloXBottomChrome(
     hasMedia: Boolean,
     minimized: Boolean,
     modifier: Modifier = Modifier,
-    miniPlayer: @Composable () -> Unit,
+    miniPlayer: @Composable (compactProgress: Float) -> Unit,
 ) {
     val rawProgress by animateFloatAsState(
         targetValue = if (minimized) 1f else 0f,
@@ -325,10 +327,10 @@ private fun MeloXBottomChrome(
     val shrinkStage = smoothStep(progress, 0.25f, 0.82f)
     val dropStage = smoothStep(progress, 0.78f, 1.00f)
 
-    val navHeight = lerpDp(66.dp, 58.dp, sizeStage)
-    val searchSize = lerpDp(66.dp, 58.dp, sizeStage)
-    val expandedChromeHeight = if (hasMedia) 137.dp else 72.dp
-    val chromeHeight = lerpDp(expandedChromeHeight, 64.dp, dropStage)
+    val navHeight = lerpDp(56.dp, 52.dp, sizeStage)
+    val searchSize = lerpDp(56.dp, 52.dp, sizeStage)
+    val expandedChromeHeight = if (hasMedia) 119.dp else 62.dp
+    val chromeHeight = lerpDp(expandedChromeHeight, 58.dp, dropStage)
     val labelAlpha = 1f - labelStage
     val expandedLayerAlpha = 1f - smoothStep(progress, 0.43f, 0.72f)
     val compactLayerAlpha = smoothStep(progress, 0.52f, 0.82f)
@@ -344,13 +346,13 @@ private fun MeloXBottomChrome(
                 .fillMaxWidth()
                 .height(chromeHeight),
         ) {
-            val horizontalMargin = 14.dp
-            val compactSize = 58.dp
-            val expandedGap = 9.dp
-            val compactGap = 4.dp
-            val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 66.dp
+            val horizontalMargin = 16.dp
+            val compactSize = 52.dp
+            val expandedGap = 8.dp
+            val compactGap = 6.dp
+            val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 56.dp
             val navWidth = lerpDp(expandedNavWidth, compactSize, shrinkStage)
-            val navRadius = lerpDp(34.dp, 29.dp, shrinkStage)
+            val navRadius = lerpDp(28.dp, 26.dp, shrinkStage)
             val navShape = RoundedCornerShape(navRadius)
             val primaryTabs = listOf(
                 AppTab.Home to RootGlyph.Home,
@@ -363,11 +365,11 @@ private fun MeloXBottomChrome(
                 (maxWidth - horizontalMargin * 2 - compactSize * 2 - compactGap * 2)
                     .coerceAtLeast(80.dp)
             val compactMiniWrapperWidth =
-                (desiredCompactMiniVisibleWidth + 28.dp).coerceAtMost(maxWidth)
-            val compactMiniWrapperX = horizontalMargin + compactSize + compactGap - 14.dp
+                (desiredCompactMiniVisibleWidth + 32.dp).coerceAtMost(maxWidth)
+            val compactMiniWrapperX = horizontalMargin + compactSize + compactGap - 16.dp
             val miniWrapperWidth = lerpDp(maxWidth, compactMiniWrapperWidth, shrinkStage)
             val miniWrapperX = lerpDp(0.dp, compactMiniWrapperX, shrinkStage)
-            val miniLift = lerpDp(72.dp, 0.dp, shrinkStage)
+            val miniLift = lerpDp(62.dp, 0.dp, shrinkStage)
 
             if (hasMedia) {
                 Box(
@@ -379,7 +381,7 @@ private fun MeloXBottomChrome(
                         )
                         .width(miniWrapperWidth),
                 ) {
-                    miniPlayer()
+                    miniPlayer(progress)
                 }
             }
 
@@ -413,7 +415,41 @@ private fun MeloXBottomChrome(
                 shadowElevation = lerpDp(2.dp, 4.dp, progress),
                 tonalElevation = 0.dp,
             ) {
-                Box(Modifier.fillMaxSize()) {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val selectedIndex = primaryTabs.indexOfFirst { it.first == selectedTab }
+                    val lensPosition by animateFloatAsState(
+                        targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
+                        animationSpec = spring(
+                            dampingRatio = 0.78f,
+                            stiffness = 360f,
+                            visibilityThreshold = 0.001f,
+                        ),
+                        label = "melox-tab-selection-position",
+                    )
+                    val lensAlpha by animateFloatAsState(
+                        targetValue = if (selectedIndex >= 0 && progress < 0.56f) 1f else 0f,
+                        animationSpec = spring(dampingRatio = 0.86f, stiffness = 440f),
+                        label = "melox-tab-selection-alpha",
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.25f)
+                            .fillMaxHeight()
+                            .padding(4.dp)
+                            .graphicsLayer {
+                                alpha = lensAlpha * expandedLayerAlpha
+                                translationX = lensPosition * constraints.maxWidth / 4f
+                            }
+                            .meloXLiquidTabSelection(
+                                shape = RoundedCornerShape(24.dp),
+                                selected = lensAlpha > 0.001f,
+                                tint = if (dark) {
+                                    Color.White.copy(alpha = 0.18f)
+                                } else {
+                                    Color.White.copy(alpha = 0.32f)
+                                },
+                            ),
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -441,8 +477,12 @@ private fun MeloXBottomChrome(
                         ) {
                             RootGlyphIcon(
                                 glyph = selectedTab.rootGlyph(),
-                                modifier = Modifier.size(27.dp),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(25.dp),
+                                color = if (selectedTab == AppTab.Search) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MeloXAccent
+                                },
                             )
                         }
                     }
@@ -472,7 +512,7 @@ private fun MeloXBottomChrome(
                 Box(contentAlignment = Alignment.Center) {
                     RootGlyphIcon(
                         glyph = RootGlyph.Search,
-                        modifier = Modifier.size(lerpDp(31.dp, 29.dp, sizeStage)),
+                        modifier = Modifier.size(lerpDp(28.dp, 27.dp, sizeStage)),
                         color = if (selectedTab == AppTab.Search) {
                             MeloXAccent
                         } else {
@@ -509,32 +549,29 @@ private fun RowScope.RootTabButton(
     labelAlpha: Float,
     dark: Boolean,
 ) {
-    val foreground = if (selected) MeloXAccent else MaterialTheme.colorScheme.onSurface
-    val selectedBackground = when {
-        !selected -> Color.Transparent
-        dark -> Color.White.copy(alpha = 0.08f)
-        else -> Color.White.copy(alpha = 0.24f)
-    }
+    val foreground by animateColorAsState(
+        targetValue = if (selected) {
+            MeloXAccent
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+        },
+        animationSpec = spring(dampingRatio = 0.84f, stiffness = 480f),
+        label = "melox-tab-foreground",
+    )
     Column(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(28.dp))
-            .meloXLiquidTabSelection(
-                shape = RoundedCornerShape(28.dp),
-                selected = selected,
-                tint = selectedBackground,
-            )
             .padding(horizontal = 4.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        RootGlyphIcon(glyph = glyph, modifier = Modifier.size(26.dp), color = foreground)
+        RootGlyphIcon(glyph = glyph, modifier = Modifier.size(24.dp), color = foreground)
         Text(
             text = tab.title,
             modifier = Modifier.graphicsLayer { alpha = labelAlpha },
-            fontSize = 10.sp,
-            lineHeight = 12.sp,
+            fontSize = 9.sp,
+            lineHeight = 11.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = foreground,
         )

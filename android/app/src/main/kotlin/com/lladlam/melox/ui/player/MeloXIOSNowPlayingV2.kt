@@ -645,12 +645,6 @@ private fun CupertinoPlayPauseButton(state: MeloXPlaybackUiState) {
                 scaleY = scale
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                surfaceColor = Color.White.copy(alpha = 0.035f),
-                lensRadius = 12.dp,
-                refractionHeight = 20.dp,
-            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -707,12 +701,6 @@ private fun CupertinoTransportButton(
                 scaleY = scale
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                surfaceColor = Color.White.copy(alpha = 0.025f),
-                lensRadius = 10.dp,
-                refractionHeight = 18.dp,
-            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -910,13 +898,7 @@ private fun CupertinoPageButton(
                 scaleY = s
             }
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                enabled = enabled,
-                surfaceColor = Color.White.copy(alpha = 0.035f + backgroundAlpha * 0.42f),
-                lensRadius = if (selected) 11.dp else 8.dp,
-                refractionHeight = if (selected) 18.dp else 12.dp,
-            )
+            .background(Color.White.copy(alpha = backgroundAlpha * 0.16f))
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,

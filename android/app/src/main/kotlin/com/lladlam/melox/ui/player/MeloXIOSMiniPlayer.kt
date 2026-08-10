@@ -43,13 +43,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
-import com.lladlam.melox.ui.glass.meloXLiquidButton
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun MeloXIOSMiniPlayer(
     state: MeloXPlaybackUiState,
     onExpand: () -> Unit,
+    compactProgress: Float = 0f,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -115,7 +115,7 @@ fun MeloXIOSMiniPlayer(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 3.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .pointerInput(state.mediaId) {
                 detectHorizontalDragGestures(
                     onDragStart = { accumulatedDrag = 0f },
@@ -131,7 +131,12 @@ fun MeloXIOSMiniPlayer(
                 )
             },
     ) {
-        val miniShape = RoundedCornerShape(22.dp)
+        val compact = compactProgress.coerceIn(0f, 1f)
+        val miniShape = RoundedCornerShape(25.dp)
+        val artworkSize = lerpDp(40.dp, 30.dp, compact)
+        val metadataAlpha = 1f - smoothStep(compact, 0.42f, 0.92f)
+        val artistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
+        val nextAlpha = 1f - smoothStep(compact, 0.08f, 0.68f)
         val dark = isSystemInDarkTheme()
         val glassTint = if (dark) {
             Color.Black.copy(alpha = 0.12f)
@@ -147,7 +152,7 @@ fun MeloXIOSMiniPlayer(
         Surface(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(50.dp)
                 .graphicsLayer { alpha = miniSurfaceAlpha }
                 .meloXLiquidBottomBar(
                     shape = miniShape,
@@ -164,8 +169,8 @@ fun MeloXIOSMiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
-                .padding(start = 9.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
+                .height(50.dp)
+                .padding(start = 7.dp, end = 7.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -193,8 +198,8 @@ fun MeloXIOSMiniPlayer(
                 Artwork(
                     url = state.artworkUrl,
                     modifier = sharedArtworkModifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(10.dp)),
+                        .size(artworkSize)
+                        .clip(RoundedCornerShape(lerpDp(9.dp, 7.dp, compact))),
                 )
 
                 Column(
@@ -211,7 +216,7 @@ fun MeloXIOSMiniPlayer(
                         softWrap = false,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = miniChromeAlpha,
+                            alpha = miniChromeAlpha * metadataAlpha,
                         ),
                     )
                     Text(
@@ -222,7 +227,7 @@ fun MeloXIOSMiniPlayer(
                         lineHeight = 15.sp,
                         softWrap = false,
                         color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.54f * miniChromeAlpha,
+                            alpha = 0.54f * miniChromeAlpha * artistAlpha,
                         ),
                     )
                 }
@@ -233,7 +238,7 @@ fun MeloXIOSMiniPlayer(
                 enabled = true,
                 onClick = state::togglePlayPause,
                 modifier = chromeOverlayModifier,
-                visualAlpha = miniChromeAlpha,
+                visualAlpha = miniChromeAlpha * nextAlpha,
             )
             MiniVectorButton(
                 kind = MiniGlyph.Forward,
@@ -264,13 +269,6 @@ private fun MiniVectorButton(
         modifier = modifier
             .size(36.dp)
             .clip(CircleShape)
-            .meloXLiquidButton(
-                shape = CircleShape,
-                enabled = enabled && visualAlpha > 0.05f,
-                surfaceColor = Color.White.copy(alpha = 0.035f * visualAlpha),
-                lensRadius = 8.dp,
-                refractionHeight = 12.dp,
-            )
             .clickable(
                 enabled = enabled && visualAlpha > 0.05f,
                 onClick = onClick,
@@ -328,3 +326,6 @@ private fun smoothStep(value: Float, start: Float, end: Float): Float {
     val t = ((value - start) / (end - start)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
 }
+
+private fun lerpDp(start: androidx.compose.ui.unit.Dp, end: androidx.compose.ui.unit.Dp, progress: Float) =
+    (start.value + (end.value - start.value) * progress.coerceIn(0f, 1f)).dp
