@@ -84,6 +84,8 @@ data class MeloXQueueEntry(
 @Stable
 class MeloXPlaybackUiState internal constructor() {
     private var controller: MediaController? = null
+    private val sleepTimerHandler = Handler(Looper.getMainLooper())
+    private var sleepTimerRunnable: Runnable? = null
 
     var mediaId by mutableStateOf<String?>(null)
         private set
@@ -115,6 +117,8 @@ class MeloXPlaybackUiState internal constructor() {
         private set
     var volume by mutableFloatStateOf(1f)
         private set
+    var sleepTimerEndRealtimeMs by mutableLongStateOf(0L)
+        private set
 
     val hasMedia: Boolean
         get() = mediaId != null
@@ -143,6 +147,7 @@ class MeloXPlaybackUiState internal constructor() {
         controller?.removeListener(listener)
         controller?.release()
         controller = null
+        cancelSleepTimer()
     }
 
     internal fun refresh() {
@@ -232,6 +237,33 @@ class MeloXPlaybackUiState internal constructor() {
             player.volume = value.coerceIn(0f, 1f)
             volume = player.volume
         }
+    }
+
+    fun addCurrentToQueue() {
+        val player = controller ?: return
+        val item = player.currentMediaItem ?: return
+        player.addMediaItem(item)
+        refresh()
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        cancelSleepTimer()
+        if (minutes <= 0) return
+        val delayMillis = minutes * 60_000L
+        sleepTimerEndRealtimeMs = android.os.SystemClock.elapsedRealtime() + delayMillis
+        val runnable = Runnable {
+            controller?.pause()
+            sleepTimerEndRealtimeMs = 0L
+            sleepTimerRunnable = null
+        }
+        sleepTimerRunnable = runnable
+        sleepTimerHandler.postDelayed(runnable, delayMillis)
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerRunnable?.let(sleepTimerHandler::removeCallbacks)
+        sleepTimerRunnable = null
+        sleepTimerEndRealtimeMs = 0L
     }
 }
 

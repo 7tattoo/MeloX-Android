@@ -219,9 +219,9 @@ internal object ArtworkDynamicPaletteProvider {
     private fun average(colors: List<Color>): Color {
         if (colors.isEmpty()) return ArtworkDynamicPalette.Fallback.average
         return Color(
-            red = colors.map(Color::red).average().toFloat(),
-            green = colors.map(Color::green).average().toFloat(),
-            blue = colors.map(Color::blue).average().toFloat(),
+            red = colors.map { it.red }.average().toFloat(),
+            green = colors.map { it.green }.average().toFloat(),
+            blue = colors.map { it.blue }.average().toFloat(),
             alpha = 1f,
         )
     }
