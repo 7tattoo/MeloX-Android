@@ -1,0 +1,37 @@
+name: Apply interactive transition fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply source patch
+        run: python tools/apply_interactive_fix.py
+      - name: Verify patch
+        run: |
+          git diff --check
+          git diff --stat
+      - name: Commit and clean temporary files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm tools/apply_interactive_fix.py .github/workflows/apply-interactive-player-fix.yml
+          git add android/app/src/main/kotlin/com/lladlam/melox/ui/MeloXApp.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXIOSMiniPlayer.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXIOSNowPlayingSharedHost.kt \
+                  android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt
+          git commit -m "fix: unify interactive player collapse and picker animations"
+          git push origin HEAD:main
