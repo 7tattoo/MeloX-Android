@@ -156,7 +156,7 @@ class NeteaseLibraryClient(
 
         val trackIds = playlist.optJSONArray("trackIds") ?: JSONArray()
         val desiredIds = buildList {
-            for (index in 0 until minOf(trackIds.length(), 100)) {
+            for (index in 0 until trackIds.length()) {
                 trackIds.optJSONObject(index)?.optLong("id")
                     ?.takeIf { it > 0L }
                     ?.let(::add)
@@ -169,7 +169,9 @@ class NeteaseLibraryClient(
         }
         val missing = desiredIds.filterNot(byId::containsKey)
         if (missing.isNotEmpty()) {
-            songDetailsBlocking(missing).forEach { byId[it.id] = it }
+            missing.chunked(100).forEach { page ->
+                songDetailsBlocking(page).forEach { byId[it.id] = it }
+            }
         }
         val songs = if (desiredIds.isNotEmpty()) {
             desiredIds.mapNotNull(byId::get)
@@ -213,13 +215,20 @@ class NeteaseLibraryClient(
         return NeteasePlaylistSummary(
             id = id,
             name = value.optString("name").ifBlank { "未命名歌单" },
-            coverUrl = value.optString("coverImgUrl")
-                .takeIf(String::isNotBlank)
+            coverUrl = sequenceOf(
+                value.optString("coverImgUrl"),
+                value.optString("picUrl"),
+                value.optString("coverUrl"),
+            )
+                .firstOrNull(String::isNotBlank)
                 ?.let(::secureUrl),
             trackCount = value.optInt("trackCount").coerceAtLeast(0),
             creatorName = value.optJSONObject("creator")
                 ?.optString("nickname")
                 .orEmpty(),
+            creatorUserId = value.optJSONObject("creator")
+                ?.optLong("userId", -1L)
+                ?.takeIf { it > 0L },
             playCount = value.optLong("playCount", 0L).coerceAtLeast(0L),
             description = description,
         )

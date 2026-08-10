@@ -1,5 +1,6 @@
 package com.lladlam.melox.ui.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
@@ -13,6 +14,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -30,6 +32,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,11 +51,14 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource.Companion.UserInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.core.network.MeloXSearchKind
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -63,6 +69,7 @@ import kotlinx.coroutines.launch
 fun MeloXIOSNowPlayingSharedHost(
     state: MeloXPlaybackUiState,
     onDismiss: () -> Unit,
+    onNavigateSearch: (String, MeloXSearchKind) -> Unit = { _, _ -> },
     onSeekCollapse: suspend (Float) -> Unit,
     onSettleCollapse: suspend (Boolean) -> Unit,
     sharedTransitionScope: SharedTransitionScope,
@@ -73,9 +80,16 @@ fun MeloXIOSNowPlayingSharedHost(
         mutableStateOf(MeloXNowPlayingPage.Artwork)
     }
     var showActions by remember(state.mediaId) { mutableStateOf(false) }
+    var showQuality by remember(state.mediaId) { mutableStateOf(false) }
     var gestureCollapseProgress by remember(state.mediaId) { mutableFloatStateOf(0f) }
     var settleJob by remember(state.mediaId) { mutableStateOf<Job?>(null) }
     val scope = rememberCoroutineScope()
+    val hostView = LocalView.current
+    DisposableEffect(MeloXSettingsRuntime.keepScreenOn) {
+        val previous = hostView.keepScreenOn
+        hostView.keepScreenOn = MeloXSettingsRuntime.keepScreenOn
+        onDispose { hostView.keepScreenOn = previous }
+    }
 
     // Two distinct scenes avoid recursive glass sampling:
     // controls sample the flowing-light player scene; the actions overlay samples
@@ -108,6 +122,13 @@ fun MeloXIOSNowPlayingSharedHost(
             boundsTransform = MeloXPlayerLinearBoundsTransform,
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
         )
+    }
+
+    // NowPlaying owns the player-level Back handler. Child modal overlays are
+    // composed later and temporarily disable this handler, so Back always unwinds
+    // the topmost visual layer before the player itself is dismissed.
+    BackHandler(enabled = !showActions && !showQuality) {
+        onDismiss()
     }
 
     BoxWithConstraints(
@@ -235,10 +256,14 @@ fun MeloXIOSNowPlayingSharedHost(
                         .layerBackdrop(playerControlBackdrop)
                         .graphicsLayer { alpha = backdropAlpha },
                 ) {
-                    MeloXFlowingLightBackdrop(
-                        artworkUrl = state.artworkUrl,
-                        isPlaying = state.isPlaying,
-                    )
+                    if (MeloXSettingsRuntime.flowingBackdropEnabled) {
+                        MeloXFlowingLightBackdrop(
+                            artworkUrl = state.artworkUrl,
+                            isPlaying = state.isPlaying,
+                        )
+                    } else {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF15171B)))
+                    }
                 }
 
                 CompositionLocalProvider(LocalMeloXBackdrop provides playerControlBackdrop) {
@@ -258,7 +283,14 @@ fun MeloXIOSNowPlayingSharedHost(
                                     page = destination
                                 }
                             },
-                            onShowActions = { showActions = true },
+                            onShowActions = {
+                                showQuality = false
+                                showActions = true
+                            },
+                            onShowQuality = {
+                                showActions = false
+                                showQuality = true
+                            },
                             grabberDragModifier = alternateGrabberDragModifier,
                         )
                     }
@@ -279,6 +311,12 @@ fun MeloXIOSNowPlayingSharedHost(
                 state = state,
                 visible = showActions,
                 onDismiss = { showActions = false },
+                onNavigateSearch = onNavigateSearch,
+            )
+            MeloXQualitySelectionOverlay(
+                state = state,
+                visible = showQuality,
+                onDismiss = { showQuality = false },
             )
         }
     }
@@ -305,7 +343,7 @@ private fun SharedArtworkDestination(
     )
 
     val playbackScale by animateFloatAsState(
-        targetValue = if (state.isPlaying) 1f else 0.74f,
+        targetValue = if (!MeloXSettingsRuntime.artworkMotionEnabled || state.isPlaying) 1f else 0.74f,
         animationSpec = if (state.isPlaying) {
             spring(
                 dampingRatio = 0.70f,

@@ -1,6 +1,5 @@
 package com.lladlam.melox.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -87,7 +87,9 @@ import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.search.SearchScreen
+import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import com.lladlam.melox.ui.settings.SettingsScreen
+import com.lladlam.melox.core.network.MeloXSearchKind
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -282,7 +284,10 @@ fun MeloXApp(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
+                        // Explicit z-order is important here: this transparent hit-test
+                        // shield must sit above Scaffold/BottomChrome but below NowPlaying.
+                        .zIndex(10f)
+                        .pointerInput(fullPlayerVisible) {
                             awaitPointerEventScope {
                                 while (true) {
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -297,11 +302,18 @@ fun MeloXApp(
                 visible = { value -> value },
                 enter = EnterTransition.None,
                 exit = ExitTransition.None,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(20f),
             ) {
                 MeloXIOSNowPlayingSharedHost(
                     state = playbackState,
                     onDismiss = closePlayer,
+                    onNavigateSearch = { query, kind ->
+                        MeloXSearchLaunchBus.post(query, kind)
+                        selectedTab = AppTab.Search
+                        closePlayer()
+                    },
                     onSeekCollapse = { fraction ->
                         playerTransitionState.seekTo(
                             fraction = fraction.coerceIn(0f, 0.999f),
@@ -319,9 +331,6 @@ fun MeloXApp(
                 )
             }
 
-            BackHandler(enabled = fullPlayerVisible && !showNeteaseLogin) {
-                closePlayer()
-            }
         }
 
         if (showNeteaseLogin) {

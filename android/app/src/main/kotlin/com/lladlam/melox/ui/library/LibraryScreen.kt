@@ -84,12 +84,15 @@ import com.lladlam.melox.core.library.NeteaseLibrarySnapshot
 import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
+import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
+import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
+import com.lladlam.melox.ui.player.MeloXSongActionsOverlay
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -697,11 +700,35 @@ private fun MeloXPlaylistDetailScreen(
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
     val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
+    val accountClient = remember(appContext) {
+        NeteaseSearchClient(cookieProvider = { NeteaseSessionStore.readCookie(appContext) })
+    }
+    val operationsClient = remember(appContext) {
+        NeteaseMusicOperationsClient(cookieProvider = { NeteaseSessionStore.readCookie(appContext) })
+    }
     var detail by remember(initialPlaylist.id) { mutableStateOf<NeteasePlaylistDetail?>(null) }
     var loading by remember(initialPlaylist.id) { mutableStateOf(true) }
     var errorMessage by remember(initialPlaylist.id) { mutableStateOf<String?>(null) }
     var searchQuery by remember(initialPlaylist.id) { mutableStateOf("") }
+    var showPlaylistActions by remember(initialPlaylist.id) { mutableStateOf(false) }
+    var selectedTrackAction by remember(initialPlaylist.id) { mutableStateOf<SearchSong?>(null) }
+    var isSaved by remember(initialPlaylist.id) { mutableStateOf<Boolean?>(null) }
+    var savingPlaylist by remember(initialPlaylist.id) { mutableStateOf(false) }
     var palette by remember(initialPlaylist.coverUrl) { mutableStateOf(MeloXDetailPalette.LightFallback) }
+
+    suspend fun refreshSavedState() {
+        val cookie = NeteaseSessionStore.readCookie(appContext)
+        if (!NeteaseSessionStore.containsMusicU(cookie)) {
+            isSaved = null
+            return
+        }
+        runCatching {
+            val profile = accountClient.accountProfile(cookie)
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                client.userPlaylistsBlocking(profile.userId)
+            }.any { it.id == initialPlaylist.id }
+        }.onSuccess { isSaved = it }
+    }
 
     suspend fun refreshPlaylist() {
         loading = true
@@ -721,6 +748,10 @@ private fun MeloXPlaylistDetailScreen(
         if (NeteaseLibraryCache.beginPlaylistColdStartRefresh(initialPlaylist.id)) {
             refreshPlaylist()
         }
+    }
+
+    LaunchedEffect(initialPlaylist.id) {
+        refreshSavedState()
     }
 
     val displayed = detail?.summary ?: initialPlaylist
@@ -764,6 +795,8 @@ private fun MeloXPlaylistDetailScreen(
             MeloXPlaylistToolbar(
                 foreground = foreground,
                 onBack = onBack,
+                onShare = { sharePlaylistFromDetail(context, displayed) },
+                onMore = { showPlaylistActions = true },
             )
             MeloXPlaylistSearchField(
                 value = searchQuery,
@@ -801,6 +834,23 @@ private fun MeloXPlaylistDetailScreen(
                                     selectedSongId = first.id,
                                     onFailure = { errorMessage = it.message ?: "播放失败" },
                                 )
+                            }
+                        },
+                        isSaved = isSaved == true,
+                        onToggleSaved = {
+                            if (!savingPlaylist) {
+                                val desired = isSaved != true
+                                savingPlaylist = true
+                                scope.launch {
+                                    runCatching {
+                                        operationsClient.setPlaylistSubscribed(displayed.id, desired)
+                                    }.onSuccess {
+                                        isSaved = desired
+                                    }.onFailure {
+                                        errorMessage = it.message ?: "歌单收藏操作失败"
+                                    }
+                                    savingPlaylist = false
+                                }
                             }
                         },
                         sharedTransitionScope = sharedTransitionScope,
@@ -873,6 +923,7 @@ private fun MeloXPlaylistDetailScreen(
                                     onFailure = { errorMessage = it.message ?: "播放失败" },
                                 )
                             },
+                            onMore = { selectedTrackAction = song },
                         )
                         if (song.id != filteredSongs.lastOrNull()?.id) {
                             HorizontalDivider(
@@ -885,6 +936,22 @@ private fun MeloXPlaylistDetailScreen(
                 }
             }
         }
+
+        MeloXPlaylistActionsOverlay(
+            playlist = displayed,
+            visible = showPlaylistActions,
+            onDismiss = { showPlaylistActions = false },
+            onRefresh = { scope.launch { refreshPlaylist() } },
+        )
+        val actionSong = selectedTrackAction
+        if (actionSong != null) {
+            MeloXSongActionsOverlay(
+                song = actionSong,
+                queue = songs,
+                visible = true,
+                onDismiss = { selectedTrackAction = null },
+            )
+        }
     }
 }
 
@@ -892,6 +959,8 @@ private fun MeloXPlaylistDetailScreen(
 private fun MeloXPlaylistToolbar(
     foreground: Color,
     onBack: () -> Unit,
+    onShare: () -> Unit,
+    onMore: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -927,7 +996,8 @@ private fun MeloXPlaylistToolbar(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) {},
+                        onClick = onShare,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 MeloXShareGlyph(Modifier.size(22.dp), Color(0xFFFF3147))
@@ -938,7 +1008,8 @@ private fun MeloXPlaylistToolbar(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) {},
+                        onClick = onMore,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1010,11 +1081,14 @@ private fun MeloXStandardPlaylistHero(
     secondary: Color,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
+    isSaved: Boolean,
+    onToggleSaved: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val artworkSize = minOf(maxWidth * 0.68f, 300.dp)
+        var descriptionExpanded by remember(playlist.id) { mutableStateOf(false) }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1132,17 +1206,34 @@ private fun MeloXStandardPlaylistHero(
                 MeloXGlassCircleButton(
                     foreground = foreground,
                     size = 54.dp,
-                    onClick = {},
+                    onClick = onToggleSaved,
                 ) {
                     Text(
-                        "+",
+                        if (isSaved) "✓" else "+",
                         color = foreground,
-                        fontSize = 34.sp,
+                        fontSize = if (isSaved) 24.sp else 34.sp,
                         lineHeight = 34.sp,
-                        fontWeight = FontWeight.Light,
+                        fontWeight = if (isSaved) FontWeight.SemiBold else FontWeight.Light,
                     )
                 }
             }
+
+            playlist.description
+                ?.takeIf(String::isNotBlank)
+                ?.let { description ->
+                    Text(
+                        text = description,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, top = 24.dp)
+                            .clickable { descriptionExpanded = !descriptionExpanded },
+                        color = secondary,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        maxLines = if (descriptionExpanded) 12 else 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
         }
     }
 }
@@ -1153,6 +1244,7 @@ private fun MeloXPlaylistTrackRow(
     index: Int,
     foreground: Color,
     onClick: () -> Unit,
+    onMore: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -1192,7 +1284,8 @@ private fun MeloXPlaylistTrackRow(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) {},
+                    onClick = onMore,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -1370,4 +1463,17 @@ private fun optimized160Artwork(url: String?): String? {
     if (!source.contains(".music.126.net")) return source
     val separator = if (source.contains('?')) '&' else '?'
     return if (source.contains("param=")) source else "$source${separator}param=160y160"
+}
+
+private fun sharePlaylistFromDetail(context: android.content.Context, playlist: NeteasePlaylistSummary) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent.createChooser(
+                android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, "${playlist.name}\nhttps://music.163.com/playlist?id=${playlist.id}"),
+                "分享歌单",
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
 }
