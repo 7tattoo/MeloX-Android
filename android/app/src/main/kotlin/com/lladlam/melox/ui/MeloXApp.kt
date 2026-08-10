@@ -47,9 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -62,11 +64,13 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lladlam.melox.ui.library.LibraryScreen
 import com.lladlam.melox.ui.discovery.MeloXExploreScreen
@@ -80,6 +84,7 @@ import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.search.SearchScreen
 import com.lladlam.melox.ui.settings.SettingsScreen
+import kotlin.math.roundToInt
 
 enum class AppTab(val title: String) {
     Home("首页"),
@@ -104,8 +109,24 @@ fun MeloXApp(
     var scrollAccumulator by remember { mutableFloatStateOf(0f) }
     val playbackState = rememberMeloXPlaybackUiState()
     val neteaseSession = rememberNeteaseSessionStore()
-    val glassBackdrop = rememberLayerBackdrop()
-    val dynamicGlassEnabled = selectedTab == AppTab.Home || selectedTab == AppTab.Explore
+    val darkGlass = isSystemInDarkTheme()
+    // Page controls use a stable, non-recursive scene. The Dock samples the
+    // live page layer separately below. Keeping both scenes isolated prevents
+    // descendants from reading a LayerBackdrop while that same layer records.
+    val screenControlBackdrop = rememberCanvasBackdrop {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = if (darkGlass) {
+                    listOf(Color(0xFF31323A), Color(0xFF111219))
+                } else {
+                    listOf(Color(0xFFFDFDFE), Color(0xFFD9DCE2))
+                },
+                start = Offset.Zero,
+                end = Offset(size.width, size.height),
+            ),
+        )
+    }
+    val bottomChromeBackdrop = rememberLayerBackdrop()
 
     val tabBarMinimizeConnection = remember {
         object : NestedScrollConnection {
@@ -152,9 +173,7 @@ fun MeloXApp(
         scrollAccumulator = 0f
     }
 
-    CompositionLocalProvider(
-        LocalMeloXBackdrop provides if (dynamicGlassEnabled) glassBackdrop else null,
-    ) {
+    CompositionLocalProvider(LocalMeloXBackdrop provides screenControlBackdrop) {
       Box(modifier = Modifier.fillMaxSize()) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
@@ -163,10 +182,7 @@ fun MeloXApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(tabBarMinimizeConnection)
-                    .then(
-                        if (dynamicGlassEnabled) Modifier.layerBackdrop(glassBackdrop)
-                        else Modifier,
-                    ),
+                    .layerBackdrop(bottomChromeBackdrop),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 containerColor = MaterialTheme.colorScheme.background,
             ) { innerPadding ->
@@ -201,33 +217,34 @@ fun MeloXApp(
                 }
             }
 
-            MeloXBottomChrome(
-                selectedTab = selectedTab,
-                dynamicGlassEnabled = dynamicGlassEnabled,
-                onSelect = { tab ->
-                    tabBarMinimized = false
-                    selectedTab = tab
-                },
-                hasMedia = playbackState.hasMedia,
-                minimized = tabBarMinimized,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                miniPlayer = {
-                    AnimatedVisibility(
-                        visible = !fullPlayerVisible,
-                        enter = EnterTransition.None,
-                        exit = ExitTransition.None,
-                    ) {
-                        MeloXIOSMiniPlayer(
-                            state = playbackState,
-                            onExpand = { showNowPlaying = true },
-                            inline = tabBarMinimized,
-                            dynamicGlassEnabled = dynamicGlassEnabled,
-                            sharedTransitionScope = sharedScope,
-                            animatedVisibilityScope = this,
-                        )
-                    }
-                },
-            )
+            CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
+                MeloXBottomChrome(
+                    selectedTab = selectedTab,
+                    onSelect = { tab ->
+                        tabBarMinimized = false
+                        selectedTab = tab
+                    },
+                    hasMedia = playbackState.hasMedia,
+                    minimized = tabBarMinimized,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    miniPlayer = {
+                        AnimatedVisibility(
+                            visible = !fullPlayerVisible,
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
+                        ) {
+                            MeloXIOSMiniPlayer(
+                                state = playbackState,
+                                onExpand = { showNowPlaying = true },
+                                inline = tabBarMinimized,
+                                dynamicGlassEnabled = true,
+                                sharedTransitionScope = sharedScope,
+                                animatedVisibilityScope = this,
+                            )
+                        }
+                    },
+                )
+            }
 
             if (fullPlayerVisible) {
                 Box(
@@ -309,13 +326,13 @@ private fun MeloXSectionShell(
 @Composable
 private fun MeloXBottomChrome(
     selectedTab: AppTab,
-    dynamicGlassEnabled: Boolean,
     onSelect: (AppTab) -> Unit,
     hasMedia: Boolean,
     minimized: Boolean,
     modifier: Modifier = Modifier,
     miniPlayer: @Composable () -> Unit,
 ) {
+    val tabsBackdrop = rememberLayerBackdrop()
     val rawProgress by animateFloatAsState(
         targetValue = if (minimized) 1f else 0f,
         animationSpec = spring(
@@ -401,7 +418,7 @@ private fun MeloXBottomChrome(
                     .meloXLiquidBottomBar(
                         shape = navShape,
                         tint = bottomLiquidGlassTint(),
-                        surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.42f),
+                        surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.18f),
                     )
                     .pointerInput(progress, selectedTab) {
                         detectTapGestures { tap ->
@@ -417,20 +434,32 @@ private fun MeloXBottomChrome(
                 shape = navShape,
                 color = Color.Transparent,
                 border = null,
-                shadowElevation = if (dynamicGlassEnabled) {
-                    lerpDp(2.dp, 4.dp, progress)
-                } else {
-                    0.dp
-                },
+                shadowElevation = lerpDp(2.dp, 4.dp, progress),
                 tonalElevation = 0.dp,
             ) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
+                    // Mirror the official LiquidBottomTabs scene graph: record
+                    // an invisible panel layer so the selection can sample the
+                    // combined page + Dock glass instead of raw page pixels.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(0f)
+                            .layerBackdrop(tabsBackdrop)
+                            .meloXLiquidBottomBar(
+                                shape = navShape,
+                                tint = bottomLiquidGlassTint(),
+                                surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.18f),
+                            ),
+                    )
                     val selectedIndex = primaryTabs.indexOfFirst { it.first == selectedTab }
                     val lensPosition by animateFloatAsState(
                         targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
                         animationSpec = spring(
-                            dampingRatio = 0.78f,
-                            stiffness = 360f,
+                            // No overshoot: the selection glides between tabs
+                            // without the fractional-layer lean seen on device.
+                            dampingRatio = 1f,
+                            stiffness = 460f,
                             visibilityThreshold = 0.001f,
                         ),
                         label = "melox-tab-selection-position",
@@ -444,14 +473,22 @@ private fun MeloXBottomChrome(
                         modifier = Modifier
                             .fillMaxWidth(0.25f)
                             .fillMaxHeight()
+                            .offset {
+                                IntOffset(
+                                    x = (
+                                        lensPosition * constraints.maxWidth / 4f
+                                        ).roundToInt(),
+                                    y = 0,
+                                )
+                            }
                             .padding(4.dp)
                             .graphicsLayer {
                                 alpha = lensAlpha * expandedLayerAlpha
-                                translationX = lensPosition * constraints.maxWidth / 4f
                             }
                             .meloXLiquidTabSelection(
                                 shape = RoundedCornerShape(24.dp),
                                 selected = lensAlpha > 0.001f,
+                                panelBackdrop = tabsBackdrop,
                                 tint = if (dark) {
                                     Color.White.copy(alpha = 0.18f)
                                 } else {
@@ -509,17 +546,13 @@ private fun MeloXBottomChrome(
                         blurRadius = 6.dp,
                         lensRadius = 12.dp,
                         refractionHeight = 18.dp,
-                        surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.32f),
+                        surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.16f),
                     )
                     .clickable { onSelect(AppTab.Search) },
                 shape = CircleShape,
                 color = Color.Transparent,
                 border = null,
-                shadowElevation = if (dynamicGlassEnabled) {
-                    lerpDp(2.dp, 4.dp, progress)
-                } else {
-                    0.dp
-                },
+                shadowElevation = lerpDp(2.dp, 4.dp, progress),
                 tonalElevation = 0.dp,
             ) {
                 Box(contentAlignment = Alignment.Center) {

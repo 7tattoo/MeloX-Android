@@ -26,12 +26,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
-import com.kyant.shapes.Capsule
 import kotlinx.coroutines.launch
 
 /** The screen backdrop sampled by all MeloX liquid controls. */
@@ -69,16 +71,31 @@ fun Modifier.meloXLiquidButton(
     return this
         .drawBackdrop(
             backdrop = backdrop,
-            shape = { Capsule() },
+            shape = { shape },
             effects = {
                 vibrancy()
                 blur(blurRadius.toPx())
+                // AndroidLiquidGlass' official button uses a 12/24dp lens.
+                // Keep the same effect order with a shallower, non-chromatic
+                // lens: full demo refraction produced polygonal artifacts on
+                // the target MediaTek renderer.
+                lens(
+                    (lensRadius * 0.42f).toPx(),
+                    (refractionHeight * 0.32f).toPx(),
+                    chromaticAberration = false,
+                )
             },
             highlight = {
-                Highlight.Plain.copy(alpha = 0.48f + press.value * 0.30f)
+                Highlight.Default.copy(alpha = 0.44f + press.value * 0.36f)
             },
             shadow = {
-                Shadow(radius = 5.dp, alpha = 0.12f + press.value * 0.06f)
+                Shadow(radius = 4.dp, alpha = 0.14f + press.value * 0.08f)
+            },
+            innerShadow = {
+                InnerShadow(
+                    radius = 4.dp * press.value,
+                    alpha = press.value * 0.72f,
+                )
             },
             onDrawSurface = {
                 if (tint != Color.Unspecified) {
@@ -114,13 +131,17 @@ fun Modifier.meloXLiquidBottomBar(
     }
     return drawBackdrop(
         backdrop = backdrop,
-        shape = { Capsule() },
+        shape = { shape },
         effects = {
             vibrancy()
             blur(8.dp.toPx())
+            // Official LiquidBottomTabs uses a 24/24dp lens. A shallow lens
+            // preserves the edge refraction while remaining stable on the
+            // target GPU; blur and vibrancy remain at the official values.
+            lens(3.dp.toPx(), 4.dp.toPx(), chromaticAberration = false)
         },
-        highlight = { Highlight.Plain.copy(alpha = 0.56f) },
-        shadow = { Shadow(radius = 7.dp, alpha = 0.14f) },
+        highlight = { Highlight.Default.copy(alpha = 0.68f) },
+        shadow = { Shadow(radius = 6.dp, alpha = 0.16f) },
         onDrawSurface = {
             drawRect(tint, blendMode = BlendMode.Hue)
             drawRect(surfaceColor)
@@ -134,6 +155,7 @@ fun Modifier.meloXLiquidTabSelection(
     shape: Shape,
     selected: Boolean,
     tint: Color,
+    panelBackdrop: Backdrop? = null,
 ): Modifier {
     if (!selected) return this
     val backdrop = LocalMeloXBackdrop.current
@@ -141,15 +163,26 @@ fun Modifier.meloXLiquidTabSelection(
         return background(tint.copy(alpha = maxOf(tint.alpha, 0.36f)), shape)
             .border(0.5.dp, Color.White.copy(alpha = 0.58f), shape)
     }
+    // Official LiquidBottomTabs records the panel into a second Backdrop and
+    // samples the combined page + panel scene for the moving selection.
+    // Without this, the selected capsule samples page artwork directly and
+    // appears skewed or punched through.
+    val selectionBackdrop = if (panelBackdrop != null) {
+        rememberCombinedBackdrop(backdrop, panelBackdrop)
+    } else {
+        backdrop
+    }
     return drawBackdrop(
-        backdrop = backdrop,
-        shape = { Capsule() },
+        backdrop = selectionBackdrop,
+        shape = { shape },
         effects = {
-            vibrancy()
-            blur(2.dp.toPx())
+            // At rest the official selection has almost no refraction; the
+            // large chromatic lens is only introduced while dragging.
+            lens(0.25.dp.toPx(), 0.5.dp.toPx(), chromaticAberration = false)
         },
-        highlight = { Highlight.Plain.copy(alpha = 0.66f) },
-        shadow = { Shadow(radius = 3.dp, alpha = 0.16f) },
+        highlight = { Highlight.Default.copy(alpha = 0.56f) },
+        shadow = { Shadow(radius = 3.dp, alpha = 0.12f) },
+        innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.18f) },
         onDrawSurface = { drawRect(tint) },
     )
 }
