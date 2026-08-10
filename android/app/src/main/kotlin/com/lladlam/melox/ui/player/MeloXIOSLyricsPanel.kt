@@ -45,6 +45,7 @@ import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 private const val LYRIC_FRAME_DELAY_MS = 16L
 private const val FOCUS_COLOR_DURATION_MS = 120
@@ -157,6 +158,7 @@ fun MeloXIOSLyricsPanel(
                             line = line,
                             positionMs = renderedPositionMs,
                             active = index == highlightedIndex,
+                            distanceFromFocus = highlightedIndex?.let { abs(index - it) } ?: 0,
                             onClick = { state.seekTo(line.timeMs) },
                         )
                     }
@@ -171,6 +173,7 @@ private fun MeloXAnimatedLyricLine(
     line: LyricLine,
     positionMs: Long,
     active: Boolean,
+    distanceFromFocus: Int,
     onClick: () -> Unit,
 ) {
     // MeloX keeps focus color and focus geometry as separate transitions. The iOS
@@ -193,6 +196,30 @@ private fun MeloXAnimatedLyricLine(
         ),
         label = "lyric-focus-scale-${line.timeMs}",
     )
+    val distanceAlpha by animateFloatAsState(
+        targetValue = when (distanceFromFocus) {
+            0 -> 1f
+            1 -> 0.72f
+            2 -> 0.52f
+            3 -> 0.38f
+            else -> 0.28f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = 360f,
+            visibilityThreshold = 0.001f,
+        ),
+        label = "lyric-distance-alpha-${line.timeMs}",
+    )
+    val focusLift by animateFloatAsState(
+        targetValue = if (active) -5f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = 280f,
+            visibilityThreshold = 0.05f,
+        ),
+        label = "lyric-focus-lift-${line.timeMs}",
+    )
 
     // Reserve the promoted/current-line layout size for every item and only scale
     // its rendered layer. This mirrors MeloX's promotedLayoutScale idea and, most
@@ -205,6 +232,8 @@ private fun MeloXAnimatedLyricLine(
             .graphicsLayer {
                 scaleX = visualScale
                 scaleY = visualScale
+                alpha = distanceAlpha
+                translationY = focusLift
                 transformOrigin = TransformOrigin(0f, 0.5f)
             }
             .clickable(onClick = onClick)
