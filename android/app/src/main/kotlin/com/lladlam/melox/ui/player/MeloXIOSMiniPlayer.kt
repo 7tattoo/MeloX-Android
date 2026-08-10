@@ -49,7 +49,8 @@ import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 fun MeloXIOSMiniPlayer(
     state: MeloXPlaybackUiState,
     onExpand: () -> Unit,
-    compactProgress: Float = 0f,
+    inline: Boolean = false,
+    dynamicGlassEnabled: Boolean = true,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
@@ -131,11 +132,7 @@ fun MeloXIOSMiniPlayer(
                 )
             },
     ) {
-        val compact = compactProgress.coerceIn(0f, 1f)
         val miniShape = RoundedCornerShape(25.dp)
-        val artworkSize = lerpDp(40.dp, 30.dp, compact)
-        val artistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
-        val nextAlpha = 1f - smoothStep(compact, 0.08f, 0.68f)
         val dark = isSystemInDarkTheme()
         val glassTint = if (dark) {
             Color.Black.copy(alpha = 0.12f)
@@ -162,7 +159,7 @@ fun MeloXIOSMiniPlayer(
             color = Color.Transparent,
             border = null,
             tonalElevation = 0.dp,
-            shadowElevation = (2f * miniSurfaceAlpha).dp,
+            shadowElevation = if (dynamicGlassEnabled) (2f * miniSurfaceAlpha).dp else 0.dp,
         ) {}
 
         Row(
@@ -197,8 +194,8 @@ fun MeloXIOSMiniPlayer(
                 Artwork(
                     url = state.artworkUrl,
                     modifier = sharedArtworkModifier
-                        .size(artworkSize)
-                        .clip(RoundedCornerShape(lerpDp(9.dp, 7.dp, compact))),
+                        .size(if (inline) 30.dp else 40.dp)
+                        .clip(RoundedCornerShape(if (inline) 7.dp else 9.dp)),
                 )
 
                 Column(
@@ -218,17 +215,19 @@ fun MeloXIOSMiniPlayer(
                             alpha = miniChromeAlpha,
                         ),
                     )
-                    Text(
-                        text = state.artist,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 12.sp,
-                        lineHeight = 15.sp,
-                        softWrap = false,
-                        color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.54f * miniChromeAlpha * artistAlpha,
-                        ),
-                    )
+                    if (!inline) {
+                        Text(
+                            text = state.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp,
+                            softWrap = false,
+                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                alpha = 0.54f * miniChromeAlpha,
+                            ),
+                        )
+                    }
                 }
             }
 
@@ -237,15 +236,17 @@ fun MeloXIOSMiniPlayer(
                 enabled = true,
                 onClick = state::togglePlayPause,
                 modifier = chromeOverlayModifier,
-                visualAlpha = miniChromeAlpha * nextAlpha,
-            )
-            MiniVectorButton(
-                kind = MiniGlyph.Forward,
-                enabled = state.hasNext || state.repeatMode != 0,
-                onClick = state::next,
-                modifier = chromeOverlayModifier,
                 visualAlpha = miniChromeAlpha,
             )
+            if (!inline) {
+                MiniVectorButton(
+                    kind = MiniGlyph.Forward,
+                    enabled = state.hasNext || state.repeatMode != 0,
+                    onClick = state::next,
+                    modifier = chromeOverlayModifier,
+                    visualAlpha = miniChromeAlpha,
+                )
+            }
         }
     }
 }
@@ -325,6 +326,3 @@ private fun smoothStep(value: Float, start: Float, end: Float): Float {
     val t = ((value - start) / (end - start)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
 }
-
-private fun lerpDp(start: androidx.compose.ui.unit.Dp, end: androidx.compose.ui.unit.Dp, progress: Float) =
-    (start.value + (end.value - start.value) * progress.coerceIn(0f, 1f)).dp

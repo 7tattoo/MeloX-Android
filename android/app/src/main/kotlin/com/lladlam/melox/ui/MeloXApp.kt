@@ -105,6 +105,7 @@ fun MeloXApp(
     val playbackState = rememberMeloXPlaybackUiState()
     val neteaseSession = rememberNeteaseSessionStore()
     val glassBackdrop = rememberLayerBackdrop()
+    val dynamicGlassEnabled = selectedTab == AppTab.Home || selectedTab == AppTab.Explore
 
     val tabBarMinimizeConnection = remember {
         object : NestedScrollConnection {
@@ -151,7 +152,9 @@ fun MeloXApp(
         scrollAccumulator = 0f
     }
 
-    CompositionLocalProvider(LocalMeloXBackdrop provides glassBackdrop) {
+    CompositionLocalProvider(
+        LocalMeloXBackdrop provides if (dynamicGlassEnabled) glassBackdrop else null,
+    ) {
       Box(modifier = Modifier.fillMaxSize()) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
@@ -160,7 +163,10 @@ fun MeloXApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(tabBarMinimizeConnection)
-                    .layerBackdrop(glassBackdrop),
+                    .then(
+                        if (dynamicGlassEnabled) Modifier.layerBackdrop(glassBackdrop)
+                        else Modifier,
+                    ),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 containerColor = MaterialTheme.colorScheme.background,
             ) { innerPadding ->
@@ -197,6 +203,7 @@ fun MeloXApp(
 
             MeloXBottomChrome(
                 selectedTab = selectedTab,
+                dynamicGlassEnabled = dynamicGlassEnabled,
                 onSelect = { tab ->
                     tabBarMinimized = false
                     selectedTab = tab
@@ -204,7 +211,7 @@ fun MeloXApp(
                 hasMedia = playbackState.hasMedia,
                 minimized = tabBarMinimized,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                miniPlayer = { compactProgress ->
+                miniPlayer = {
                     AnimatedVisibility(
                         visible = !fullPlayerVisible,
                         enter = EnterTransition.None,
@@ -213,7 +220,8 @@ fun MeloXApp(
                         MeloXIOSMiniPlayer(
                             state = playbackState,
                             onExpand = { showNowPlaying = true },
-                            compactProgress = compactProgress,
+                            inline = tabBarMinimized,
+                            dynamicGlassEnabled = dynamicGlassEnabled,
                             sharedTransitionScope = sharedScope,
                             animatedVisibilityScope = this,
                         )
@@ -301,11 +309,12 @@ private fun MeloXSectionShell(
 @Composable
 private fun MeloXBottomChrome(
     selectedTab: AppTab,
+    dynamicGlassEnabled: Boolean,
     onSelect: (AppTab) -> Unit,
     hasMedia: Boolean,
     minimized: Boolean,
     modifier: Modifier = Modifier,
-    miniPlayer: @Composable (compactProgress: Float) -> Unit,
+    miniPlayer: @Composable () -> Unit,
 ) {
     val rawProgress by animateFloatAsState(
         targetValue = if (minimized) 1f else 0f,
@@ -377,7 +386,7 @@ private fun MeloXBottomChrome(
                         )
                         .width(miniWrapperWidth),
                 ) {
-                    miniPlayer(progress)
+                    miniPlayer()
                 }
             }
 
@@ -408,7 +417,11 @@ private fun MeloXBottomChrome(
                 shape = navShape,
                 color = Color.Transparent,
                 border = null,
-                shadowElevation = lerpDp(2.dp, 4.dp, progress),
+                shadowElevation = if (dynamicGlassEnabled) {
+                    lerpDp(2.dp, 4.dp, progress)
+                } else {
+                    0.dp
+                },
                 tonalElevation = 0.dp,
             ) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -502,7 +515,11 @@ private fun MeloXBottomChrome(
                 shape = CircleShape,
                 color = Color.Transparent,
                 border = null,
-                shadowElevation = lerpDp(2.dp, 4.dp, progress),
+                shadowElevation = if (dynamicGlassEnabled) {
+                    lerpDp(2.dp, 4.dp, progress)
+                } else {
+                    0.dp
+                },
                 tonalElevation = 0.dp,
             ) {
                 Box(contentAlignment = Alignment.Center) {
