@@ -39,6 +39,61 @@ class NeteaseLibraryClient(
     suspend fun playlistDetail(playlistId: Long): NeteasePlaylistDetail =
         withContext(Dispatchers.IO) { playlistDetailBlocking(playlistId) }
 
+    suspend fun homeContent(limit: Int = 12): NeteaseHomeContent = withContext(Dispatchers.IO) {
+        val authenticated = NeteaseSessionStore.containsMusicU(cookieProvider())
+        val playlistsResponse = eapi(
+            uri = "/api/personalized/playlist",
+            data = JSONObject().put("limit", limit).put("total", true).put("n", 1_000),
+            authenticated = authenticated,
+        )
+        val songsResponse = eapi(
+            uri = "/api/personalized/newsong",
+            data = JSONObject().put("type", "recommend").put("limit", limit).put("areaId", 0),
+            authenticated = authenticated,
+        )
+        val songItems = songsResponse.optJSONArray("result") ?: JSONArray()
+        val songs = buildList {
+            for (index in 0 until songItems.length()) {
+                val item = songItems.optJSONObject(index) ?: continue
+                parseSong(item.optJSONObject("song") ?: item)?.let(::add)
+            }
+        }
+        NeteaseHomeContent(
+            playlists = parsePlaylists(playlistsResponse.optJSONArray("result") ?: JSONArray()),
+            newSongs = songs,
+        )
+    }
+
+    suspend fun explorePlaylists(category: String, limit: Int = 50): List<NeteasePlaylistSummary> =
+        withContext(Dispatchers.IO) {
+            val authenticated = NeteaseSessionStore.containsMusicU(cookieProvider())
+            val response = when (category) {
+                "推荐歌单" -> eapi(
+                    "/api/personalized/playlist",
+                    JSONObject().put("limit", limit).put("total", true).put("n", 1_000),
+                    authenticated,
+                )
+                "排行榜" -> eapi("/api/toplist", JSONObject(), authenticated)
+                "精品歌单" -> eapi(
+                    "/api/playlist/highquality/list",
+                    JSONObject().put("cat", "全部").put("limit", limit).put("lasttime", 0).put("total", true),
+                    authenticated,
+                )
+                else -> eapi(
+                    "/api/playlist/list",
+                    JSONObject().put("cat", category).put("order", "hot").put("offset", 0)
+                        .put("limit", limit).put("total", true),
+                    authenticated,
+                )
+            }
+            val values = when (category) {
+                "推荐歌单" -> response.optJSONArray("result")
+                "排行榜" -> response.optJSONArray("list")
+                else -> response.optJSONArray("playlists")
+            } ?: JSONArray()
+            parsePlaylists(values)
+        }
+
     fun userPlaylistsBlocking(userId: Long, limit: Int = 2_000): List<NeteasePlaylistSummary> {
         ensureLoggedIn()
         val response = eapi(
@@ -85,14 +140,14 @@ class NeteaseLibraryClient(
     }
 
     fun playlistDetailBlocking(playlistId: Long): NeteasePlaylistDetail {
-        ensureLoggedIn()
+        val authenticated = NeteaseSessionStore.containsMusicU(cookieProvider())
         val response = eapi(
             uri = "/api/v6/playlist/detail",
             data = JSONObject()
                 .put("id", playlistId)
                 .put("n", 100)
                 .put("s", 8),
-            authenticated = true,
+            authenticated = authenticated,
         )
         val playlist = response.optJSONObject("playlist")
             ?: throw IOException("网易云没有返回歌单详情")
@@ -132,7 +187,7 @@ class NeteaseLibraryClient(
         val response = eapi(
             uri = "/api/v3/song/detail",
             data = JSONObject().put("c", descriptors.toString()),
-            authenticated = true,
+            authenticated = NeteaseSessionStore.containsMusicU(cookieProvider()),
         )
         val songs = response.optJSONArray("songs") ?: JSONArray()
         return buildList {

@@ -69,6 +69,8 @@ import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lladlam.melox.ui.library.LibraryScreen
+import com.lladlam.melox.ui.discovery.MeloXExploreScreen
+import com.lladlam.melox.ui.discovery.MeloXHomeScreen
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
@@ -169,14 +171,8 @@ fun MeloXApp(
                 ) {
                     when (selectedTab) {
                         AppTab.Search -> SearchScreen()
-                        AppTab.Home -> MeloXSectionShell(
-                            "首页",
-                            "每日推荐与个性化内容将按 iOS MeloX 结构接入。",
-                        )
-                        AppTab.Explore -> MeloXSectionShell(
-                            "发现",
-                            "推荐、排行榜、精品与分类内容正在迁移。",
-                        )
+                        AppTab.Home -> MeloXHomeScreen()
+                        AppTab.Explore -> MeloXExploreScreen()
                         AppTab.Library -> LibraryScreen(
                             session = neteaseSession,
                             // Back ownership is state-based instead of relying on
