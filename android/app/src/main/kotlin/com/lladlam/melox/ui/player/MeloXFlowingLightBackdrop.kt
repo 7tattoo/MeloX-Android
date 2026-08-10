@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
@@ -35,11 +36,12 @@ internal fun MeloXFlowingLightBackdrop(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var targetPalette by remember { mutableStateOf(ArtworkDynamicPalette.Fallback) }
     var phase by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(artworkUrl) {
-        targetPalette = ArtworkDynamicPaletteProvider.paletteFor(artworkUrl)
+        targetPalette = ArtworkDynamicPaletteProvider.paletteFor(context, artworkUrl)
     }
 
     LaunchedEffect(isPlaying, artworkUrl) {
