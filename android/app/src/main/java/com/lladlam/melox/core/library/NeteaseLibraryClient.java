@@ -82,7 +82,7 @@ public final class NeteaseLibraryClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryClient$snapshot$2 */
     /* JADX INFO: compiled from: NeteaseLibraryClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/library/NeteaseLibrarySnapshot;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryClient$snapshot$2", m720f = "NeteaseLibraryClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryClient$snapshot$2", f = "NeteaseLibraryClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26102 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super NeteaseLibrarySnapshot>, Object> {
         final /* synthetic */ long $userId;
         int label;
@@ -126,7 +126,7 @@ public final class NeteaseLibraryClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryClient$playlistDetail$2 */
     /* JADX INFO: compiled from: NeteaseLibraryClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/library/NeteasePlaylistDetail;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryClient$playlistDetail$2", m720f = "NeteaseLibraryClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryClient$playlistDetail$2", f = "NeteaseLibraryClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26092 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super NeteasePlaylistDetail>, Object> {
         final /* synthetic */ long $playlistId;
         int label;
@@ -174,7 +174,7 @@ public final class NeteaseLibraryClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryClient$discoveryPlaylists$2 */
     /* JADX INFO: compiled from: NeteaseLibraryClient.kt */
     @Metadata(d1 = {"\u0000\u000e\n\u0000\n\u0002\u0010 \n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\b\u0012\u0004\u0012\u00020\u00020\u0001*\u00020\u0003H\n"}, d2 = {"<anonymous>", "", "Lcom/lladlam/melox/core/library/NeteasePlaylistSummary;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryClient$discoveryPlaylists$2", m720f = "NeteaseLibraryClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryClient$discoveryPlaylists$2", f = "NeteaseLibraryClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26072 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super List<? extends NeteasePlaylistSummary>>, Object> {
         final /* synthetic */ String $category;
         final /* synthetic */ int $limit;
@@ -264,7 +264,7 @@ public final class NeteaseLibraryClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryClient$homeSnapshot$2 */
     /* JADX INFO: compiled from: NeteaseLibraryClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/library/NeteaseHomeSnapshot;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryClient$homeSnapshot$2", m720f = "NeteaseLibraryClient.kt", m721i = {}, m722l = {95, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {}, m725nl = {ResolvedStyleKt.InheritedFlags, 94}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryClient$homeSnapshot$2", f = "NeteaseLibraryClient.kt", i = {}, l = {95, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {}, nl = {ResolvedStyleKt.InheritedFlags, 94}, s = {}, v = 2)
     static final class C26082 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super NeteaseHomeSnapshot>, Object> {
         Object L$0;
         int label;

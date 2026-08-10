@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXIOSNowPlayingSharedHost.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$dragState$1$1$1", m720f = "MeloXIOSNowPlayingSharedHost.kt", m721i = {}, m722l = {66}, m723m = "invokeSuspend", m724n = {}, m725nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, m726s = {}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$dragState$1$1$1", f = "MeloXIOSNowPlayingSharedHost.kt", i = {}, l = {66}, m = "invokeSuspend", n = {}, nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, s = {}, v = 2)
 final class C2664x7fe5eddb extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ Animatable<Float, AnimationVector1D> $dragOffset;
     final /* synthetic */ float $next;

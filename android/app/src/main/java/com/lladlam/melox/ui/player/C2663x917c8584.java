@@ -22,7 +22,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXIOSNowPlayingSharedHost.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\u0010\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0007\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u0004H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;", "velocity", ""}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$2$2$1", m720f = "MeloXIOSNowPlayingSharedHost.kt", m721i = {0, 0, 1, 1}, m722l = {145, 151}, m723m = "invokeSuspend", m724n = {"velocity", "shouldDismiss", "velocity", "shouldDismiss"}, m725nl = {149, 160}, m726s = {"F$0", "I$0", "F$0", "I$0"}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$2$2$1", f = "MeloXIOSNowPlayingSharedHost.kt", i = {0, 0, 1, 1}, l = {145, 151}, m = "invokeSuspend", n = {"velocity", "shouldDismiss", "velocity", "shouldDismiss"}, nl = {149, 160}, s = {"F$0", "I$0", "F$0", "I$0"}, v = 2)
 final class C2663x917c8584 extends SuspendLambda implements Function3<CoroutineScope, Float, Continuation<? super Unit>, Object> {
     final /* synthetic */ MutableState<Boolean> $committingDismiss$delegate;
     final /* synthetic */ float $dismissThresholdPx;

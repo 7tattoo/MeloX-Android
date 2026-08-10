@@ -61,7 +61,7 @@ public final class ArtworkDynamicPaletteProvider {
     /* JADX INFO: renamed from: com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3 */
     /* JADX INFO: compiled from: ArtworkDynamicPalette.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/ui/player/ArtworkDynamicPalette;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3", m720f = "ArtworkDynamicPalette.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3", f = "ArtworkDynamicPalette.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26503 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super ArtworkDynamicPalette>, Object> {
         final /* synthetic */ String $source;
         private /* synthetic */ Object L$0;

@@ -667,7 +667,7 @@ public final class MeloXAppKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1 */
                         /* JADX INFO: compiled from: MeloXApp.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(m719c = "com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1", m720f = "MeloXApp.kt", m721i = {0}, m722l = {243}, m723m = "invokeSuspend", m724n = {"$this$awaitPointerEventScope"}, m725nl = {244}, m726s = {"L$0"}, m727v = 2)
+                        @DebugMetadata(c = "com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1", f = "MeloXApp.kt", i = {0}, l = {243}, m = "invokeSuspend", n = {"$this$awaitPointerEventScope"}, nl = {244}, s = {"L$0"}, v = 2)
                         static final class C26181 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                             private /* synthetic */ Object L$0;
                             int label;

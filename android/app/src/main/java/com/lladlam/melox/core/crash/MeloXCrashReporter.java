@@ -24,15 +24,15 @@ import kotlin.ResultKt;
 import kotlin.Unit;
 import kotlin.collections.CollectionsKt;
 import kotlin.jvm.internal.Intrinsics;
-import kotlin.io.CloseableKt;
-import kotlin.io.FilesKt;
+import kotlin.p013io.CloseableKt;
+import kotlin.p013io.FilesKt;
 import kotlin.text.Charsets;
 import kotlin.text.Regex;
 import kotlin.text.StringsKt;
 
 /* JADX INFO: compiled from: MeloXCrashReporter.kt */
 /* JADX INFO: loaded from: classes8.dex */
-@Metadata(d1 = {"\u0000Z\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u000e\n\u0002\b\u0005\n\u0002\u0010\b\n\u0000\n\u0002\u0010\t\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0010\u000b\n\u0002\b\u0007\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0003\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\bÇ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\u000e\u0010\u0011\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u0014J\u0016\u0010\u0015\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u00142\u0006\u0010\u0016\u001a\u00020\u0005J\u0010\u0010\u0017\u001a\u0004\u0018\u00010\u00052\u0006\u0010\u0013\u001a\u00020\u0014J\u000e\u0010\u0018\u001a\u00020\u00192\u0006\u0010\u0013\u001a\u00020\u0014J\u0012\u0010\u001a\u001a\u0004\u0018\u00010\u00052\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0010\u0010\u001b\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0010\u0010\u001c\u001a\u00020\u00192\u0006\u0010\u001d\u001a\u00020\u000bH\u0002J\u0010\u0010\u001e\u001a\u00020\u00052\u0006\u0010\u001d\u001a\u00020\u000bH\u0002J\u0018\u0010\u001f\u001a\u00020\u00052\u0006\u0010 \u001a\u00020!2\u0006\u0010\"\u001a\u00020#H\u0002J\u0010\u0010$\u001a\u00020\u00052\u0006\u0010%\u001a\u00020\u0005H\u0002J\u0018\u0010&\u001a\u00020\u00192\u0006\u0010\u0013\u001a\u00020\u00142\u0006\u0010'\u001a\u00020\u0005H\u0002J\u0010\u0010(\u001a\u00020)2\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0018\u0010*\u001a\n ,*\u0004\u0018\u00010+0+2\u0006\u0010\u0013\u001a\u00020\u0014H\u0002R\u000e\u0010\u0004\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u0006\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u0007\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\b\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\t\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\n\u001a\u00020\u000bX\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\f\u001a\u00020\rX\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u000e\u001a\u00020\u000fX\u0082\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\u0010\u001a\u00020\u000fX\u0082\u0004¢\u0006\u0002\n\u0000¨\u0006-"}, d2 = {"Lcom/lladlam/melox/core/crash/MeloXCrashReporter;", "", "<init>", "()V", "PENDING_REPORT_FILE", "", "PREFS_NAME", "LAST_ACTION", "LAST_ACTION_TIME", "LAST_SEEN_EXIT_TIME", "MAX_REPORT_LENGTH", "", "ACTION_EXIT_WINDOW_MS", "", "installed", "Ljava/util/concurrent/atomic/AtomicBoolean;", "handlingCrash", "install", "", "context", "Landroid/content/Context;", "recordAction", "action", "restoreBestAvailableReportToClipboard", "restorePendingReportToClipboard", "", "buildHistoricalExitReport", "markHistoricalExitsSeen", "isActionableExit", "reason", "reasonName", "buildReport", "thread", "Ljava/lang/Thread;", "throwable", "", "redact", "value", "copyToClipboard", "report", "pendingReportFile", "Ljava/io/File;", "preferences", "Landroid/content/SharedPreferences;", "kotlin.jvm.PlatformType", "app"}, k = 1, mv = {2, 3, 0}, xi = 48)
+@Metadata(m709d1 = {"\u0000Z\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u000e\n\u0002\b\u0005\n\u0002\u0010\b\n\u0000\n\u0002\u0010\t\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0010\u000b\n\u0002\b\u0007\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0003\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\bÇ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\u000e\u0010\u0011\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u0014J\u0016\u0010\u0015\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u00142\u0006\u0010\u0016\u001a\u00020\u0005J\u0010\u0010\u0017\u001a\u0004\u0018\u00010\u00052\u0006\u0010\u0013\u001a\u00020\u0014J\u000e\u0010\u0018\u001a\u00020\u00192\u0006\u0010\u0013\u001a\u00020\u0014J\u0012\u0010\u001a\u001a\u0004\u0018\u00010\u00052\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0010\u0010\u001b\u001a\u00020\u00122\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0010\u0010\u001c\u001a\u00020\u00192\u0006\u0010\u001d\u001a\u00020\u000bH\u0002J\u0010\u0010\u001e\u001a\u00020\u00052\u0006\u0010\u001d\u001a\u00020\u000bH\u0002J\u0018\u0010\u001f\u001a\u00020\u00052\u0006\u0010 \u001a\u00020!2\u0006\u0010\"\u001a\u00020#H\u0002J\u0010\u0010$\u001a\u00020\u00052\u0006\u0010%\u001a\u00020\u0005H\u0002J\u0018\u0010&\u001a\u00020\u00192\u0006\u0010\u0013\u001a\u00020\u00142\u0006\u0010'\u001a\u00020\u0005H\u0002J\u0010\u0010(\u001a\u00020)2\u0006\u0010\u0013\u001a\u00020\u0014H\u0002J\u0018\u0010*\u001a\n ,*\u0004\u0018\u00010+0+2\u0006\u0010\u0013\u001a\u00020\u0014H\u0002R\u000e\u0010\u0004\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u0006\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u0007\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\b\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\t\u001a\u00020\u0005X\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\n\u001a\u00020\u000bX\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\f\u001a\u00020\rX\u0082T¢\u0006\u0002\n\u0000R\u000e\u0010\u000e\u001a\u00020\u000fX\u0082\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\u0010\u001a\u00020\u000fX\u0082\u0004¢\u0006\u0002\n\u0000¨\u0006-"}, m710d2 = {"Lcom/lladlam/melox/core/crash/MeloXCrashReporter;", "", "<init>", "()V", "PENDING_REPORT_FILE", "", "PREFS_NAME", "LAST_ACTION", "LAST_ACTION_TIME", "LAST_SEEN_EXIT_TIME", "MAX_REPORT_LENGTH", "", "ACTION_EXIT_WINDOW_MS", "", "installed", "Ljava/util/concurrent/atomic/AtomicBoolean;", "handlingCrash", "install", "", "context", "Landroid/content/Context;", "recordAction", "action", "restoreBestAvailableReportToClipboard", "restorePendingReportToClipboard", "", "buildHistoricalExitReport", "markHistoricalExitsSeen", "isActionableExit", "reason", "reasonName", "buildReport", "thread", "Ljava/lang/Thread;", "throwable", "", "redact", "value", "copyToClipboard", "report", "pendingReportFile", "Ljava/io/File;", "preferences", "Landroid/content/SharedPreferences;", "kotlin.jvm.PlatformType", "app"}, m711k = 1, m712mv = {2, 3, 0}, m714xi = 48)
 public final class MeloXCrashReporter {
     private static final long ACTION_EXIT_WINDOW_MS = 600000;
     private static final String LAST_ACTION = "last_action";
@@ -74,19 +74,19 @@ public final class MeloXCrashReporter {
                 Result.Companion companion = Result.INSTANCE;
                 Intrinsics.checkNotNull($appContext);
                 FilesKt.writeText$default(meloXCrashReporter2.pendingReportFile($appContext), report, null, 2, null);
-                Result.constructor_impl(Unit.INSTANCE);
+                Result.m9714constructorimpl(Unit.INSTANCE);
             } catch (Throwable th) {
                 Result.Companion companion2 = Result.INSTANCE;
-                Result.constructor_impl(ResultKt.createFailure(th));
+                Result.m9714constructorimpl(ResultKt.createFailure(th));
             }
             MeloXCrashReporter meloXCrashReporter3 = INSTANCE;
             try {
                 Result.Companion companion3 = Result.INSTANCE;
                 Intrinsics.checkNotNull($appContext);
-                Result.constructor_impl(Boolean.valueOf(meloXCrashReporter3.copyToClipboard($appContext, report)));
+                Result.m9714constructorimpl(Boolean.valueOf(meloXCrashReporter3.copyToClipboard($appContext, report)));
             } catch (Throwable th2) {
                 Result.Companion companion4 = Result.INSTANCE;
-                Result.constructor_impl(ResultKt.createFailure(th2));
+                Result.m9714constructorimpl(ResultKt.createFailure(th2));
             }
         }
         if ($previousHandler != null) {
@@ -117,10 +117,10 @@ public final class MeloXCrashReporter {
                 } else {
                     unit = null;
                 }
-                Result.constructor_impl(unit);
+                Result.m9714constructorimpl(unit);
             } catch (Throwable th) {
                 Result.Companion companion2 = Result.INSTANCE;
-                Result.constructor_impl(ResultKt.createFailure(th));
+                Result.m9714constructorimpl(ResultKt.createFailure(th));
             }
         }
     }
@@ -138,12 +138,12 @@ public final class MeloXCrashReporter {
         }
         try {
             Result.Companion companion = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor_impl(Boolean.valueOf(copyToClipboard(context, report)));
+            objM9714constructorimpl = Result.m9714constructorimpl(Boolean.valueOf(copyToClipboard(context, report)));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.m9714constructorimpl(ResultKt.createFailure(th));
         }
-        if (Result.isFailure_impl(objM9714constructorimpl)) {
+        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
             objM9714constructorimpl = false;
         }
         if (((Boolean) objM9714constructorimpl).booleanValue()) {
@@ -163,12 +163,12 @@ public final class MeloXCrashReporter {
         try {
             Result.Companion companion = Result.INSTANCE;
             MeloXCrashReporter meloXCrashReporter = this;
-            objM9714constructorimpl = Result.constructor_impl(FilesKt.readText$default(file, null, 1, null));
+            objM9714constructorimpl = Result.m9714constructorimpl(FilesKt.readText$default(file, null, 1, null));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.m9714constructorimpl(ResultKt.createFailure(th));
         }
-        if (Result.isFailure_impl(objM9714constructorimpl)) {
+        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
             objM9714constructorimpl = null;
         }
         String str = (String) objM9714constructorimpl;
@@ -177,12 +177,12 @@ public final class MeloXCrashReporter {
             if (report != null) {
                 try {
                     Result.Companion companion3 = Result.INSTANCE;
-                    objM9714constructorimpl2 = Result.constructor_impl(Boolean.valueOf(copyToClipboard(context, report)));
+                    objM9714constructorimpl2 = Result.m9714constructorimpl(Boolean.valueOf(copyToClipboard(context, report)));
                 } catch (Throwable th2) {
                     Result.Companion companion4 = Result.INSTANCE;
-                    objM9714constructorimpl2 = Result.constructor_impl(ResultKt.createFailure(th2));
+                    objM9714constructorimpl2 = Result.m9714constructorimpl(ResultKt.createFailure(th2));
                 }
-                if (Result.isFailure_impl(objM9714constructorimpl2)) {
+                if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
                     objM9714constructorimpl2 = false;
                 }
                 boolean copied = ((Boolean) objM9714constructorimpl2).booleanValue();
@@ -190,10 +190,10 @@ public final class MeloXCrashReporter {
                     try {
                         Result.Companion companion5 = Result.INSTANCE;
                         MeloXCrashReporter meloXCrashReporter2 = this;
-                        Result.constructor_impl(Boolean.valueOf(file.delete()));
+                        Result.m9714constructorimpl(Boolean.valueOf(file.delete()));
                     } catch (Throwable th3) {
                         Result.Companion companion6 = Result.INSTANCE;
-                        Result.constructor_impl(ResultKt.createFailure(th3));
+                        Result.m9714constructorimpl(ResultKt.createFailure(th3));
                     }
                 }
                 return copied;
@@ -250,17 +250,17 @@ public final class MeloXCrashReporter {
                 if (historicalProcessExitReasons == null) {
                     historicalProcessExitReasons = CollectionsKt.emptyList();
                 }
-                objM9714constructorimpl = Result.constructor_impl(historicalProcessExitReasons);
+                objM9714constructorimpl = Result.m9714constructorimpl(historicalProcessExitReasons);
             } catch (Throwable th2) {
                 th = th2;
                 Result.Companion companion2 = Result.INSTANCE;
-                objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
+                objM9714constructorimpl = Result.m9714constructorimpl(ResultKt.createFailure(th));
             }
         } catch (Throwable th3) {
             th = th3;
         }
         List listEmptyList = CollectionsKt.emptyList();
-        if (Result.isFailure_impl(objM9714constructorimpl)) {
+        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
             objM9714constructorimpl = listEmptyList;
         }
         Iterable exits = (List) objM9714constructorimpl;
@@ -373,12 +373,12 @@ public final class MeloXCrashReporter {
                     processState2 = processState;
                     lValueOf2 = null;
                 }
-                objM9714constructorimpl2 = Result.constructor_impl(lValueOf2);
+                objM9714constructorimpl2 = Result.m9714constructorimpl(lValueOf2);
             } catch (Throwable th8) {
                 th = th8;
                 Result.Companion companion4 = Result.INSTANCE;
-                objM9714constructorimpl2 = Result.constructor_impl(ResultKt.createFailure(th));
-                if (Result.isFailure_impl(objM9714constructorimpl2)) {
+                objM9714constructorimpl2 = Result.m9714constructorimpl(ResultKt.createFailure(th));
+                if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
                     obj = null;
                 } else {
                     obj = objM9714constructorimpl2;
@@ -418,7 +418,7 @@ public final class MeloXCrashReporter {
             th = th9;
             processState2 = processState;
         }
-        if (Result.isFailure_impl(objM9714constructorimpl2)) {
+        if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
             obj = null;
         } else {
             obj = objM9714constructorimpl2;
@@ -466,12 +466,12 @@ public final class MeloXCrashReporter {
             Result.Companion companion = Result.INSTANCE;
             MeloXCrashReporter meloXCrashReporter = this;
             ActivityManager activityManager = (ActivityManager) context.getSystemService(ActivityManager.class);
-            objM9714constructorimpl = Result.constructor_impl((activityManager == null || (historicalProcessExitReasons = activityManager.getHistoricalProcessExitReasons(context.getPackageName(), 0, 1)) == null || (applicationExitInfo = (ApplicationExitInfo) CollectionsKt.firstOrNull((List) historicalProcessExitReasons)) == null) ? null : Long.valueOf(applicationExitInfo.getTimestamp()));
+            objM9714constructorimpl = Result.m9714constructorimpl((activityManager == null || (historicalProcessExitReasons = activityManager.getHistoricalProcessExitReasons(context.getPackageName(), 0, 1)) == null || (applicationExitInfo = (ApplicationExitInfo) CollectionsKt.firstOrNull((List) historicalProcessExitReasons)) == null) ? null : Long.valueOf(applicationExitInfo.getTimestamp()));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.m9714constructorimpl(ResultKt.createFailure(th));
         }
-        Long l = (Long) (Result.isFailure_impl(objM9714constructorimpl) ? null : objM9714constructorimpl);
+        Long l = (Long) (Result.m9720isFailureimpl(objM9714constructorimpl) ? null : objM9714constructorimpl);
         if (l != null) {
             long newestTimestamp = l.longValue();
             preferences(context).edit().putLong(LAST_SEEN_EXIT_TIME, newestTimestamp).apply();

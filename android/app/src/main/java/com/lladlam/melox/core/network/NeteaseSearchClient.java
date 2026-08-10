@@ -75,7 +75,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$ensureArtwork$3 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient", m720f = "NeteaseSearchClient.kt", m721i = {0}, m722l = {159}, m723m = "ensureArtwork", m724n = {"song"}, m725nl = {-1}, m726s = {"L$0"}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient", f = "NeteaseSearchClient.kt", i = {0}, l = {159}, m = "ensureArtwork", n = {"song"}, nl = {-1}, s = {"L$0"}, v = 2)
     static final class C26133 extends ContinuationImpl {
         Object L$0;
         int label;
@@ -131,7 +131,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$accountProfile$2 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/account/NeteaseAccountProfile;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient$accountProfile$2", m720f = "NeteaseSearchClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient$accountProfile$2", f = "NeteaseSearchClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26112 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super NeteaseAccountProfile>, Object> {
         final /* synthetic */ String $cookieHeader;
         int label;
@@ -210,7 +210,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$searchSongs$2 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(d1 = {"\u0000\u000e\n\u0000\n\u0002\u0010 \n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\b\u0012\u0004\u0012\u00020\u00020\u0001*\u00020\u0003H\n"}, d2 = {"<anonymous>", "", "Lcom/lladlam/melox/core/model/SearchSong;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient$searchSongs$2", m720f = "NeteaseSearchClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient$searchSongs$2", f = "NeteaseSearchClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26162 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super List<? extends SearchSong>>, Object> {
         final /* synthetic */ String $keywords;
         final /* synthetic */ int $limit;
@@ -340,7 +340,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$ensureArtwork$2 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(d1 = {"\u0000\u000e\n\u0000\n\u0002\u0010 \n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\b\u0012\u0004\u0012\u00020\u00020\u0001*\u00020\u0003H\n"}, d2 = {"<anonymous>", "", "Lcom/lladlam/melox/core/model/SearchSong;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient$ensureArtwork$2", m720f = "NeteaseSearchClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient$ensureArtwork$2", f = "NeteaseSearchClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26122 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super List<? extends SearchSong>>, Object> {
         final /* synthetic */ List<SearchSong> $songs;
         private /* synthetic */ Object L$0;
@@ -561,7 +561,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$lyrics$2 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/lyrics/LyricsDocument;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient$lyrics$2", m720f = "NeteaseSearchClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient$lyrics$2", f = "NeteaseSearchClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26142 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super LyricsDocument>, Object> {
         final /* synthetic */ long $songId;
         int label;
@@ -634,7 +634,7 @@ public final class NeteaseSearchClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.network.NeteaseSearchClient$playbackUrl$2 */
     /* JADX INFO: compiled from: NeteaseSearchClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u000e\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.network.NeteaseSearchClient$playbackUrl$2", m720f = "NeteaseSearchClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.network.NeteaseSearchClient$playbackUrl$2", f = "NeteaseSearchClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
     static final class C26152 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super String>, Object> {
         final /* synthetic */ long $songId;
         int label;

@@ -15,7 +15,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: SettingsScreen.kt */
 /* JADX INFO: loaded from: classes7.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.settings.SettingsScreenKt$SettingsScreen$1$1", m720f = "SettingsScreen.kt", m721i = {}, m722l = {MotionEventCompat.AXIS_GENERIC_10}, m723m = "invokeSuspend", m724n = {}, m725nl = {42}, m726s = {}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.settings.SettingsScreenKt$SettingsScreen$1$1", f = "SettingsScreen.kt", i = {}, l = {MotionEventCompat.AXIS_GENERIC_10}, m = "invokeSuspend", n = {}, nl = {42}, s = {}, v = 2)
 final class SettingsScreenKt$SettingsScreen$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ NeteaseSessionStore $session;
     int label;

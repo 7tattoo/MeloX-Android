@@ -20,7 +20,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: LibraryScreen.kt */
 /* JADX INFO: loaded from: classes3.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.library.LibraryScreenKt$LibraryScreen$1$1", m720f = "LibraryScreen.kt", m721i = {0, 1}, m722l = {TsExtractor.TS_STREAM_TYPE_E_AC3, 137}, m723m = "invokeSuspend", m724n = {"userId", "userId"}, m725nl = {1300, TsExtractor.TS_STREAM_TYPE_DTS_UHD}, m726s = {"J$0", "J$0"}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.library.LibraryScreenKt$LibraryScreen$1$1", f = "LibraryScreen.kt", i = {0, 1}, l = {TsExtractor.TS_STREAM_TYPE_E_AC3, 137}, m = "invokeSuspend", n = {"userId", "userId"}, nl = {1300, TsExtractor.TS_STREAM_TYPE_DTS_UHD}, s = {"J$0", "J$0"}, v = 2)
 final class LibraryScreenKt$LibraryScreen$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ NeteaseLibraryCache $cache;
     final /* synthetic */ NeteaseLibraryClient $client;

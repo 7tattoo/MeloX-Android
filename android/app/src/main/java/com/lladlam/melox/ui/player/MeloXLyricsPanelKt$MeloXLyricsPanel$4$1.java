@@ -17,7 +17,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXLyricsPanel.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXLyricsPanelKt$MeloXLyricsPanel$4$1", m720f = "MeloXLyricsPanel.kt", m721i = {0, 0, 0, 0, 0}, m722l = {98}, m723m = "invokeSuspend", m724n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "index", "target", "$i$a$-runCatching-MeloXLyricsPanelKt$MeloXLyricsPanel$4$1$1\\1\\98\\0"}, m725nl = {98}, m726s = {"L$0", "L$1", "I$0", "I$1", "I$2"}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXLyricsPanelKt$MeloXLyricsPanel$4$1", f = "MeloXLyricsPanel.kt", i = {0, 0, 0, 0, 0}, l = {98}, m = "invokeSuspend", n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "index", "target", "$i$a$-runCatching-MeloXLyricsPanelKt$MeloXLyricsPanel$4$1$1\\1\\98\\0"}, nl = {98}, s = {"L$0", "L$1", "I$0", "I$1", "I$2"}, v = 2)
 final class MeloXLyricsPanelKt$MeloXLyricsPanel$4$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ Integer $highlightedIndex;
     final /* synthetic */ LazyListState $listState;

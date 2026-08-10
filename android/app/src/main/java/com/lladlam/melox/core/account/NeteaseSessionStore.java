@@ -59,7 +59,7 @@ public final class NeteaseSessionStore {
     /* JADX INFO: renamed from: com.lladlam.melox.core.account.NeteaseSessionStore$refreshProfile$1 */
     /* JADX INFO: compiled from: NeteaseSessionStore.kt */
     @Metadata(k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(m719c = "com.lladlam.melox.core.account.NeteaseSessionStore", m720f = "NeteaseSessionStore.kt", m721i = {0, 0, 0}, m722l = {68}, m723m = "refreshProfile", m724n = {"$this$refreshProfile_u24lambda_u240\\1", "force", "$i$a$-runCatching-NeteaseSessionStore$refreshProfile$2\\1\\67\\0"}, m725nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, m726s = {"L$0", "Z$0", "I$0"}, m727v = 2)
+    @DebugMetadata(c = "com.lladlam.melox.core.account.NeteaseSessionStore", f = "NeteaseSessionStore.kt", i = {0, 0, 0}, l = {68}, m = "refreshProfile", n = {"$this$refreshProfile_u24lambda_u240\\1", "force", "$i$a$-runCatching-NeteaseSessionStore$refreshProfile$2\\1\\67\\0"}, nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, s = {"L$0", "Z$0", "I$0"}, v = 2)
     static final class C25991 extends ContinuationImpl {
         int I$0;
         Object L$0;

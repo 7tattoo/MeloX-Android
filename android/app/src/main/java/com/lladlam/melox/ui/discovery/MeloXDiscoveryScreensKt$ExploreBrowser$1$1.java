@@ -22,7 +22,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXDiscoveryScreens.kt */
 /* JADX INFO: loaded from: classes16.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.discovery.MeloXDiscoveryScreensKt$ExploreBrowser$1$1", m720f = "MeloXDiscoveryScreens.kt", m721i = {0, 1}, m722l = {171, 174}, m723m = "invokeSuspend", m724n = {"requested", "requested"}, m725nl = {171, 176}, m726s = {"L$0", "L$0"}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.discovery.MeloXDiscoveryScreensKt$ExploreBrowser$1$1", f = "MeloXDiscoveryScreens.kt", i = {0, 1}, l = {171, 174}, m = "invokeSuspend", n = {"requested", "requested"}, nl = {171, 176}, s = {"L$0", "L$0"}, v = 2)
 final class MeloXDiscoveryScreensKt$ExploreBrowser$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ NeteaseDiscoveryCache $cache;
     final /* synthetic */ MutableState<String> $category$delegate;

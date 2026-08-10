@@ -19,7 +19,7 @@ import kotlinx.coroutines.DelayKt;
 /* JADX INFO: compiled from: MeloXIOSNowPlayingV2.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$2$1", m720f = "MeloXIOSNowPlayingV2.kt", m721i = {0}, m722l = {516}, m723m = "invokeSuspend", m724n = {"songId"}, m725nl = {-1}, m726s = {"J$0"}, m727v = 2)
+@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$2$1", f = "MeloXIOSNowPlayingV2.kt", i = {0}, l = {516}, m = "invokeSuspend", n = {"songId"}, nl = {-1}, s = {"J$0"}, v = 2)
 final class MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$2$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ MutableState<MusicQuality> $actual$delegate;
     final /* synthetic */ MeloXPlaybackUiState $state;
