@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,13 +35,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
+import com.kyant.shapes.Capsule
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -132,7 +131,7 @@ fun MeloXIOSMiniPlayer(
                 )
             },
     ) {
-        val miniShape = RoundedCornerShape(25.dp)
+        val miniShape = Capsule()
         val dark = isSystemInDarkTheme()
         val glassTint = if (dark) {
             Color.Black.copy(alpha = 0.12f)
@@ -145,22 +144,18 @@ fun MeloXIOSMiniPlayer(
             Color.White.copy(alpha = 0.66f)
         }
 
-        Surface(
+        Box(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .graphicsLayer { alpha = miniSurfaceAlpha }
                 .meloXLiquidBottomBar(
                     shape = miniShape,
                     tint = glassTint,
-                    surfaceColor = fallbackTint.copy(alpha = fallbackTint.alpha * 0.40f),
+                    surfaceColor = fallbackTint.copy(
+                        alpha = fallbackTint.alpha * 0.40f * miniSurfaceAlpha,
+                    ),
                 ),
-            shape = miniShape,
-            color = Color.Transparent,
-            border = null,
-            tonalElevation = 0.dp,
-            shadowElevation = if (dynamicGlassEnabled) (2f * miniSurfaceAlpha).dp else 0.dp,
-        ) {}
+        )
 
         Row(
             modifier = Modifier
