@@ -134,7 +134,6 @@ fun MeloXIOSMiniPlayer(
         val compact = compactProgress.coerceIn(0f, 1f)
         val miniShape = RoundedCornerShape(25.dp)
         val artworkSize = lerpDp(40.dp, 30.dp, compact)
-        val metadataAlpha = 1f - smoothStep(compact, 0.42f, 0.92f)
         val artistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
         val nextAlpha = 1f - smoothStep(compact, 0.08f, 0.68f)
         val dark = isSystemInDarkTheme()
@@ -216,7 +215,7 @@ fun MeloXIOSMiniPlayer(
                         softWrap = false,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = miniChromeAlpha * metadataAlpha,
+                            alpha = miniChromeAlpha,
                         ),
                     )
                     Text(
