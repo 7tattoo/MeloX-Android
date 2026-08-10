@@ -11,8 +11,8 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0-v5"
+        versionCode = 1
+        versionName = "0.1.0-dev"
     }
 
     buildFeatures {
@@ -54,11 +54,6 @@ dependencies {
     // LiquidBottomTabs examples while preserving MeloX's iOS geometry.
     implementation("io.github.kyant0:backdrop:2.0.0")
     implementation("io.github.kyant0:shapes:1.2.0")
-
-    implementation("androidx.autofill:autofill:1.0.0")
-    implementation("androidx.exifinterface:exifinterface:1.4.1")
-    implementation("androidx.window:window:1.3.0")
-    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("androidx.media3:media3-common:1.10.1")
     implementation("androidx.media3:media3-datasource:1.10.1")
