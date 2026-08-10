@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.library;
+package com.lladlam.melox.p012ui.library;
 
 import kotlin.Metadata;
 import kotlin.enums.EnumEntries;

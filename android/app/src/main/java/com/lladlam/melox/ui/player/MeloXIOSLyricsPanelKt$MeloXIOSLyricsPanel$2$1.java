@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import android.os.SystemClock;
 import androidx.compose.runtime.MutableLongState;
@@ -17,7 +17,7 @@ import kotlinx.coroutines.DelayKt;
 /* JADX INFO: compiled from: MeloXIOSLyricsPanel.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$2$1", f = "MeloXIOSLyricsPanel.kt", i = {}, l = {TsExtractor.TS_STREAM_TYPE_DVBSUBS}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$2$1", m720f = "MeloXIOSLyricsPanel.kt", m721i = {}, m722l = {TsExtractor.TS_STREAM_TYPE_DVBSUBS}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
 final class MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$2$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ MutableLongState $anchorPositionMs$delegate;
     final /* synthetic */ MutableLongState $anchorRealtimeMs$delegate;

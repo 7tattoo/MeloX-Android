@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.library;
+package com.lladlam.melox.p012ui.library;
 
 import androidx.compose.foundation.layout.PaddingKt;
 import androidx.compose.foundation.lazy.LazyItemScope;
@@ -7,7 +7,7 @@ import androidx.compose.material3.TextKt;
 import androidx.compose.ui.Modifier;
 import androidx.compose.ui.graphics.Color;
 import androidx.compose.ui.text.font.FontWeight;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.ui.unit.TextUnitKt;
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;
@@ -55,7 +55,7 @@ public final class ComposableSingletons$LibraryScreenKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(-2107823229, $changed, -1, "com.lladlam.melox.ui.library.ComposableSingletons$LibraryScreenKt.lambda$-2107823229.<anonymous> (LibraryScreen.kt:347)");
             }
-            TextKt.m3912TextNvy7gAk("登录网易云音乐", PaddingKt.m1806paddingVpY3zN4(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(18), C1301Dp.m8905constructorimpl(10)), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnPrimary(), null, 0L, null, FontWeight.INSTANCE.getSemiBold(), null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer, 1572918, 0, 262072);
+            TextKt.m3912TextNvy7gAk("登录网易云音乐", PaddingKt.m1806paddingVpY3zN4(Modifier.INSTANCE, Dp.constructor_impl(18), Dp.constructor_impl(10)), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnPrimary(), null, 0L, null, FontWeight.INSTANCE.getSemiBold(), null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer, 1572918, 0, 262072);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -70,10 +70,10 @@ public final class ComposableSingletons$LibraryScreenKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(162496283, $changed, -1, "com.lladlam.melox.ui.library.ComposableSingletons$LibraryScreenKt.lambda$162496283.<anonymous> (LibraryScreen.kt:542)");
             }
-            Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(20), C1301Dp.m8905constructorimpl(8), 0.0f, C1301Dp.m8905constructorimpl(6), 4, null);
+            Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, Dp.constructor_impl(20), Dp.constructor_impl(8), 0.0f, Dp.constructor_impl(6), 4, null);
             long sp = TextUnitKt.getSp(13);
             long onBackground = MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnBackground();
-            TextKt.m3912TextNvy7gAk("歌单", modifierM1809paddingqDBjuR0$default, Color.m6066copywmQWz5c(onBackground, (14 & 1) != 0 ? Color.m6070getAlphaimpl(onBackground) : 0.5f, (14 & 2) != 0 ? Color.m6074getRedimpl(onBackground) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(onBackground) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(onBackground) : 0.0f), null, sp, null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer, 24630, 0, 262120);
+            TextKt.m3912TextNvy7gAk("歌单", modifierM1809paddingqDBjuR0$default, Color.copy_wmQWz5c(onBackground, (14 & 1) != 0 ? Color.getAlpha_impl(onBackground) : 0.5f, (14 & 2) != 0 ? Color.getRed_impl(onBackground) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(onBackground) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(onBackground) : 0.0f), null, sp, null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer, 24630, 0, 262120);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }

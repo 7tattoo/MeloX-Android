@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.glass;
+package com.lladlam.melox.p012ui.glass;
 
 import androidx.compose.animation.core.Animatable;
 import androidx.compose.animation.core.AnimatableKt;
@@ -19,7 +19,7 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope;
 import androidx.compose.ui.input.pointer.PointerInputEventHandler;
 import androidx.compose.ui.input.pointer.PointerInputScope;
 import androidx.compose.ui.input.pointer.SuspendingPointerInputFilterKt;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;
 import androidx.compose.runtime.CompositionLocalKt;
@@ -50,7 +50,6 @@ import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import kotlin.jvm.internal.Intrinsics;
-import kotlinx.coroutines.BuildersKt__Builders_commonKt;
 import kotlinx.coroutines.CoroutineScope;
 import okhttp3.internal.ws.WebSocketProtocol;
 
@@ -99,12 +98,12 @@ public final class MeloXBackdropComponentsKt {
         boolean enabled4 = (i & 2) != 0 ? true : enabled;
         final long tint2 = (i & 4) != 0 ? Color.INSTANCE.m6104getUnspecified0d7_KjU() : tint;
         long surfaceColor3 = (i & 8) != 0 ? Color.INSTANCE.m6104getUnspecified0d7_KjU() : surfaceColor;
-        final float blurRadius2 = (i & 16) != 0 ? C1301Dp.m8905constructorimpl(2) : blurRadius;
+        final float blurRadius2 = (i & 16) != 0 ? Dp.constructor_impl(2) : blurRadius;
         if ((i & 32) != 0) {
-            C1301Dp.m8905constructorimpl(12);
+            Dp.constructor_impl(12);
         }
         if ((i & 64) != 0) {
-            C1301Dp.m8905constructorimpl(24);
+            Dp.constructor_impl(24);
         }
         if (ComposerKt.isTraceInProgress()) {
             ComposerKt.traceEventStart(1958737740, $changed, -1, "com.lladlam.melox.ui.glass.meloXLiquidButton (MeloXBackdropComponents.kt:52)");
@@ -117,18 +116,18 @@ public final class MeloXBackdropComponentsKt {
         if (backdrop == null) {
             if (!Color.m6069equalsimpl0(surfaceColor3, Color.INSTANCE.m6104getUnspecified0d7_KjU())) {
                 long surfaceColor4 = surfaceColor3;
-                surfaceColor2 = Color.m6066copywmQWz5c(surfaceColor4, (14 & 1) != 0 ? Color.m6070getAlphaimpl(surfaceColor4) : Math.max(Color.m6070getAlphaimpl(surfaceColor3), 0.46f), (14 & 2) != 0 ? Color.m6074getRedimpl(surfaceColor4) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(surfaceColor4) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(surfaceColor4) : 0.0f);
+                surfaceColor2 = Color.copy_wmQWz5c(surfaceColor4, (14 & 1) != 0 ? Color.getAlpha_impl(surfaceColor4) : Math.max(Color.getAlpha_impl(surfaceColor3), 0.46f), (14 & 2) != 0 ? Color.getRed_impl(surfaceColor4) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(surfaceColor4) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(surfaceColor4) : 0.0f);
             } else if (Color.m6069equalsimpl0(tint2, Color.INSTANCE.m6104getUnspecified0d7_KjU())) {
                 long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-                surfaceColor2 = Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.46f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f);
+                surfaceColor2 = Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.46f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f);
             } else {
                 long tint3 = tint2;
-                surfaceColor2 = Color.m6066copywmQWz5c(tint3, (14 & 1) != 0 ? Color.m6070getAlphaimpl(tint3) : Math.max(Color.m6070getAlphaimpl(tint2), 0.42f), (14 & 2) != 0 ? Color.m6074getRedimpl(tint3) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(tint3) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(tint3) : 0.0f);
+                surfaceColor2 = Color.copy_wmQWz5c(tint3, (14 & 1) != 0 ? Color.getAlpha_impl(tint3) : Math.max(Color.getAlpha_impl(tint2), 0.42f), (14 & 2) != 0 ? Color.getRed_impl(tint3) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(tint3) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(tint3) : 0.0f);
             }
             Modifier modifierM1042backgroundbw27NRU = BackgroundKt.m1042backgroundbw27NRU(meloXLiquidButton, surfaceColor2, shape);
-            float fM8905constructorimpl = C1301Dp.m8905constructorimpl((float) 0.75d);
+            float fM8905constructorimpl = Dp.constructor_impl((float) 0.75d);
             long jM6105getWhite0d7_KjU2 = Color.INSTANCE.m6105getWhite0d7_KjU();
-            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU2) : 0.62f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU2) : 0.0f), shape);
+            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU2) : 0.62f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU2) : 0.0f), shape);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -236,7 +235,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                         static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             final /* synthetic */ CoroutineScope $scope;
@@ -305,7 +304,7 @@ public final class MeloXBackdropComponentsKt {
                             /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                             /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                             @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                            @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                            @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                             static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                                 final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                                 int label;
@@ -353,7 +352,7 @@ public final class MeloXBackdropComponentsKt {
                             /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                             /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                             @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                            @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                            @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                             static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                                 final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                                 int label;
@@ -426,7 +425,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                     static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         final /* synthetic */ CoroutineScope $scope;
@@ -495,7 +494,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -543,7 +542,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -603,7 +602,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                     static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         final /* synthetic */ CoroutineScope $scope;
@@ -672,7 +671,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -720,7 +719,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -844,7 +843,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                     static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         final /* synthetic */ CoroutineScope $scope;
@@ -913,7 +912,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -961,7 +960,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -1021,7 +1020,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                     static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         final /* synthetic */ CoroutineScope $scope;
@@ -1090,7 +1089,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -1138,7 +1137,7 @@ public final class MeloXBackdropComponentsKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                         /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                         static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                             final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                             int label;
@@ -1212,7 +1211,7 @@ public final class MeloXBackdropComponentsKt {
                 /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                 /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                 static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                     final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                     final /* synthetic */ CoroutineScope $scope;
@@ -1281,7 +1280,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                     static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         int label;
@@ -1329,7 +1328,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                     static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         int label;
@@ -1389,7 +1388,7 @@ public final class MeloXBackdropComponentsKt {
                 /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1 */
                 /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", f = "MeloXBackdropComponents.kt", i = {0, 1}, l = {94, ResolvedStyleKt.InheritedFlags}, m = "invokeSuspend", n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, nl = {95, 97}, s = {"L$0", "L$0"}, v = 2)
+                @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {0, 1}, m722l = {94, ResolvedStyleKt.InheritedFlags}, m723m = "invokeSuspend", m724n = {"$this$awaitEachGesture", "$this$awaitEachGesture"}, m725nl = {95, 97}, m726s = {"L$0", "L$0"}, m727v = 2)
                 static final class C26361 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                     final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                     final /* synthetic */ CoroutineScope $scope;
@@ -1458,7 +1457,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1, reason: invalid class name */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", f = "MeloXBackdropComponents.kt", i = {}, l = {95}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$1", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {95}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                     static final class AnonymousClass1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         int label;
@@ -1506,7 +1505,7 @@ public final class MeloXBackdropComponentsKt {
                     /* JADX INFO: renamed from: com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2, reason: invalid class name */
                     /* JADX INFO: compiled from: MeloXBackdropComponents.kt */
                     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                    @DebugMetadata(c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", f = "MeloXBackdropComponents.kt", i = {}, l = {97}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+                    @DebugMetadata(m719c = "com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt$meloXLiquidButton$6$1$1$2", m720f = "MeloXBackdropComponents.kt", m721i = {}, m722l = {97}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
                     static final class AnonymousClass2 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
                         final /* synthetic */ Animatable<Float, AnimationVector1D> $press;
                         int label;
@@ -1590,7 +1589,7 @@ public final class MeloXBackdropComponentsKt {
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final Shadow meloXLiquidButton_NsDo4u0$lambda$4$0(Animatable $press) {
-        return new Shadow(C1301Dp.m8905constructorimpl(5), 0L, 0L, (((Number) $press.getValue()).floatValue() * 0.06f) + 0.12f, 0, 22, null);
+        return new Shadow(Dp.constructor_impl(5), 0L, 0L, (((Number) $press.getValue()).floatValue() * 0.06f) + 0.12f, 0, 22, null);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -1598,7 +1597,7 @@ public final class MeloXBackdropComponentsKt {
         Intrinsics.checkNotNullParameter(drawBackdrop, "$this$drawBackdrop");
         if (!Color.m6069equalsimpl0($tint, Color.INSTANCE.m6104getUnspecified0d7_KjU())) {
             DrawScope.m6636drawRectnJ9OG0$default(drawBackdrop, $tint, 0L, 0L, 0.0f, null, null, BlendMode.INSTANCE.m5994getHue0nO6VwU(), 62, null);
-            DrawScope.m6636drawRectnJ9OG0$default(drawBackdrop, Color.m6066copywmQWz5c($tint, (14 & 1) != 0 ? Color.m6070getAlphaimpl($tint) : Color.m6070getAlphaimpl($tint) * 0.75f, (14 & 2) != 0 ? Color.m6074getRedimpl($tint) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl($tint) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl($tint) : 0.0f), 0L, 0L, 0.0f, null, null, 0, WebSocketProtocol.PAYLOAD_SHORT, null);
+            DrawScope.m6636drawRectnJ9OG0$default(drawBackdrop, Color.copy_wmQWz5c($tint, (14 & 1) != 0 ? Color.getAlpha_impl($tint) : Color.getAlpha_impl($tint) * 0.75f, (14 & 2) != 0 ? Color.getRed_impl($tint) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl($tint) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl($tint) : 0.0f), 0L, 0L, 0.0f, null, null, 0, WebSocketProtocol.PAYLOAD_SHORT, null);
         }
         if (!Color.m6069equalsimpl0($surfaceColor, Color.INSTANCE.m6104getUnspecified0d7_KjU())) {
             DrawScope.m6636drawRectnJ9OG0$default(drawBackdrop, $surfaceColor, 0L, 0L, 0.0f, null, null, 0, WebSocketProtocol.PAYLOAD_SHORT, null);
@@ -1621,11 +1620,11 @@ public final class MeloXBackdropComponentsKt {
         ComposerKt.sourceInformationMarkerEnd($composer);
         Backdrop backdrop = (Backdrop) objConsume;
         if (backdrop == null) {
-            long stableSurface = Color.m6066copywmQWz5c(surfaceColor, (14 & 1) != 0 ? Color.m6070getAlphaimpl(surfaceColor) : Math.max(Color.m6070getAlphaimpl(surfaceColor), 0.48f), (14 & 2) != 0 ? Color.m6074getRedimpl(surfaceColor) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(surfaceColor) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(surfaceColor) : 0.0f);
+            long stableSurface = Color.copy_wmQWz5c(surfaceColor, (14 & 1) != 0 ? Color.getAlpha_impl(surfaceColor) : Math.max(Color.getAlpha_impl(surfaceColor), 0.48f), (14 & 2) != 0 ? Color.getRed_impl(surfaceColor) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(surfaceColor) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(surfaceColor) : 0.0f);
             Modifier modifierM1042backgroundbw27NRU = BackgroundKt.m1042backgroundbw27NRU(meloXLiquidBottomBar, stableSurface, shape);
-            float fM8905constructorimpl = C1301Dp.m8905constructorimpl((float) 0.75d);
+            float fM8905constructorimpl = Dp.constructor_impl((float) 0.75d);
             long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.62f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f), shape);
+            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.62f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f), shape);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -1719,7 +1718,7 @@ public final class MeloXBackdropComponentsKt {
     public static final Unit meloXLiquidBottomBar_9z6LAg8$lambda$1$0(BackdropEffectScope drawBackdrop) {
         Intrinsics.checkNotNullParameter(drawBackdrop, "$this$drawBackdrop");
         ColorFilterKt.vibrancy(drawBackdrop);
-        BlurKt.m9522blur3YTHUZs$default(drawBackdrop, drawBackdrop.mo1189toPx0680j_4(C1301Dp.m8905constructorimpl(8)), 0, 2, null);
+        BlurKt.m9522blur3YTHUZs$default(drawBackdrop, drawBackdrop.mo1189toPx0680j_4(Dp.constructor_impl(8)), 0, 2, null);
         return Unit.INSTANCE;
     }
 
@@ -1730,7 +1729,7 @@ public final class MeloXBackdropComponentsKt {
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final Shadow meloXLiquidBottomBar_9z6LAg8$lambda$3$0() {
-        return new Shadow(C1301Dp.m8905constructorimpl(7), 0L, 0L, 0.14f, 0, 22, null);
+        return new Shadow(Dp.constructor_impl(7), 0L, 0L, 0.14f, 0, 22, null);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -1763,10 +1762,10 @@ public final class MeloXBackdropComponentsKt {
         ComposerKt.sourceInformationMarkerEnd($composer);
         Backdrop backdrop = (Backdrop) objConsume;
         if (backdrop == null) {
-            Modifier modifierM1042backgroundbw27NRU = BackgroundKt.m1042backgroundbw27NRU(meloXLiquidTabSelection, Color.m6066copywmQWz5c(tint, (14 & 1) != 0 ? Color.m6070getAlphaimpl(tint) : Math.max(Color.m6070getAlphaimpl(tint), 0.36f), (14 & 2) != 0 ? Color.m6074getRedimpl(tint) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(tint) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(tint) : 0.0f), shape);
-            float fM8905constructorimpl = C1301Dp.m8905constructorimpl((float) 0.5d);
+            Modifier modifierM1042backgroundbw27NRU = BackgroundKt.m1042backgroundbw27NRU(meloXLiquidTabSelection, Color.copy_wmQWz5c(tint, (14 & 1) != 0 ? Color.getAlpha_impl(tint) : Math.max(Color.getAlpha_impl(tint), 0.36f), (14 & 2) != 0 ? Color.getRed_impl(tint) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(tint) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(tint) : 0.0f), shape);
+            float fM8905constructorimpl = Dp.constructor_impl((float) 0.5d);
             long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.58f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f), shape);
+            Modifier modifierM1054borderxT4_qwU = BorderKt.m1054borderxT4_qwU(modifierM1042backgroundbw27NRU, fM8905constructorimpl, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.58f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f), shape);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -1860,7 +1859,7 @@ public final class MeloXBackdropComponentsKt {
     public static final Unit meloXLiquidTabSelection_Bx497Mc$lambda$1$0(BackdropEffectScope drawBackdrop) {
         Intrinsics.checkNotNullParameter(drawBackdrop, "$this$drawBackdrop");
         ColorFilterKt.vibrancy(drawBackdrop);
-        BlurKt.m9522blur3YTHUZs$default(drawBackdrop, drawBackdrop.mo1189toPx0680j_4(C1301Dp.m8905constructorimpl(2)), 0, 2, null);
+        BlurKt.m9522blur3YTHUZs$default(drawBackdrop, drawBackdrop.mo1189toPx0680j_4(Dp.constructor_impl(2)), 0, 2, null);
         return Unit.INSTANCE;
     }
 
@@ -1871,7 +1870,7 @@ public final class MeloXBackdropComponentsKt {
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final Shadow meloXLiquidTabSelection_Bx497Mc$lambda$3$0() {
-        return new Shadow(C1301Dp.m8905constructorimpl(3), 0L, 0L, 0.16f, 0, 22, null);
+        return new Shadow(Dp.constructor_impl(3), 0L, 0L, 0.16f, 0, 22, null);
     }
 
     /* JADX INFO: Access modifiers changed from: private */

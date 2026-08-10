@@ -23,8 +23,6 @@ public final /* data */ class NeteasePlaylistDetail {
         }
         return neteasePlaylistDetail.copy(neteasePlaylistSummary, list);
     }
-
-
     public final List<SearchSong> component2() {
         return this.songs;
     }

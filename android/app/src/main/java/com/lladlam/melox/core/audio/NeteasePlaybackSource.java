@@ -31,8 +31,6 @@ public final /* data */ class NeteasePlaybackSource {
 
 
 
-
-
     public final NeteasePlaybackSource copy(String url, Integer bitrate, String format, MusicQuality quality) {
         Intrinsics.checkNotNullParameter(url, "url");
         return new NeteasePlaybackSource(url, bitrate, format, quality);

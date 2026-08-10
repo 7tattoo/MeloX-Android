@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.library;
+package com.lladlam.melox.p012ui.library;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -60,7 +60,7 @@ public final class MeloXDetailPaletteProvider {
     /* JADX INFO: renamed from: com.lladlam.melox.ui.library.MeloXDetailPaletteProvider$paletteFor$3 */
     /* JADX INFO: compiled from: MeloXDetailPalette.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/ui/library/MeloXDetailPalette;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.ui.library.MeloXDetailPaletteProvider$paletteFor$3", f = "MeloXDetailPalette.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.ui.library.MeloXDetailPaletteProvider$paletteFor$3", m720f = "MeloXDetailPalette.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
     static final class C26493 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super MeloXDetailPalette>, Object> {
         final /* synthetic */ String $source;
         private /* synthetic */ Object L$0;
@@ -121,8 +121,8 @@ public final class MeloXDetailPaletteProvider {
                                 }
                                 bitmapDecodeByteArray.recycle();
                                 CloseableKt.closeFinally(responseExecute, null);
-                                objM9714constructorimpl = Result.constructor-impl(meloXDetailPaletteMakePalette);
-                                if (Result.m9717exceptionOrNullimpl(objM9714constructorimpl) != null) {
+                                objM9714constructorimpl = Result.constructor_impl(meloXDetailPaletteMakePalette);
+                                if (Result.exceptionOrNull_impl(objM9714constructorimpl) != null) {
                                     objM9714constructorimpl = MeloXDetailPalette.INSTANCE.getLightFallback();
                                 }
                                 MeloXDetailPalette palette = (MeloXDetailPalette) objM9714constructorimpl;
@@ -145,11 +145,11 @@ public final class MeloXDetailPaletteProvider {
                         }
                     } catch (Throwable th4) {
                         Result.Companion companion2 = Result.INSTANCE;
-                        objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th4));
+                        objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th4));
                     }
                     Result.Companion companion3 = Result.INSTANCE;
-                    objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th4));
-                    if (Result.m9717exceptionOrNullimpl(objM9714constructorimpl) != null) {
+                    objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th4));
+                    if (Result.exceptionOrNull_impl(objM9714constructorimpl) != null) {
                         objM9714constructorimpl = MeloXDetailPalette.INSTANCE.getLightFallback();
                     }
                     MeloXDetailPalette palette2 = (MeloXDetailPalette) objM9714constructorimpl;

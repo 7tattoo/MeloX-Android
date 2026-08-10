@@ -1,10 +1,9 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import androidx.compose.ui.graphics.Color;
 import androidx.compose.ui.graphics.ColorKt;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import com.google.common.net.HttpHeaders;
 import java.net.URI;
 import java.util.List;
@@ -62,7 +61,7 @@ public final class ArtworkDynamicPaletteProvider {
     /* JADX INFO: renamed from: com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3 */
     /* JADX INFO: compiled from: ArtworkDynamicPalette.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/ui/player/ArtworkDynamicPalette;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3", f = "ArtworkDynamicPalette.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.ui.player.ArtworkDynamicPaletteProvider$paletteFor$3", m720f = "ArtworkDynamicPalette.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
     static final class C26503 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super ArtworkDynamicPalette>, Object> {
         final /* synthetic */ String $source;
         private /* synthetic */ Object L$0;
@@ -126,8 +125,8 @@ public final class ArtworkDynamicPaletteProvider {
                                 }
                                 bitmapDecodeByteArray.recycle();
                                 CloseableKt.closeFinally(responseExecute, null);
-                                objM9714constructorimpl = Result.constructor-impl(artworkDynamicPaletteMakePalette);
-                                if (Result.m9717exceptionOrNullimpl(objM9714constructorimpl) != null) {
+                                objM9714constructorimpl = Result.constructor_impl(artworkDynamicPaletteMakePalette);
+                                if (Result.exceptionOrNull_impl(objM9714constructorimpl) != null) {
                                     objM9714constructorimpl = ArtworkDynamicPalette.INSTANCE.getFallback();
                                 }
                                 ArtworkDynamicPalette palette = (ArtworkDynamicPalette) objM9714constructorimpl;
@@ -140,7 +139,7 @@ public final class ArtworkDynamicPaletteProvider {
                                 bitmapDecodeByteArray.recycle();
                                 throw th;
                             }
-                            if (Result.m9717exceptionOrNullimpl(objM9714constructorimpl) != null) {
+                            if (Result.exceptionOrNull_impl(objM9714constructorimpl) != null) {
                                 objM9714constructorimpl = ArtworkDynamicPalette.INSTANCE.getFallback();
                             }
                             ArtworkDynamicPalette palette2 = (ArtworkDynamicPalette) objM9714constructorimpl;
@@ -156,10 +155,10 @@ public final class ArtworkDynamicPaletteProvider {
                         }
                     } catch (Throwable th4) {
                         Result.Companion companion2 = Result.INSTANCE;
-                        objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th4));
+                        objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th4));
                     }
                     Result.Companion companion3 = Result.INSTANCE;
-                    objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th4));
+                    objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th4));
                     break;
                 default:
                     throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
@@ -213,12 +212,12 @@ public final class ArtworkDynamicPaletteProvider {
         try {
             Result.Companion companion = Result.INSTANCE;
             ArtworkDynamicPaletteProvider artworkDynamicPaletteProvider = this;
-            objM9714constructorimpl = Result.constructor-impl(new URI(source));
+            objM9714constructorimpl = Result.constructor_impl(new URI(source));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = null;
         }
         URI uri = (URI) objM9714constructorimpl;

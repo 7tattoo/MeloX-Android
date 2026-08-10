@@ -38,7 +38,7 @@ public final class MeloXPlaybackService extends MediaSessionService {
     @Override // androidx.media3.session.MediaSessionService, androidx.lifecycle.LifecycleService, android.app.Service
     public void onCreate() {
         super.onCreate();
-        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).setDefaultRequestProperties(MapsKt.mapOf(TuplesKt.m717to(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36"), TuplesKt.m717to(HttpHeaders.REFERER, "https://music.163.com/")));
+        DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).setDefaultRequestProperties(MapsKt.mapOf(TuplesKt.to(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36"), TuplesKt.to(HttpHeaders.REFERER, "https://music.163.com/")));
         Intrinsics.checkNotNullExpressionValue(httpDataSourceFactory, "setDefaultRequestProperties(...)");
         Function0 cookieProvider = new Function0() { // from class: com.lladlam.melox.playback.MeloXPlaybackService$$ExternalSyntheticLambda0
             @Override // kotlin.jvm.functions.Function0

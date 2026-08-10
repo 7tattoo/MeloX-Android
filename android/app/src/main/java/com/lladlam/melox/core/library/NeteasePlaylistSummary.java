@@ -1,7 +1,6 @@
 package com.lladlam.melox.core.library;
 
 import androidx.autofill.HintConstants;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import kotlin.Metadata;
 import kotlin.jvm.internal.DefaultConstructorMarker;
 import kotlin.jvm.internal.Intrinsics;
@@ -37,8 +36,6 @@ public final /* data */ class NeteasePlaylistSummary {
         }
         return neteasePlaylistSummary.copy(j3, str5, str6, i, (i2 & 16) != 0 ? neteasePlaylistSummary.creatorName : str3, (i2 & 32) != 0 ? neteasePlaylistSummary.playCount : j2, (i2 & 64) != 0 ? neteasePlaylistSummary.description : str4);
     }
-
-
 
 
 

@@ -104,7 +104,7 @@ public final class NeteaseLibraryCache {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryCache$readJson$2 */
     /* JADX INFO: compiled from: NeteaseLibraryCache.kt */
     @Metadata(d1 = {"\u0000\b\n\u0002\b\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u0004\u0018\u0001H\u0001\"\u0004\b\u0000\u0010\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", ExifInterface.GPS_DIRECTION_TRUE, "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryCache$readJson$2", f = "NeteaseLibraryCache.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryCache$readJson$2", m720f = "NeteaseLibraryCache.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
     static final class C26052<T> extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super T>, Object> {
         final /* synthetic */ Function1<JSONObject, T> $decode;
         final /* synthetic */ File $file;
@@ -142,13 +142,13 @@ public final class NeteaseLibraryCache {
                     Function1<JSONObject, T> function1 = this.$decode;
                     try {
                         Result.Companion companion = Result.INSTANCE;
-                        objM9714constructorimpl = Result.constructor-impl(!file.isFile() ? null : function1.invoke(new JSONObject(FilesKt.readText$default(file, null, 1, null))));
+                        objM9714constructorimpl = Result.constructor_impl(!file.isFile() ? null : function1.invoke(new JSONObject(FilesKt.readText$default(file, null, 1, null))));
                         break;
                     } catch (Throwable th) {
                         Result.Companion companion2 = Result.INSTANCE;
-                        objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+                        objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
                     }
-                    if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+                    if (Result.isFailure_impl(objM9714constructorimpl)) {
                         return null;
                     }
                     return objM9714constructorimpl;
@@ -166,7 +166,7 @@ public final class NeteaseLibraryCache {
     /* JADX INFO: renamed from: com.lladlam.melox.core.library.NeteaseLibraryCache$writeJson$2 */
     /* JADX INFO: compiled from: NeteaseLibraryCache.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.core.library.NeteaseLibraryCache$writeJson$2", f = "NeteaseLibraryCache.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.core.library.NeteaseLibraryCache$writeJson$2", m720f = "NeteaseLibraryCache.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
     static final class C26062 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
         final /* synthetic */ File $file;
         final /* synthetic */ JSONObject $value;

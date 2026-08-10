@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.animation.AnimatedVisibilityScope;
 import androidx.compose.animation.EnterExitState;
@@ -47,7 +47,7 @@ import androidx.compose.ui.layout.MeasurePolicy;
 import androidx.compose.ui.node.ComposeUiNode;
 import androidx.compose.ui.platform.CompositionLocalsKt;
 import androidx.compose.ui.text.font.FontWeight;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.ui.unit.Constraints;
 import androidx.compose.ui.unit.Density;
 import androidx.compose.ui.unit.TextUnitKt;
@@ -62,14 +62,12 @@ import androidx.compose.runtime.ProvidableCompositionLocal;
 import androidx.compose.runtime.RecomposeScopeImplKt;
 import androidx.compose.runtime.ScopeUpdateScope;
 import androidx.compose.runtime.SnapshotStateKt;
-import androidx.compose.runtime.SnapshotStateKt__SnapshotStateKt;
 import androidx.compose.runtime.State;
 import androidx.compose.runtime.Updater;
 import androidx.compose.runtime.internal.ComposableLambdaKt;
 import androidx.compose.runtime.snapshots.Snapshot;
 import androidx.media3.exoplayer.RendererCapabilities;
 import androidx.media3.extractor.ts.TsExtractor;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import kotlin.Metadata;
 import kotlin.Unit;
 import kotlin.comparisons.ComparisonsKt;
@@ -83,7 +81,6 @@ import kotlin.jvm.internal.FloatCompanionObject;
 import kotlin.jvm.internal.Intrinsics;
 import kotlin.ranges.RangesKt;
 import kotlin.text.StringsKt;
-import kotlinx.coroutines.BuildersKt__Builders_commonKt;
 import kotlinx.coroutines.CoroutineScope;
 import kotlinx.coroutines.CoroutineStart;
 
@@ -461,7 +458,7 @@ public final class MeloXIOSNowPlayingSharedHostKt {
             ComposerKt.sourceInformationMarkerEnd($composer);
             Density density = (Density) objConsume;
             float heightPx = RangesKt.coerceAtLeast(Constraints.m8857getMaxHeightimpl(BoxWithConstraints.mo1521getConstraintsmsEJaDk()), 1.0f);
-            float dismissThresholdPx3 = density.mo1189toPx0680j_4(C1301Dp.m8905constructorimpl(132));
+            float dismissThresholdPx3 = density.mo1189toPx0680j_4(Dp.constructor_impl(132));
             float dragProgress = RangesKt.coerceIn(((Number) $dragOffset.getValue()).floatValue() / (0.42f * heightPx), 0.0f, 1.0f);
             float dragCornerRadius = Math.max($baseCornerRadius, 30.0f * dragProgress);
             final float dragScale = 1.0f - (0.035f * dragProgress);
@@ -480,7 +477,7 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 objRememberedValue = obj;
             }
             ComposerKt.sourceInformationMarkerEnd($composer);
-            Modifier modifierClip = ClipKt.clip(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default, (Function1) objRememberedValue), RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(C1301Dp.m8905constructorimpl(dragCornerRadius)));
+            Modifier modifierClip = ClipKt.clip(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default, (Function1) objRememberedValue), RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(Dp.constructor_impl(dragCornerRadius)));
             if (MeloXIOSNowPlayingSharedHost$lambda$1($page$delegate) == MeloXNowPlayingPage.Artwork) {
                 $composer.startReplaceGroup(-492374531);
                 ComposerKt.sourceInformation($composer, "138@6156L1191");
@@ -534,12 +531,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function0 = constructor;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
@@ -580,12 +577,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function1 = constructor2;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl2 = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl2 = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
             int i5 = (i4 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance2 = BoxScopeInstance.INSTANCE;
@@ -634,12 +631,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function2 = constructor3;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl3 = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl3, measurePolicyMaybeCachedBoxMeasurePolicy3, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl3 = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl3, measurePolicyMaybeCachedBoxMeasurePolicy3, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
             int i8 = (i7 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance3 = BoxScopeInstance.INSTANCE;
@@ -774,7 +771,7 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 springSpecSpring = AnimationSpecKt.spring(0.94f, 360.0f, Float.valueOf(0.001f));
             }
             State<Float> stateAnimateFloatAsState = AnimateAsStateKt.animateFloatAsState(f, springSpecSpring, 0.0f, "shared-artwork-playback-scale", null, $composer3, 3072, 20);
-            final State<C1301Dp> stateM940animateDpAsStateAjpBEmI = AnimateAsStateKt.m940animateDpAsStateAjpBEmI(meloXPlaybackUiState.isPlaying() ? C1301Dp.m8905constructorimpl(26) : C1301Dp.m8905constructorimpl(14), AnimationSpecKt.spring$default(0.92f, 320.0f, null, 4, null), "shared-artwork-shadow", null, $composer3, 432, 8);
+            final State<Dp> stateM940animateDpAsStateAjpBEmI = AnimateAsStateKt.m940animateDpAsStateAjpBEmI(meloXPlaybackUiState.isPlaying() ? Dp.constructor_impl(26) : Dp.constructor_impl(14), AnimationSpecKt.spring$default(0.92f, 320.0f, null, 4, null), "shared-artwork-shadow", null, $composer3, 432, 8);
             $composer2 = $composer3;
             if (page == MeloXNowPlayingPage.Artwork) {
                 artworkAlpha = 1.0f;
@@ -783,7 +780,7 @@ public final class MeloXIOSNowPlayingSharedHostKt {
             }
             float fullScreenScaleBlend = smoothStep(expansionProgress, 0.3f, 0.88f);
             final float effectiveScale = ((SharedArtworkDestination$lambda$0(stateAnimateFloatAsState) - 1.0f) * fullScreenScaleBlend) + 1.0f;
-            Modifier modifierM1807paddingVpY3zN4$default = PaddingKt.m1807paddingVpY3zN4$default(WindowInsetsPadding_androidKt.statusBarsPadding(SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null)), C1301Dp.m8905constructorimpl(32), 0.0f, 2, null);
+            Modifier modifierM1807paddingVpY3zN4$default = PaddingKt.m1807paddingVpY3zN4$default(WindowInsetsPadding_androidKt.statusBarsPadding(SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null)), Dp.constructor_impl(32), 0.0f, 2, null);
             ComposerKt.sourceInformationMarkerStart($composer2, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), Alignment.INSTANCE.getStart(), $composer2, ((0 >> 3) & 14) | ((0 >> 3) & 112));
             ComposerKt.sourceInformationMarkerStart($composer2, -1159599143, "CC(Layout)N(content,modifier,measurePolicy)81@3355L27,84@3521L415:Layout.kt#80mrfh");
@@ -804,25 +801,25 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function0 = constructor;
                 $composer2.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer2);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer2);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer2, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             int i3 = ((0 >> 6) & 112) | 6;
             ColumnScope columnScope = ColumnScopeInstance.INSTANCE;
             ComposerKt.sourceInformationMarkerStart($composer2, -1456954750, "C261@10854L30,267@11017L2647,263@10894L2770,335@13674L31:MeloXIOSNowPlayingSharedHost.kt#qhu5z0");
-            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(30)), $composer2, 6);
+            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(30)), $composer2, 6);
             BoxWithConstraintsKt.BoxWithConstraints(ColumnScope.weight$default(columnScope, SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null), 1.0f, false, 2, null), null, false, ComposableLambdaKt.rememberComposableLambda(1253814676, true, new Function3() { // from class: com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$$ExternalSyntheticLambda0
                 @Override // kotlin.jvm.functions.Function3
                 public final Object invoke(Object obj, Object obj2, Object obj3) {
                     return MeloXIOSNowPlayingSharedHostKt.SharedArtworkDestination$lambda$2$0(sharedTransitionScope, state, animatedVisibilityScope, artworkAlpha, effectiveScale, stateM940animateDpAsStateAjpBEmI, (BoxWithConstraintsScope) obj, (Composer) obj2, ((Integer) obj3).intValue());
                 }
             }, $composer2, 54), $composer2, 3072, 6);
-            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(279)), $composer2, 6);
+            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(279)), $composer2, 6);
             ComposerKt.sourceInformationMarkerEnd($composer2);
             ComposerKt.sourceInformationMarkerEnd($composer2);
             $composer2.endNode();
@@ -851,8 +848,8 @@ public final class MeloXIOSNowPlayingSharedHostKt {
         return ((Number) state.getValue()).floatValue();
     }
 
-    private static final float SharedArtworkDestination$lambda$1(State<C1301Dp> state) {
-        return ((C1301Dp) state.getValue()).m8919unboximpl();
+    private static final float SharedArtworkDestination$lambda$1(State<Dp> state) {
+        return ((Dp) state.getValue()).m8919unboximpl();
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -870,7 +867,7 @@ public final class MeloXIOSNowPlayingSharedHostKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(1253814676, $dirty, -1, "com.lladlam.melox.ui.player.SharedArtworkDestination.<anonymous>.<anonymous> (MeloXIOSNowPlayingSharedHost.kt:268)");
             }
-            float artworkSize = ((C1301Dp) ComparisonsKt.maxOf(C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(170)), ComparisonsKt.minOf(C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() + C1301Dp.m8905constructorimpl(16))), C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(BoxWithConstraints.mo1522getMaxHeightD9Ej5fM() - C1301Dp.m8905constructorimpl(92)))))).m8919unboximpl();
+            float artworkSize = ((Dp) ComparisonsKt.maxOf(Dp.m8903boximpl(Dp.constructor_impl(170)), ComparisonsKt.minOf(Dp.m8903boximpl(Dp.constructor_impl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() + Dp.constructor_impl(16))), Dp.m8903boximpl(Dp.constructor_impl(BoxWithConstraints.mo1522getMaxHeightD9Ej5fM() - Dp.constructor_impl(92)))))).m8919unboximpl();
             Modifier modifierFillMaxSize$default = SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null);
             ComposerKt.sourceInformationMarkerStart($composer, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), Alignment.INSTANCE.getStart(), $composer, ((6 >> 3) & 14) | ((6 >> 3) & 112));
@@ -892,12 +889,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function0 = constructor;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             int i3 = ((6 >> 6) & 112) | 6;
@@ -929,12 +926,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function1 = constructor2;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl2 = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl2 = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
             int i5 = (i4 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
@@ -957,18 +954,18 @@ public final class MeloXIOSNowPlayingSharedHostKt {
             ComposerKt.sourceInformationMarkerEnd($composer);
             Modifier modifierGraphicsLayer = GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default2, (Function1) objRememberedValue);
             float fSharedArtworkDestination$lambda$1 = SharedArtworkDestination$lambda$1($shadowElevation$delegate);
-            RoundedCornerShape roundedCornerShapeM2135RoundedCornerShape0680j_4 = RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(C1301Dp.m8905constructorimpl(12));
+            RoundedCornerShape roundedCornerShapeM2135RoundedCornerShape0680j_4 = RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(Dp.constructor_impl(12));
             long jM6094getBlack0d7_KjU = Color.INSTANCE.m6094getBlack0d7_KjU();
-            long jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6094getBlack0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6094getBlack0d7_KjU) : $artworkAlpha * 0.28f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6094getBlack0d7_KjU) : 0.0f);
+            long jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6094getBlack0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6094getBlack0d7_KjU) : $artworkAlpha * 0.28f, (14 & 2) != 0 ? Color.getRed_impl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6094getBlack0d7_KjU) : 0.0f);
             long jM6094getBlack0d7_KjU2 = Color.INSTANCE.m6094getBlack0d7_KjU();
-            MeloXPlayerUiKt.Artwork(artworkUrl, ClipKt.clip(ShadowKt.m5665shadows4CzXII(modifierGraphicsLayer, fSharedArtworkDestination$lambda$1, roundedCornerShapeM2135RoundedCornerShape0680j_4, false, jM6066copywmQWz5c, Color.m6066copywmQWz5c(jM6094getBlack0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6094getBlack0d7_KjU2) : $artworkAlpha * 0.28f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6094getBlack0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6094getBlack0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6094getBlack0d7_KjU2) : 0.0f)), RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(C1301Dp.m8905constructorimpl(12))), $composer, 0);
+            MeloXPlayerUiKt.Artwork(artworkUrl, ClipKt.clip(ShadowKt.m5665shadows4CzXII(modifierGraphicsLayer, fSharedArtworkDestination$lambda$1, roundedCornerShapeM2135RoundedCornerShape0680j_4, false, jM6066copywmQWz5c, Color.copy_wmQWz5c(jM6094getBlack0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6094getBlack0d7_KjU2) : $artworkAlpha * 0.28f, (14 & 2) != 0 ? Color.getRed_impl(jM6094getBlack0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6094getBlack0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6094getBlack0d7_KjU2) : 0.0f)), RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(Dp.constructor_impl(12))), $composer, 0);
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
             $composer.endNode();
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
-            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(20)), $composer, 6);
+            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(20)), $composer, 6);
             Modifier modifierFillMaxWidth$default = SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null);
             ComposerKt.sourceInformationMarkerStart($composer, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy2 = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), Alignment.INSTANCE.getStart(), $composer, ((6 >> 3) & 14) | ((6 >> 3) & 112));
@@ -990,12 +987,12 @@ public final class MeloXIOSNowPlayingSharedHostKt {
                 function2 = constructor3;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl3 = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl3, measurePolicyColumnMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl3 = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl3, measurePolicyColumnMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
             int i8 = (i7 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             ColumnScopeInstance columnScopeInstance = ColumnScopeInstance.INSTANCE;
@@ -1010,14 +1007,14 @@ public final class MeloXIOSNowPlayingSharedHostKt {
             if (StringsKt.isBlank(artist)) {
                 artist = " ";
             }
-            TextKt.m3912TextNvy7gAk(artist, PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, 0.0f, C1301Dp.m8905constructorimpl(2), 0.0f, 0.0f, 13, null), Color.INSTANCE.m6103getTransparent0d7_KjU(), null, TextUnitKt.getSp(20), null, null, null, 0L, null, null, TextUnitKt.getSp(24), 0, false, 1, 0, null, null, $composer, 25008, 24624, 243688);
+            TextKt.m3912TextNvy7gAk(artist, PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, 0.0f, Dp.constructor_impl(2), 0.0f, 0.0f, 13, null), Color.INSTANCE.m6103getTransparent0d7_KjU(), null, TextUnitKt.getSp(20), null, null, null, 0L, null, null, TextUnitKt.getSp(24), 0, false, 1, 0, null, null, $composer, 25008, 24624, 243688);
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
             $composer.endNode();
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
-            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(8)), $composer, 6);
+            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(8)), $composer, 6);
             ComposerKt.sourceInformationMarkerEnd($composer);
             ComposerKt.sourceInformationMarkerEnd($composer);
             $composer.endNode();

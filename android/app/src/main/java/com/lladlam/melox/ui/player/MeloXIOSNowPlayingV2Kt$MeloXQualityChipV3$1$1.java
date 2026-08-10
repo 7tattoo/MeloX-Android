@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.runtime.MutableState;
 import com.lladlam.melox.core.audio.NeteaseQualityClient;
@@ -19,7 +19,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXIOSNowPlayingV2.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1", f = "MeloXIOSNowPlayingV2.kt", i = {0, 0, 0, 0}, l = {509}, m = "invokeSuspend", n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "songId", "$i$a$-runCatching-MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1$1\\1\\509\\0"}, nl = {509}, s = {"L$0", "L$1", "J$0", "I$0"}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1", m720f = "MeloXIOSNowPlayingV2.kt", m721i = {0, 0, 0, 0}, m722l = {509}, m723m = "invokeSuspend", m724n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "songId", "$i$a$-runCatching-MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1$1\\1\\509\\0"}, m725nl = {509}, m726s = {"L$0", "L$1", "J$0", "I$0"}, m727v = 2)
 final class MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ MutableState<SongAudioAvailability> $availability$delegate;
     final /* synthetic */ NeteaseQualityClient $qualityClient;
@@ -92,13 +92,13 @@ final class MeloXIOSNowPlayingV2Kt$MeloXQualityChipV3$1$1 extends SuspendLambda 
                 default:
                     throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
             }
-            objM9714constructorimpl = Result.constructor-impl((SongAudioAvailability) objAudioAvailability);
+            objM9714constructorimpl = Result.constructor_impl((SongAudioAvailability) objAudioAvailability);
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
         SongAudioAvailability unknown = SongAudioAvailability.INSTANCE.getUnknown();
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = unknown;
         }
         mutableState.setValue((SongAudioAvailability) objM9714constructorimpl);

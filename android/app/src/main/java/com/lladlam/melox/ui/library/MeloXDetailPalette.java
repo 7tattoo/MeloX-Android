@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.library;
+package com.lladlam.melox.p012ui.library;
 
 import androidx.compose.ui.graphics.Color;
 import androidx.compose.ui.graphics.ColorKt;
@@ -33,8 +33,10 @@ public final /* data */ class MeloXDetailPalette {
         return meloXDetailPalette.m9666copyDxMtmZc(j, z);
     }
 
-
-
+    /* JADX INFO: renamed from: component1-0d7_KjU, reason: not valid java name and from getter */
+    public final long getBackground() {
+        return this.background;
+    }
     /* JADX INFO: renamed from: copy-DxMtmZc, reason: not valid java name */
     public final MeloXDetailPalette m9666copyDxMtmZc(long background, boolean prefersDarkAppearance) {
         return new MeloXDetailPalette(background, prefersDarkAppearance, null);

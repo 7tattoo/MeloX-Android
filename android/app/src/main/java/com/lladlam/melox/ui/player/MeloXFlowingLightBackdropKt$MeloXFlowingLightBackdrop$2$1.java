@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.runtime.MutableFloatState;
 import kotlin.Metadata;
@@ -15,7 +15,7 @@ import kotlinx.coroutines.DelayKt;
 /* JADX INFO: compiled from: MeloXFlowingLightBackdrop.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXFlowingLightBackdropKt$MeloXFlowingLightBackdrop$2$1", f = "MeloXFlowingLightBackdrop.kt", i = {}, l = {48}, m = "invokeSuspend", n = {}, nl = {50}, s = {}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXFlowingLightBackdropKt$MeloXFlowingLightBackdrop$2$1", m720f = "MeloXFlowingLightBackdrop.kt", m721i = {}, m722l = {48}, m723m = "invokeSuspend", m724n = {}, m725nl = {50}, m726s = {}, m727v = 2)
 final class MeloXFlowingLightBackdropKt$MeloXFlowingLightBackdrop$2$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ boolean $isPlaying;
     final /* synthetic */ MutableFloatState $phase$delegate;

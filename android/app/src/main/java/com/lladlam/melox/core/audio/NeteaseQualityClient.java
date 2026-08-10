@@ -2,7 +2,6 @@ package com.lladlam.melox.core.audio;
 
 import androidx.core.app.NotificationCompat;
 import androidx.media3.exoplayer.upstream.CmcdData;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import androidx.savedstate.serialization.ClassDiscriminatorModeKt;
 import com.google.common.net.HttpHeaders;
 import com.lladlam.melox.core.account.NeteaseSessionStore;
@@ -95,7 +94,7 @@ public final class NeteaseQualityClient {
     /* JADX INFO: renamed from: com.lladlam.melox.core.audio.NeteaseQualityClient$audioAvailability$2 */
     /* JADX INFO: compiled from: NeteaseQualityClient.kt */
     @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "Lcom/lladlam/melox/core/audio/SongAudioAvailability;", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.core.audio.NeteaseQualityClient$audioAvailability$2", f = "NeteaseQualityClient.kt", i = {}, l = {}, m = "invokeSuspend", n = {}, nl = {}, s = {}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.core.audio.NeteaseQualityClient$audioAvailability$2", m720f = "NeteaseQualityClient.kt", m721i = {}, m722l = {}, m723m = "invokeSuspend", m724n = {}, m725nl = {}, m726s = {}, m727v = 2)
     static final class C26002 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super SongAudioAvailability>, Object> {
         final /* synthetic */ long $songId;
         int label;
@@ -151,13 +150,13 @@ public final class NeteaseQualityClient {
             } else {
                 unknown = neteaseQualityClient.parseAvailability(jSONObjectOptJSONObject);
             }
-            objM9714constructorimpl = Result.constructor-impl(unknown);
+            objM9714constructorimpl = Result.constructor_impl(unknown);
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
         SongAudioAvailability unknown2 = SongAudioAvailability.INSTANCE.getUnknown();
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = unknown2;
         }
         return (SongAudioAvailability) objM9714constructorimpl;

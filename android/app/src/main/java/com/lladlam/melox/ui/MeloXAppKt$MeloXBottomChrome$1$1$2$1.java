@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui;
+package com.lladlam.melox.p012ui;
 
 import androidx.compose.foundation.gestures.TapGestureDetectorKt;
 import androidx.compose.ui.geometry.Offset;

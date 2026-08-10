@@ -26,8 +26,6 @@ public final /* data */ class SongAudioResource {
     }
 
 
-
-
     public final SongAudioResource copy(Integer bitrate, Integer sampleRate, Long size) {
         return new SongAudioResource(bitrate, sampleRate, size);
     }

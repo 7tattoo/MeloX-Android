@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.search;
+package com.lladlam.melox.p012ui.search;
 
 import androidx.compose.runtime.MutableState;
 import com.lladlam.melox.core.model.SearchSong;

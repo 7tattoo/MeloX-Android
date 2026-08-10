@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.animation.AnimatedContentScope;
 import androidx.compose.foundation.layout.SizeKt;
@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.SpacerKt;
 import androidx.compose.material3.SliderState;
 import androidx.compose.ui.Modifier;
 import androidx.compose.ui.graphics.Color;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;
 import androidx.compose.runtime.internal.ComposableLambdaKt;
@@ -52,7 +52,7 @@ public final class ComposableSingletons$MeloXIOSNowPlayingV2Kt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(1770962769, $changed, -1, "com.lladlam.melox.ui.player.ComposableSingletons$MeloXIOSNowPlayingV2Kt.lambda$1770962769.<anonymous> (MeloXIOSNowPlayingV2.kt:429)");
             }
-            SpacerKt.Spacer(SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(0)), $composer, 6);
+            SpacerKt.Spacer(SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(0)), $composer, 6);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -68,7 +68,7 @@ public final class ComposableSingletons$MeloXIOSNowPlayingV2Kt {
         if (ComposerKt.isTraceInProgress()) {
             ComposerKt.traceEventStart(-1310663515, $changed, -1, "com.lladlam.melox.ui.player.ComposableSingletons$MeloXIOSNowPlayingV2Kt.lambda$-1310663515.<anonymous> (MeloXIOSNowPlayingV2.kt:669)");
         }
-        MeloXIOSNowPlayingV2Kt.m9689CupertinoGlyphXOJAsU(playing ? CupertinoGlyphKind.Pause : CupertinoGlyphKind.Play, SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(48)), Color.INSTANCE.m6105getWhite0d7_KjU(), $composer, 432);
+        MeloXIOSNowPlayingV2Kt.m9689CupertinoGlyphXOJAsU(playing ? CupertinoGlyphKind.Pause : CupertinoGlyphKind.Play, SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(48)), Color.INSTANCE.m6105getWhite0d7_KjU(), $composer, 432);
         if (ComposerKt.isTraceInProgress()) {
             ComposerKt.traceEventEnd();
         }

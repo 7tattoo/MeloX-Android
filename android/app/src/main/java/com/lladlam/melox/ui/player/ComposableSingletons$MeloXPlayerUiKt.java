@@ -1,10 +1,10 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.foundation.layout.BoxKt;
 import androidx.compose.foundation.layout.SizeKt;
 import androidx.compose.material3.SliderState;
 import androidx.compose.ui.Modifier;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;
 import androidx.compose.runtime.internal.ComposableLambdaKt;
@@ -36,7 +36,7 @@ public final class ComposableSingletons$MeloXPlayerUiKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(1065021834, $changed, -1, "com.lladlam.melox.ui.player.ComposableSingletons$MeloXPlayerUiKt.lambda$1065021834.<anonymous> (MeloXPlayerUi.kt:565)");
             }
-            BoxKt.Box(SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(1)), $composer, 6);
+            BoxKt.Box(SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(1)), $composer, 6);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }

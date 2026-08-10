@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;

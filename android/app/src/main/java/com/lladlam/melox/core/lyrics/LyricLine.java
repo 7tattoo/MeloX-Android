@@ -47,13 +47,9 @@ public final /* data */ class LyricLine {
     }
 
 
-
-
     public final List<LyricSyllable> component4() {
         return this.syllables;
     }
-
-
 
     public final LyricLine copy(long timeMs, Long durationMs, String text, List<LyricSyllable> syllables, String translation, String romanization) {
         Intrinsics.checkNotNullParameter(text, "text");

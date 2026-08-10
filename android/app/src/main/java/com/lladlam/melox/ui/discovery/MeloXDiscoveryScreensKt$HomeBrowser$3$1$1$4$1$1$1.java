@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.discovery;
+package com.lladlam.melox.p012ui.discovery;
 
 import androidx.compose.runtime.MutableState;
 import com.lladlam.melox.core.library.NeteaseDiscoveryCache;
@@ -17,7 +17,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXDiscoveryScreens.kt */
 /* JADX INFO: loaded from: classes16.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.discovery.MeloXDiscoveryScreensKt$HomeBrowser$3$1$1$4$1$1$1", f = "MeloXDiscoveryScreens.kt", i = {}, l = {330}, m = "invokeSuspend", n = {}, nl = {-1}, s = {}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.discovery.MeloXDiscoveryScreensKt$HomeBrowser$3$1$1$4$1$1$1", m720f = "MeloXDiscoveryScreens.kt", m721i = {}, m722l = {330}, m723m = "invokeSuspend", m724n = {}, m725nl = {-1}, m726s = {}, m727v = 2)
 final class MeloXDiscoveryScreensKt$HomeBrowser$3$1$1$4$1$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ NeteaseDiscoveryCache $cache;
     final /* synthetic */ NeteaseLibraryClient $client;

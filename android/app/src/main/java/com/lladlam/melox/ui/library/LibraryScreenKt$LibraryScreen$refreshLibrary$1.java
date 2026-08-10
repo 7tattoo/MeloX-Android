@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.library;
+package com.lladlam.melox.p012ui.library;
 
 import kotlin.Metadata;
 import kotlin.coroutines.Continuation;
@@ -8,7 +8,7 @@ import kotlin.coroutines.jvm.internal.DebugMetadata;
 /* JADX INFO: compiled from: LibraryScreen.kt */
 /* JADX INFO: loaded from: classes3.dex */
 @Metadata(k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.library.LibraryScreenKt", f = "LibraryScreen.kt", i = {0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2}, l = {120, 124, 127}, m = "LibraryScreen$refreshLibrary", n = {"$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "userId", "$i$a$-runCatching-LibraryScreenKt$LibraryScreen$refreshLibrary$2\\1\\124\\0", "$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "it\\2", "userId", "$i$a$-onSuccess-LibraryScreenKt$LibraryScreen$refreshLibrary$3\\2\\125\\0"}, nl = {121, 124, 128}, s = {"L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "J$0", "I$0", "L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "L$7", "J$0", "I$0"}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.library.LibraryScreenKt", m720f = "LibraryScreen.kt", m721i = {0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2}, m722l = {120, 124, 127}, m723m = "LibraryScreen$refreshLibrary", m724n = {"$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "userId", "$i$a$-runCatching-LibraryScreenKt$LibraryScreen$refreshLibrary$2\\1\\124\\0", "$session", "loading$delegate", "errorMessage$delegate", "client", "cache", "snapshot$delegate", "it\\2", "userId", "$i$a$-onSuccess-LibraryScreenKt$LibraryScreen$refreshLibrary$3\\2\\125\\0"}, m725nl = {121, 124, 128}, m726s = {"L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "J$0", "I$0", "L$0", "L$1", "L$2", "L$3", "L$4", "L$5", "L$7", "J$0", "I$0"}, m727v = 2)
 final class LibraryScreenKt$LibraryScreen$refreshLibrary$1 extends ContinuationImpl {
     int I$0;
     long J$0;

@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import kotlin.Metadata;
 import kotlin.jvm.internal.Intrinsics;
@@ -16,8 +16,6 @@ public final /* data */ class MeloXPlayerContainerKey {
         }
         return meloXPlayerContainerKey.copy(str);
     }
-
-
     public final MeloXPlayerContainerKey copy(String mediaId) {
         Intrinsics.checkNotNullParameter(mediaId, "mediaId");
         return new MeloXPlayerContainerKey(mediaId);

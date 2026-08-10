@@ -1,7 +1,6 @@
 package com.lladlam.melox.core.model;
 
 import androidx.autofill.HintConstants;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import kotlin.Metadata;
 import kotlin.jvm.internal.DefaultConstructorMarker;
 import kotlin.jvm.internal.Intrinsics;
@@ -40,6 +39,10 @@ public final /* data */ class SearchSong {
         }
         return searchSong.copy(j3, str5, str6, str7, str4, (i & 32) != 0 ? searchSong.durationMs : j2);
     }
+
+
+
+
 
     public final SearchSong copy(long id, String name, String artists, String album, String artworkUrl, long durationMs) {
         Intrinsics.checkNotNullParameter(name, "name");

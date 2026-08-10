@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.discovery;
+package com.lladlam.melox.p012ui.discovery;
 
 import androidx.compose.ui.graphics.Color;
 import com.lladlam.melox.core.library.NeteasePlaylistSummary;
@@ -43,13 +43,9 @@ final /* data */ class EditorialCardData {
     }
 
 
-
-
     public final List<Color> component4() {
         return this.colors;
     }
-
-
 
     public final EditorialCardData copy(String eyebrow, String title, String subtitle, List<Color> colors, EditorialGlyph glyph, NeteasePlaylistSummary playlist) {
         Intrinsics.checkNotNullParameter(eyebrow, "eyebrow");

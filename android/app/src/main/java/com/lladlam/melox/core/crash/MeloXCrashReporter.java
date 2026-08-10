@@ -74,19 +74,19 @@ public final class MeloXCrashReporter {
                 Result.Companion companion = Result.INSTANCE;
                 Intrinsics.checkNotNull($appContext);
                 FilesKt.writeText$default(meloXCrashReporter2.pendingReportFile($appContext), report, null, 2, null);
-                Result.constructor-impl(Unit.INSTANCE);
+                Result.constructor_impl(Unit.INSTANCE);
             } catch (Throwable th) {
                 Result.Companion companion2 = Result.INSTANCE;
-                Result.constructor-impl(ResultKt.createFailure(th));
+                Result.constructor_impl(ResultKt.createFailure(th));
             }
             MeloXCrashReporter meloXCrashReporter3 = INSTANCE;
             try {
                 Result.Companion companion3 = Result.INSTANCE;
                 Intrinsics.checkNotNull($appContext);
-                Result.constructor-impl(Boolean.valueOf(meloXCrashReporter3.copyToClipboard($appContext, report)));
+                Result.constructor_impl(Boolean.valueOf(meloXCrashReporter3.copyToClipboard($appContext, report)));
             } catch (Throwable th2) {
                 Result.Companion companion4 = Result.INSTANCE;
-                Result.constructor-impl(ResultKt.createFailure(th2));
+                Result.constructor_impl(ResultKt.createFailure(th2));
             }
         }
         if ($previousHandler != null) {
@@ -117,10 +117,10 @@ public final class MeloXCrashReporter {
                 } else {
                     unit = null;
                 }
-                Result.constructor-impl(unit);
+                Result.constructor_impl(unit);
             } catch (Throwable th) {
                 Result.Companion companion2 = Result.INSTANCE;
-                Result.constructor-impl(ResultKt.createFailure(th));
+                Result.constructor_impl(ResultKt.createFailure(th));
             }
         }
     }
@@ -138,12 +138,12 @@ public final class MeloXCrashReporter {
         }
         try {
             Result.Companion companion = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(Boolean.valueOf(copyToClipboard(context, report)));
+            objM9714constructorimpl = Result.constructor_impl(Boolean.valueOf(copyToClipboard(context, report)));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = false;
         }
         if (((Boolean) objM9714constructorimpl).booleanValue()) {
@@ -163,12 +163,12 @@ public final class MeloXCrashReporter {
         try {
             Result.Companion companion = Result.INSTANCE;
             MeloXCrashReporter meloXCrashReporter = this;
-            objM9714constructorimpl = Result.constructor-impl(FilesKt.readText$default(file, null, 1, null));
+            objM9714constructorimpl = Result.constructor_impl(FilesKt.readText$default(file, null, 1, null));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = null;
         }
         String str = (String) objM9714constructorimpl;
@@ -177,12 +177,12 @@ public final class MeloXCrashReporter {
             if (report != null) {
                 try {
                     Result.Companion companion3 = Result.INSTANCE;
-                    objM9714constructorimpl2 = Result.constructor-impl(Boolean.valueOf(copyToClipboard(context, report)));
+                    objM9714constructorimpl2 = Result.constructor_impl(Boolean.valueOf(copyToClipboard(context, report)));
                 } catch (Throwable th2) {
                     Result.Companion companion4 = Result.INSTANCE;
-                    objM9714constructorimpl2 = Result.constructor-impl(ResultKt.createFailure(th2));
+                    objM9714constructorimpl2 = Result.constructor_impl(ResultKt.createFailure(th2));
                 }
-                if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
+                if (Result.isFailure_impl(objM9714constructorimpl2)) {
                     objM9714constructorimpl2 = false;
                 }
                 boolean copied = ((Boolean) objM9714constructorimpl2).booleanValue();
@@ -190,10 +190,10 @@ public final class MeloXCrashReporter {
                     try {
                         Result.Companion companion5 = Result.INSTANCE;
                         MeloXCrashReporter meloXCrashReporter2 = this;
-                        Result.constructor-impl(Boolean.valueOf(file.delete()));
+                        Result.constructor_impl(Boolean.valueOf(file.delete()));
                     } catch (Throwable th3) {
                         Result.Companion companion6 = Result.INSTANCE;
-                        Result.constructor-impl(ResultKt.createFailure(th3));
+                        Result.constructor_impl(ResultKt.createFailure(th3));
                     }
                 }
                 return copied;
@@ -250,17 +250,17 @@ public final class MeloXCrashReporter {
                 if (historicalProcessExitReasons == null) {
                     historicalProcessExitReasons = CollectionsKt.emptyList();
                 }
-                objM9714constructorimpl = Result.constructor-impl(historicalProcessExitReasons);
+                objM9714constructorimpl = Result.constructor_impl(historicalProcessExitReasons);
             } catch (Throwable th2) {
                 th = th2;
                 Result.Companion companion2 = Result.INSTANCE;
-                objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+                objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
             }
         } catch (Throwable th3) {
             th = th3;
         }
         List listEmptyList = CollectionsKt.emptyList();
-        if (Result.m9720isFailureimpl(objM9714constructorimpl)) {
+        if (Result.isFailure_impl(objM9714constructorimpl)) {
             objM9714constructorimpl = listEmptyList;
         }
         Iterable exits = (List) objM9714constructorimpl;
@@ -373,12 +373,12 @@ public final class MeloXCrashReporter {
                     processState2 = processState;
                     lValueOf2 = null;
                 }
-                objM9714constructorimpl2 = Result.constructor-impl(lValueOf2);
+                objM9714constructorimpl2 = Result.constructor_impl(lValueOf2);
             } catch (Throwable th8) {
                 th = th8;
                 Result.Companion companion4 = Result.INSTANCE;
-                objM9714constructorimpl2 = Result.constructor-impl(ResultKt.createFailure(th));
-                if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
+                objM9714constructorimpl2 = Result.constructor_impl(ResultKt.createFailure(th));
+                if (Result.isFailure_impl(objM9714constructorimpl2)) {
                     obj = null;
                 } else {
                     obj = objM9714constructorimpl2;
@@ -418,7 +418,7 @@ public final class MeloXCrashReporter {
             th = th9;
             processState2 = processState;
         }
-        if (Result.m9720isFailureimpl(objM9714constructorimpl2)) {
+        if (Result.isFailure_impl(objM9714constructorimpl2)) {
             obj = null;
         } else {
             obj = objM9714constructorimpl2;
@@ -466,12 +466,12 @@ public final class MeloXCrashReporter {
             Result.Companion companion = Result.INSTANCE;
             MeloXCrashReporter meloXCrashReporter = this;
             ActivityManager activityManager = (ActivityManager) context.getSystemService(ActivityManager.class);
-            objM9714constructorimpl = Result.constructor-impl((activityManager == null || (historicalProcessExitReasons = activityManager.getHistoricalProcessExitReasons(context.getPackageName(), 0, 1)) == null || (applicationExitInfo = (ApplicationExitInfo) CollectionsKt.firstOrNull((List) historicalProcessExitReasons)) == null) ? null : Long.valueOf(applicationExitInfo.getTimestamp()));
+            objM9714constructorimpl = Result.constructor_impl((activityManager == null || (historicalProcessExitReasons = activityManager.getHistoricalProcessExitReasons(context.getPackageName(), 0, 1)) == null || (applicationExitInfo = (ApplicationExitInfo) CollectionsKt.firstOrNull((List) historicalProcessExitReasons)) == null) ? null : Long.valueOf(applicationExitInfo.getTimestamp()));
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        Long l = (Long) (Result.m9720isFailureimpl(objM9714constructorimpl) ? null : objM9714constructorimpl);
+        Long l = (Long) (Result.isFailure_impl(objM9714constructorimpl) ? null : objM9714constructorimpl);
         if (l != null) {
             long newestTimestamp = l.longValue();
             preferences(context).edit().putLong(LAST_SEEN_EXIT_TIME, newestTimestamp).apply();

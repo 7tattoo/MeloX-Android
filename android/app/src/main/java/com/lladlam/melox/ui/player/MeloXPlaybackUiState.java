@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import android.net.Uri;
 import androidx.compose.runtime.MutableFloatState;
@@ -8,7 +8,6 @@ import androidx.compose.runtime.MutableState;
 import androidx.compose.runtime.PrimitiveSnapshotStateKt;
 import androidx.compose.runtime.SnapshotIntStateKt;
 import androidx.compose.runtime.SnapshotLongStateKt;
-import androidx.compose.runtime.SnapshotStateKt__SnapshotStateKt;
 import androidx.media3.common.C1565C;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;

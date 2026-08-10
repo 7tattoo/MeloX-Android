@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.webkit.CookieManager;
 import androidx.compose.runtime.MutableState;
-import androidx.compose.runtime.SnapshotStateKt__SnapshotStateKt;
 import androidx.media3.container.MdtaMetadataEntry;
 import com.lladlam.melox.core.network.NeteaseSearchClient;
 import java.util.ArrayList;
@@ -60,7 +59,7 @@ public final class NeteaseSessionStore {
     /* JADX INFO: renamed from: com.lladlam.melox.core.account.NeteaseSessionStore$refreshProfile$1 */
     /* JADX INFO: compiled from: NeteaseSessionStore.kt */
     @Metadata(k = 3, mv = {2, 3, 0}, xi = 48)
-    @DebugMetadata(c = "com.lladlam.melox.core.account.NeteaseSessionStore", f = "NeteaseSessionStore.kt", i = {0, 0, 0}, l = {68}, m = "refreshProfile", n = {"$this$refreshProfile_u24lambda_u240\\1", "force", "$i$a$-runCatching-NeteaseSessionStore$refreshProfile$2\\1\\67\\0"}, nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, s = {"L$0", "Z$0", "I$0"}, v = 2)
+    @DebugMetadata(m719c = "com.lladlam.melox.core.account.NeteaseSessionStore", m720f = "NeteaseSessionStore.kt", m721i = {0, 0, 0}, m722l = {68}, m723m = "refreshProfile", m724n = {"$this$refreshProfile_u24lambda_u240\\1", "force", "$i$a$-runCatching-NeteaseSessionStore$refreshProfile$2\\1\\67\\0"}, m725nl = {MdtaMetadataEntry.TYPE_INDICATOR_INT32}, m726s = {"L$0", "Z$0", "I$0"}, m727v = 2)
     static final class C25991 extends ContinuationImpl {
         int I$0;
         Object L$0;
@@ -130,7 +129,7 @@ public final class NeteaseSessionStore {
     /* JADX WARN: Code duplicated, block: B:7:0x0014  */
     /* JADX WARN: Multi-variable type inference failed */
     /* JADX INFO: renamed from: acceptAuthenticatedCookie-gIAlu-s, reason: not valid java name */
-    public final Object m9598acceptAuthenticatedCookiegIAlus(String str, Continuation<? super Result<NeteaseAccountProfile>> continuation) {
+    public final Object acceptAuthenticatedCookie(String str, Continuation<? super Result<NeteaseAccountProfile>> continuation) {
         NeteaseSessionStore$acceptAuthenticatedCookie$1 neteaseSessionStore$acceptAuthenticatedCookie$1;
         Object objM9714constructorimpl;
         String strNormalizeCookie;
@@ -155,7 +154,7 @@ public final class NeteaseSessionStore {
                     strNormalizeCookie = INSTANCE.normalizeCookie(str);
                     if (!INSTANCE.containsMusicU(strNormalizeCookie)) {
                         Result.Companion companion = Result.INSTANCE;
-                        return Result.constructor-impl(ResultKt.createFailure(new IllegalStateException("未检测到 MUSIC_U 登录 Cookie")));
+                        return Result.constructor_impl(ResultKt.createFailure(new IllegalStateException("未检测到 MUSIC_U 登录 Cookie")));
                     }
                     setRefreshing(true);
                     OkHttpClient okHttpClient = null;
@@ -191,12 +190,12 @@ public final class NeteaseSessionStore {
             neteaseSessionStore.preferences.edit().putString(KEY_COOKIE, strNormalizeCookie).apply();
             neteaseSessionStore.setCookie(strNormalizeCookie);
             neteaseSessionStore.setProfile(neteaseAccountProfile);
-            objM9714constructorimpl = Result.constructor-impl(neteaseAccountProfile);
+            objM9714constructorimpl = Result.constructor_impl(neteaseAccountProfile);
         } catch (Throwable th) {
             Result.Companion companion3 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        Throwable thM9717exceptionOrNullimpl = Result.m9717exceptionOrNullimpl(objM9714constructorimpl);
+        Throwable thM9717exceptionOrNullimpl = Result.exceptionOrNull_impl(objM9714constructorimpl);
         if (thM9717exceptionOrNullimpl != null) {
             String message = thM9717exceptionOrNullimpl.getMessage();
             if (message == null) {
@@ -273,15 +272,15 @@ public final class NeteaseSessionStore {
                 default:
                     throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
             }
-            objM9714constructorimpl = Result.constructor-impl((NeteaseAccountProfile) objAccountProfile);
+            objM9714constructorimpl = Result.constructor_impl((NeteaseAccountProfile) objAccountProfile);
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
-        if (Result.m9721isSuccessimpl(objM9714constructorimpl)) {
+        if (Result.isSuccess_impl(objM9714constructorimpl)) {
             setProfile((NeteaseAccountProfile) objM9714constructorimpl);
         }
-        Throwable thM9717exceptionOrNullimpl = Result.m9717exceptionOrNullimpl(objM9714constructorimpl);
+        Throwable thM9717exceptionOrNullimpl = Result.exceptionOrNull_impl(objM9714constructorimpl);
         if (thM9717exceptionOrNullimpl != null) {
             String message = thM9717exceptionOrNullimpl.getMessage();
             if (message == null) {
@@ -360,7 +359,7 @@ public final class NeteaseSessionStore {
                     String string2 = StringsKt.trim((CharSequence) listSplit$default.get(i3)).toString();
                     String string3 = StringsKt.trim((CharSequence) listSplit$default.get(1)).toString();
                     if (!StringsKt.isBlank(string2)) {
-                        pairM717to = TuplesKt.m717to(string2, string3);
+                        pairM717to = TuplesKt.to(string2, string3);
                     }
                 }
                 if (pairM717to != null) {
@@ -378,10 +377,10 @@ public final class NeteaseSessionStore {
                 Companion companion2 = this;
                 CookieManager.getInstance().removeAllCookies(null);
                 CookieManager.getInstance().flush();
-                Result.constructor-impl(Unit.INSTANCE);
+                Result.constructor_impl(Unit.INSTANCE);
             } catch (Throwable th) {
                 Result.Companion companion3 = Result.INSTANCE;
-                Result.constructor-impl(ResultKt.createFailure(th));
+                Result.constructor_impl(ResultKt.createFailure(th));
             }
         }
     }

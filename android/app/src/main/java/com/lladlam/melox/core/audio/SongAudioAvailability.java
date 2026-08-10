@@ -72,8 +72,6 @@ public final /* data */ class SongAudioAvailability {
 
 
 
-
-
     public final SongAudioAvailability copy(SongAudioResource standard, SongAudioResource medium, SongAudioResource high, SongAudioResource lossless, SongAudioResource hiResolution, SongAudioResource highDefinitionSurround, SongAudioResource immersiveSurround, SongAudioResource ultraClearMaster, boolean isKnown) {
         return new SongAudioAvailability(standard, medium, high, lossless, hiResolution, highDefinitionSurround, immersiveSurround, ultraClearMaster, isKnown);
     }

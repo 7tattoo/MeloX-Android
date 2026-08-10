@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.runtime.MutableState;
 import com.lladlam.melox.core.lyrics.LyricsDocument;
@@ -19,7 +19,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXIOSLyricsPanel.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1", f = "MeloXIOSLyricsPanel.kt", i = {0, 0, 0, 0}, l = {97}, m = "invokeSuspend", n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "songId", "$i$a$-runCatching-MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1$1\\1\\97\\0"}, nl = {97}, s = {"L$0", "L$1", "J$0", "I$0"}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1", m720f = "MeloXIOSLyricsPanel.kt", m721i = {0, 0, 0, 0}, m722l = {97}, m723m = "invokeSuspend", m724n = {"$this$LaunchedEffect", "$this$invokeSuspend_u24lambda_u240\\1", "songId", "$i$a$-runCatching-MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1$1\\1\\97\\0"}, m725nl = {97}, m726s = {"L$0", "L$1", "J$0", "I$0"}, m727v = 2)
 final class MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ NeteaseSearchClient $client;
     final /* synthetic */ MutableState<String> $errorMessage$delegate;
@@ -93,17 +93,17 @@ final class MeloXIOSLyricsPanelKt$MeloXIOSLyricsPanel$3$1 extends SuspendLambda 
                 default:
                     throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
             }
-            objM9714constructorimpl = Result.constructor-impl((LyricsDocument) objLyrics);
+            objM9714constructorimpl = Result.constructor_impl((LyricsDocument) objLyrics);
         } catch (Throwable th) {
             Result.Companion companion2 = Result.INSTANCE;
-            objM9714constructorimpl = Result.constructor-impl(ResultKt.createFailure(th));
+            objM9714constructorimpl = Result.constructor_impl(ResultKt.createFailure(th));
         }
         MutableState<LyricsDocument> mutableState = this.$lyrics$delegate;
-        if (Result.m9721isSuccessimpl(objM9714constructorimpl)) {
+        if (Result.isSuccess_impl(objM9714constructorimpl)) {
             mutableState.setValue((LyricsDocument) objM9714constructorimpl);
         }
         MutableState<String> mutableState2 = this.$errorMessage$delegate;
-        Throwable thM9717exceptionOrNullimpl = Result.m9717exceptionOrNullimpl(objM9714constructorimpl);
+        Throwable thM9717exceptionOrNullimpl = Result.exceptionOrNull_impl(objM9714constructorimpl);
         if (thM9717exceptionOrNullimpl != null) {
             String message = thM9717exceptionOrNullimpl.getMessage();
             if (message == null) {

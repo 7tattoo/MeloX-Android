@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.discovery;
+package com.lladlam.melox.p012ui.discovery;
 
 import androidx.compose.foundation.layout.PaddingKt;
 import androidx.compose.foundation.lazy.LazyItemScope;
@@ -6,7 +6,7 @@ import androidx.compose.material3.MaterialTheme;
 import androidx.compose.material3.TextKt;
 import androidx.compose.ui.Modifier;
 import androidx.compose.ui.text.font.FontWeight;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.ui.unit.TextUnitKt;
 import androidx.compose.runtime.Composer;
 import androidx.compose.runtime.ComposerKt;
@@ -81,7 +81,7 @@ public final class ComposableSingletons$MeloXDiscoveryScreensKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(-66146226, $changed, -1, "com.lladlam.melox.ui.discovery.ComposableSingletons$MeloXDiscoveryScreensKt.lambda$-66146226.<anonymous> (MeloXDiscoveryScreens.kt:191)");
             }
-            TextKt.m3912TextNvy7gAk("发现", PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(28), C1301Dp.m8905constructorimpl(42), C1301Dp.m8905constructorimpl(20), 0.0f, 8, null), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnBackground(), null, TextUnitKt.getSp(36), null, FontWeight.INSTANCE.getBold(), null, 0L, null, null, TextUnitKt.getSp(42), 0, false, 0, 0, null, null, $composer, 1597446, 48, 260008);
+            TextKt.m3912TextNvy7gAk("发现", PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, Dp.constructor_impl(28), Dp.constructor_impl(42), Dp.constructor_impl(20), 0.0f, 8, null), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnBackground(), null, TextUnitKt.getSp(36), null, FontWeight.INSTANCE.getBold(), null, 0L, null, null, TextUnitKt.getSp(42), 0, false, 0, 0, null, null, $composer, 1597446, 48, 260008);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }
@@ -132,7 +132,7 @@ public final class ComposableSingletons$MeloXDiscoveryScreensKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(-1828055472, $changed, -1, "com.lladlam.melox.ui.discovery.ComposableSingletons$MeloXDiscoveryScreensKt.lambda$-1828055472.<anonymous> (MeloXDiscoveryScreens.kt:302)");
             }
-            TextKt.m3912TextNvy7gAk("首页", PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(28), C1301Dp.m8905constructorimpl(42), C1301Dp.m8905constructorimpl(20), 0.0f, 8, null), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnBackground(), null, TextUnitKt.getSp(36), null, FontWeight.INSTANCE.getBold(), null, 0L, null, null, TextUnitKt.getSp(42), 0, false, 0, 0, null, null, $composer, 1597446, 48, 260008);
+            TextKt.m3912TextNvy7gAk("首页", PaddingKt.m1809paddingqDBjuR0$default(Modifier.INSTANCE, Dp.constructor_impl(28), Dp.constructor_impl(42), Dp.constructor_impl(20), 0.0f, 8, null), MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getOnBackground(), null, TextUnitKt.getSp(36), null, FontWeight.INSTANCE.getBold(), null, 0L, null, null, TextUnitKt.getSp(42), 0, false, 0, 0, null, null, $composer, 1597446, 48, 260008);
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventEnd();
             }

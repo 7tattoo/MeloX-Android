@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.ui.graphics.Color;
 import androidx.compose.ui.graphics.ColorKt;
@@ -40,6 +40,10 @@ public final /* data */ class ArtworkDynamicPalette {
         return this.cells;
     }
 
+    /* JADX INFO: renamed from: component2-0d7_KjU, reason: not valid java name and from getter */
+    public final long getAverage() {
+        return this.average;
+    }
 
     /* JADX INFO: renamed from: copy-4WTKRHQ, reason: not valid java name */
     public final ArtworkDynamicPalette m9670copy4WTKRHQ(List<Color> cells, long average) {

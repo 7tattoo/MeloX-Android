@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import android.content.Context;
 import android.os.SystemClock;
@@ -46,7 +46,7 @@ import androidx.compose.ui.text.style.TextAlign;
 import androidx.compose.ui.text.style.TextDecoration;
 import androidx.compose.ui.text.style.TextGeometricTransform;
 import androidx.compose.ui.text.style.TextOverflow;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.ui.unit.TextUnitKt;
 import androidx.compose.runtime.Applier;
 import androidx.compose.runtime.ComposablesKt;
@@ -60,13 +60,11 @@ import androidx.compose.runtime.ProvidableCompositionLocal;
 import androidx.compose.runtime.RecomposeScopeImplKt;
 import androidx.compose.runtime.ScopeUpdateScope;
 import androidx.compose.runtime.SnapshotLongStateKt;
-import androidx.compose.runtime.SnapshotStateKt__SnapshotStateKt;
 import androidx.compose.runtime.State;
 import androidx.compose.runtime.Updater;
 import androidx.compose.runtime.internal.ComposableLambdaKt;
 import androidx.core.app.NotificationCompat;
 import androidx.media3.exoplayer.RendererCapabilities;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import com.lladlam.melox.core.account.NeteaseSessionStore;
 import com.lladlam.melox.core.lyrics.LyricLine;
 import com.lladlam.melox.core.lyrics.LyricSyllable;
@@ -320,12 +318,12 @@ public final class MeloXIOSLyricsPanelKt {
                 function0 = constructor;
                 StartRestartGroup.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl(StartRestartGroup);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl(StartRestartGroup);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i10 = (i9 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart(StartRestartGroup, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             int i11 = ((i7 >> 6) & 112) | 6;
@@ -336,7 +334,7 @@ public final class MeloXIOSLyricsPanelKt {
                 ComposerKt.sourceInformation(StartRestartGroup, "117@4957L169");
                 Modifier modifierAlign = boxScopeInstance.align(Modifier.INSTANCE, Alignment.INSTANCE.getCenter());
                 long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-                ProgressIndicatorKt.m3567CircularProgressIndicator4lLiAd8(modifierAlign, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.9f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f), 0.0f, 0L, 0, 0.0f, StartRestartGroup, 48, 60);
+                ProgressIndicatorKt.m3567CircularProgressIndicator4lLiAd8(modifierAlign, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.9f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f), 0.0f, 0L, 0, 0.0f, StartRestartGroup, 48, 60);
                 StartRestartGroup.endReplaceGroup();
             } else if (MeloXIOSLyricsPanel$lambda$8(mutableState) != null && lyricsDocumentMeloXIOSLyricsPanel$lambda$2 == null) {
                 StartRestartGroup.startReplaceGroup(-1110425593);
@@ -345,23 +343,23 @@ public final class MeloXIOSLyricsPanelKt {
                 if (strMeloXIOSLyricsPanel$lambda$8 == null) {
                     strMeloXIOSLyricsPanel$lambda$8 = "";
                 }
-                Modifier modifierM1805padding3ABfNKs = PaddingKt.m1805padding3ABfNKs(boxScopeInstance.align(Modifier.INSTANCE, Alignment.INSTANCE.getCenter()), C1301Dp.m8905constructorimpl(24));
+                Modifier modifierM1805padding3ABfNKs = PaddingKt.m1805padding3ABfNKs(boxScopeInstance.align(Modifier.INSTANCE, Alignment.INSTANCE.getCenter()), Dp.constructor_impl(24));
                 long jM6105getWhite0d7_KjU2 = Color.INSTANCE.m6105getWhite0d7_KjU();
-                TextKt.m3912TextNvy7gAk(strMeloXIOSLyricsPanel$lambda$8, modifierM1805padding3ABfNKs, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU2) : 0.52f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU2) : 0.0f), null, TextUnitKt.getSp(15), null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, StartRestartGroup, 24960, 0, 262120);
+                TextKt.m3912TextNvy7gAk(strMeloXIOSLyricsPanel$lambda$8, modifierM1805padding3ABfNKs, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU2) : 0.52f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU2) : 0.0f), null, TextUnitKt.getSp(15), null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, StartRestartGroup, 24960, 0, 262120);
                 StartRestartGroup.endReplaceGroup();
             } else if (lyricsDocumentMeloXIOSLyricsPanel$lambda$2 == null || lyricsDocumentMeloXIOSLyricsPanel$lambda$2.getLines().isEmpty()) {
                 StartRestartGroup.startReplaceGroup(-1110034280);
                 ComposerKt.sourceInformation(StartRestartGroup, "135@5613L222");
                 Modifier modifierAlign2 = boxScopeInstance.align(Modifier.INSTANCE, Alignment.INSTANCE.getCenter());
                 long jM6105getWhite0d7_KjU3 = Color.INSTANCE.m6105getWhite0d7_KjU();
-                TextKt.m3912TextNvy7gAk("暂无歌词", modifierAlign2, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU3, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU3) : 0.42f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU3) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU3) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU3) : 0.0f), null, TextUnitKt.getSp(18), null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, StartRestartGroup, 24966, 0, 262120);
+                TextKt.m3912TextNvy7gAk("暂无歌词", modifierAlign2, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU3, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU3) : 0.42f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU3) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU3) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU3) : 0.0f), null, TextUnitKt.getSp(18), null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, StartRestartGroup, 24966, 0, 262120);
                 StartRestartGroup.endReplaceGroup();
             } else {
                 StartRestartGroup.startReplaceGroup(-1109740090);
                 ComposerKt.sourceInformation(StartRestartGroup, "150@6224L545,144@5889L880");
                 Modifier modifierFillMaxSize$default = SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null);
-                PaddingValues paddingValuesM1802PaddingValuesa9UjIt4$default = PaddingKt.m1802PaddingValuesa9UjIt4$default(0.0f, C1301Dp.m8905constructorimpl(58), 0.0f, C1301Dp.m8905constructorimpl(76), 5, null);
-                Arrangement.HorizontalOrVertical horizontalOrVerticalM1497spacedBy0680j_4 = Arrangement.INSTANCE.m1497spacedBy0680j_4(C1301Dp.m8905constructorimpl(22));
+                PaddingValues paddingValuesM1802PaddingValuesa9UjIt4$default = PaddingKt.m1802PaddingValuesa9UjIt4$default(0.0f, Dp.constructor_impl(58), 0.0f, Dp.constructor_impl(76), 5, null);
+                Arrangement.HorizontalOrVertical horizontalOrVerticalM1497spacedBy0680j_4 = Arrangement.INSTANCE.m1497spacedBy0680j_4(Dp.constructor_impl(22));
                 Alignment.Horizontal start = Alignment.INSTANCE.getStart();
                 ComposerKt.sourceInformationMarkerStart(StartRestartGroup, -589976467, str);
                 boolean zChangedInstance = StartRestartGroup.changedInstance(lyricsDocumentMeloXIOSLyricsPanel$lambda$2) | StartRestartGroup.changed(mutableLongState3) | StartRestartGroup.changed(numHighlightedIndex) | ((i5 & 14) == 4);
@@ -591,7 +589,7 @@ public final class MeloXIOSLyricsPanelKt {
                 objRememberedValue = obj;
             }
             ComposerKt.sourceInformationMarkerEnd($composer2);
-            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(ClickableKt.m1078clickableoSLSa3U$default(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxWidth$default, (Function1) objRememberedValue), false, null, null, null, function0, 15, null), C1301Dp.m8905constructorimpl(8), C1301Dp.m8905constructorimpl(2));
+            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(ClickableKt.m1078clickableoSLSa3U$default(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxWidth$default, (Function1) objRememberedValue), false, null, null, null, function0, 15, null), Dp.constructor_impl(8), Dp.constructor_impl(2));
             Alignment.Horizontal start = Alignment.INSTANCE.getStart();
             ComposerKt.sourceInformationMarkerStart($composer2, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), start, $composer2, ((RendererCapabilities.DECODER_SUPPORT_MASK >> 3) & 14) | ((RendererCapabilities.DECODER_SUPPORT_MASK >> 3) & 112));
@@ -612,12 +610,12 @@ public final class MeloXIOSLyricsPanelKt {
             } else {
                 $composer2.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer2);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer2);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i3 = (i2 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer2, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             ColumnScopeInstance columnScopeInstance = ColumnScopeInstance.INSTANCE;
@@ -632,12 +630,12 @@ public final class MeloXIOSLyricsPanelKt {
             } else {
                 $composer2.startReplaceGroup(1361341446);
                 ComposerKt.sourceInformation($composer2, "*223@8785L457");
-                Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null), 0.0f, C1301Dp.m8905constructorimpl(5), 0.0f, 0.0f, 13, null);
+                Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null), 0.0f, Dp.constructor_impl(5), 0.0f, 0.0f, 13, null);
                 int iM8763getStarte0LSkKk = TextAlign.INSTANCE.m8763getStarte0LSkKk();
                 long sp = TextUnitKt.getSp(14);
                 long sp2 = TextUnitKt.getSp(19);
                 long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-                TextKt.m3912TextNvy7gAk(str, modifierM1809paddingqDBjuR0$default, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : lerp(0.28f, 0.68f, MeloXAnimatedLyricLine$lambda$0(stateAnimateFloatAsState)), (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f), null, sp, null, null, null, 0L, null, TextAlign.m8751boximpl(iM8763getStarte0LSkKk), sp2, 0, false, 0, 0, null, null, $composer2, 24624, 48, 259048);
+                TextKt.m3912TextNvy7gAk(str, modifierM1809paddingqDBjuR0$default, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : lerp(0.28f, 0.68f, MeloXAnimatedLyricLine$lambda$0(stateAnimateFloatAsState)), (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f), null, sp, null, null, null, 0L, null, TextAlign.m8751boximpl(iM8763getStarte0LSkKk), sp2, 0, false, 0, 0, null, null, $composer2, 24624, 48, 259048);
                 $composer2.endReplaceGroup();
             }
             String romanization = line.getRomanization();
@@ -648,12 +646,12 @@ public final class MeloXIOSLyricsPanelKt {
             } else {
                 $composer2.startReplaceGroup(1361927780);
                 ComposerKt.sourceInformation($composer2, "*240@9377L458");
-                Modifier modifierM1809paddingqDBjuR0$default2 = PaddingKt.m1809paddingqDBjuR0$default(SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null), 0.0f, C1301Dp.m8905constructorimpl(3), 0.0f, 0.0f, 13, null);
+                Modifier modifierM1809paddingqDBjuR0$default2 = PaddingKt.m1809paddingqDBjuR0$default(SizeKt.fillMaxWidth$default(Modifier.INSTANCE, 0.0f, 1, null), 0.0f, Dp.constructor_impl(3), 0.0f, 0.0f, 13, null);
                 int iM8763getStarte0LSkKk2 = TextAlign.INSTANCE.m8763getStarte0LSkKk();
                 long sp3 = TextUnitKt.getSp(12);
                 long sp4 = TextUnitKt.getSp(17);
                 long jM6105getWhite0d7_KjU2 = Color.INSTANCE.m6105getWhite0d7_KjU();
-                TextKt.m3912TextNvy7gAk(str2, modifierM1809paddingqDBjuR0$default2, Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU2) : lerp(0.22f, 0.5f, MeloXAnimatedLyricLine$lambda$0(stateAnimateFloatAsState)), (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU2) : 0.0f), null, sp3, null, null, null, 0L, null, TextAlign.m8751boximpl(iM8763getStarte0LSkKk2), sp4, 0, false, 0, 0, null, null, $composer2, 24624, 48, 259048);
+                TextKt.m3912TextNvy7gAk(str2, modifierM1809paddingqDBjuR0$default2, Color.copy_wmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU2) : lerp(0.22f, 0.5f, MeloXAnimatedLyricLine$lambda$0(stateAnimateFloatAsState)), (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU2) : 0.0f), null, sp3, null, null, null, 0L, null, TextAlign.m8751boximpl(iM8763getStarte0LSkKk2), sp4, 0, false, 0, 0, null, null, $composer2, 24624, 48, 259048);
                 $composer2.endReplaceGroup();
             }
             ComposerKt.sourceInformationMarkerEnd($composer2);
@@ -734,7 +732,7 @@ public final class MeloXIOSLyricsPanelKt {
                 i = 32;
                 AnnotatedString.Builder builder = new AnnotatedString.Builder(0, 1, null);
                 long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-                int iPushStyle = builder.pushStyle(new SpanStyle(Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : lerp(0.34f, 1.0f, focusProgress), (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f), 0L, FontWeight.INSTANCE.getSemiBold(), (FontStyle) null, (FontSynthesis) null, (FontFamily) null, (String) null, 0L, (BaselineShift) null, (TextGeometricTransform) null, (LocaleList) null, 0L, (TextDecoration) null, (Shadow) null, (PlatformSpanStyle) null, (DrawStyle) null, 65530, (DefaultConstructorMarker) null));
+                int iPushStyle = builder.pushStyle(new SpanStyle(Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : lerp(0.34f, 1.0f, focusProgress), (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f), 0L, FontWeight.INSTANCE.getSemiBold(), (FontStyle) null, (FontSynthesis) null, (FontFamily) null, (String) null, 0L, (BaselineShift) null, (TextGeometricTransform) null, (LocaleList) null, 0L, (TextDecoration) null, (Shadow) null, (PlatformSpanStyle) null, (DrawStyle) null, 65530, (DefaultConstructorMarker) null));
                 try {
                     builder.append(lyricLine.getText());
                     Unit unit = Unit.INSTANCE;
@@ -756,7 +754,7 @@ public final class MeloXIOSLyricsPanelKt {
                         fCoerceIn = RangesKt.coerceIn((positionMs - lyricSyllable.getStartTimeMs()) / RangesKt.coerceAtLeast(lyricSyllable.getEndTimeMs() - lyricSyllable.getStartTimeMs(), 1L), f, (float) i2);
                     }
                     long jM6105getWhite0d7_KjU2 = Color.INSTANCE.m6105getWhite0d7_KjU();
-                    int iPushStyle2 = builder2.pushStyle(new SpanStyle(Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU2) : lerp(0.34f, 0.3f + (0.7f * fCoerceIn), focusProgress), (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU2) : 0.0f), 0L, FontWeight.INSTANCE.getSemiBold(), (FontStyle) null, (FontSynthesis) null, (FontFamily) null, (String) null, 0L, (BaselineShift) null, (TextGeometricTransform) null, (LocaleList) null, 0L, (TextDecoration) null, (Shadow) null, (PlatformSpanStyle) null, (DrawStyle) null, 65530, (DefaultConstructorMarker) null));
+                    int iPushStyle2 = builder2.pushStyle(new SpanStyle(Color.copy_wmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU2) : lerp(0.34f, 0.3f + (0.7f * fCoerceIn), focusProgress), (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU2) : 0.0f), 0L, FontWeight.INSTANCE.getSemiBold(), (FontStyle) null, (FontSynthesis) null, (FontFamily) null, (String) null, 0L, (BaselineShift) null, (TextGeometricTransform) null, (LocaleList) null, 0L, (TextDecoration) null, (Shadow) null, (PlatformSpanStyle) null, (DrawStyle) null, 65530, (DefaultConstructorMarker) null));
                     try {
                         try {
                             builder2.append(lyricSyllable.getText());

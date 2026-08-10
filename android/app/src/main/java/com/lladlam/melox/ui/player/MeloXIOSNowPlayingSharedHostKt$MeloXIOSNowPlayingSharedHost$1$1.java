@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import androidx.compose.animation.core.Animatable;
 import androidx.compose.animation.core.AnimationVector1D;
@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope;
 /* JADX INFO: compiled from: MeloXIOSNowPlayingSharedHost.kt */
 /* JADX INFO: loaded from: classes8.dex */
 @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Lkotlinx/coroutines/CoroutineScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-@DebugMetadata(c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$1$1", f = "MeloXIOSNowPlayingSharedHost.kt", i = {}, l = {91}, m = "invokeSuspend", n = {}, nl = {92}, s = {}, v = 2)
+@DebugMetadata(m719c = "com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$1$1", m720f = "MeloXIOSNowPlayingSharedHost.kt", m721i = {}, m722l = {91}, m723m = "invokeSuspend", m724n = {}, m725nl = {92}, m726s = {}, m727v = 2)
 final class MeloXIOSNowPlayingSharedHostKt$MeloXIOSNowPlayingSharedHost$1$1 extends SuspendLambda implements Function2<CoroutineScope, Continuation<? super Unit>, Object> {
     final /* synthetic */ MutableState<Boolean> $committingDismiss$delegate;
     final /* synthetic */ Animatable<Float, AnimationVector1D> $dragOffset;

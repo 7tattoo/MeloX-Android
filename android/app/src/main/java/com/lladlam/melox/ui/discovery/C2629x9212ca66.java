@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.discovery;
+package com.lladlam.melox.p012ui.discovery;
 
 import java.util.List;
 import kotlin.Metadata;

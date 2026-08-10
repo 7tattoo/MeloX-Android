@@ -26,8 +26,6 @@ public final /* data */ class LyricSyllable {
     }
 
 
-
-
     public final LyricSyllable copy(String text, long startTimeMs, long endTimeMs) {
         Intrinsics.checkNotNullParameter(text, "text");
         return new LyricSyllable(text, startTimeMs, endTimeMs);

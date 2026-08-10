@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.player;
+package com.lladlam.melox.p012ui.player;
 
 import kotlin.Metadata;
 import kotlin.jvm.internal.Intrinsics;
@@ -34,8 +34,6 @@ public final /* data */ class MeloXQueueEntry {
         String str6 = str2;
         return meloXQueueEntry.copy(i, str, str6, str3, str5);
     }
-
-
 
 
 

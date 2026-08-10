@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui.discovery;
+package com.lladlam.melox.p012ui.discovery;
 
 import kotlin.Metadata;
 import kotlin.enums.EnumEntries;

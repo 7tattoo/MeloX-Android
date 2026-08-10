@@ -1,4 +1,4 @@
-package com.lladlam.melox.ui;
+package com.lladlam.melox.p012ui;
 
 import android.content.Context;
 import androidx.activity.compose.BackHandlerKt;
@@ -64,7 +64,7 @@ import androidx.compose.ui.layout.MeasurePolicy;
 import androidx.compose.ui.node.ComposeUiNode;
 import androidx.compose.ui.platform.AndroidCompositionLocals_androidKt;
 import androidx.compose.ui.text.font.FontWeight;
-import androidx.compose.ui.unit.C1301Dp;
+import androidx.compose.ui.unit.Dp;
 import androidx.compose.ui.unit.Constraints;
 import androidx.compose.ui.unit.TextUnitKt;
 import androidx.compose.ui.unit.Velocity;
@@ -82,7 +82,6 @@ import androidx.compose.runtime.ProvidableCompositionLocal;
 import androidx.compose.runtime.ProvidedValue;
 import androidx.compose.runtime.RecomposeScopeImplKt;
 import androidx.compose.runtime.ScopeUpdateScope;
-import androidx.compose.runtime.SnapshotStateKt__SnapshotStateKt;
 import androidx.compose.runtime.State;
 import androidx.compose.runtime.Updater;
 import androidx.compose.runtime.internal.ComposableLambdaKt;
@@ -90,7 +89,6 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.location.LocationRequestCompat;
 import androidx.media3.exoplayer.RendererCapabilities;
 import androidx.media3.exoplayer.offline.DownloadService;
-import androidx.media3.extractor.text.ttml.TtmlNode;
 import androidx.profileinstaller.ProfileVerifier;
 import androidx.window.core.layout.WindowSizeClass;
 import com.kyant.backdrop.Backdrop;
@@ -100,16 +98,16 @@ import com.kyant.backdrop.backdrops.LayerBackdropModifierKt;
 import com.lladlam.melox.core.account.NeteaseSessionStore;
 import com.lladlam.melox.core.account.NeteaseSessionStoreKt;
 import com.lladlam.melox.core.crash.MeloXCrashReporter;
-import com.lladlam.melox.ui.account.NeteaseLoginScreenKt;
-import com.lladlam.melox.ui.discovery.MeloXDiscoveryScreensKt;
-import com.lladlam.melox.ui.glass.MeloXBackdropComponentsKt;
-import com.lladlam.melox.ui.library.LibraryScreenKt;
-import com.lladlam.melox.ui.player.MeloXIOSMiniPlayerKt;
-import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHostKt;
-import com.lladlam.melox.ui.player.MeloXPlaybackUiState;
-import com.lladlam.melox.ui.player.MeloXPlayerUiKt;
-import com.lladlam.melox.ui.search.SearchScreenKt;
-import com.lladlam.melox.ui.settings.SettingsScreenKt;
+import com.lladlam.melox.p012ui.account.NeteaseLoginScreenKt;
+import com.lladlam.melox.p012ui.discovery.MeloXDiscoveryScreensKt;
+import com.lladlam.melox.p012ui.glass.MeloXBackdropComponentsKt;
+import com.lladlam.melox.p012ui.library.LibraryScreenKt;
+import com.lladlam.melox.p012ui.player.MeloXIOSMiniPlayerKt;
+import com.lladlam.melox.p012ui.player.MeloXIOSNowPlayingSharedHostKt;
+import com.lladlam.melox.p012ui.player.MeloXPlaybackUiState;
+import com.lladlam.melox.p012ui.player.MeloXPlayerUiKt;
+import com.lladlam.melox.p012ui.search.SearchScreenKt;
+import com.lladlam.melox.p012ui.settings.SettingsScreenKt;
 import java.util.Iterator;
 import java.util.List;
 import kotlin.Metadata;
@@ -539,12 +537,12 @@ public final class MeloXAppKt {
             } else {
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             int i3 = ((6 >> 6) & 112) | 6;
@@ -669,7 +667,7 @@ public final class MeloXAppKt {
                         /* JADX INFO: renamed from: com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1 */
                         /* JADX INFO: compiled from: MeloXApp.kt */
                         @Metadata(d1 = {"\u0000\n\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\u0010\u0000\u001a\u00020\u0001*\u00020\u0002H\n"}, d2 = {"<anonymous>", "", "Landroidx/compose/ui/input/pointer/AwaitPointerEventScope;"}, k = 3, mv = {2, 3, 0}, xi = 48)
-                        @DebugMetadata(c = "com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1", f = "MeloXApp.kt", i = {0}, l = {243}, m = "invokeSuspend", n = {"$this$awaitPointerEventScope"}, nl = {244}, s = {"L$0"}, v = 2)
+                        @DebugMetadata(m719c = "com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1$1", m720f = "MeloXApp.kt", m721i = {0}, m722l = {243}, m723m = "invokeSuspend", m724n = {"$this$awaitPointerEventScope"}, m725nl = {244}, m726s = {"L$0"}, m727v = 2)
                         static final class C26181 extends RestrictedSuspendLambda implements Function2<AwaitPointerEventScope, Continuation<? super Unit>, Object> {
                             private /* synthetic */ Object L$0;
                             int label;
@@ -767,7 +765,7 @@ public final class MeloXAppKt {
                                     r2 = r3
                                     goto L21
                                 */
-                                throw new UnsupportedOperationException("Method not decompiled: com.lladlam.melox.ui.MeloXAppKt$MeloXApp$5$1$1$4$1.C26181.invokeSuspend(java.lang.Object):java.lang.Object");
+                                throw new UnsupportedOperationException("Method not decompiled: com.lladlam.melox.p012ui.MeloXAppKt$MeloXApp$5$1$1$4$1.C26181.invokeSuspend(java.lang.Object):java.lang.Object");
                             }
                         }
 
@@ -858,12 +856,12 @@ public final class MeloXAppKt {
                 function0 = constructor;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
@@ -1095,7 +1093,7 @@ public final class MeloXAppKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(1291568069, $dirty, -1, "com.lladlam.melox.ui.MeloXSectionShell (MeloXApp.kt:290)");
             }
-            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null), C1301Dp.m8905constructorimpl(28), C1301Dp.m8905constructorimpl(48));
+            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null), Dp.constructor_impl(28), Dp.constructor_impl(48));
             ComposerKt.sourceInformationMarkerStart($composer3, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), Alignment.INSTANCE.getStart(), $composer3, ((6 >> 3) & 14) | ((6 >> 3) & 112));
             ComposerKt.sourceInformationMarkerStart($composer3, -1159599143, "CC(Layout)N(content,modifier,measurePolicy)81@3355L27,84@3521L415:Layout.kt#80mrfh");
@@ -1114,12 +1112,12 @@ public final class MeloXAppKt {
             } else {
                 $composer3.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer3);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer3);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer3, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             ColumnScopeInstance columnScopeInstance = ColumnScopeInstance.INSTANCE;
@@ -1127,11 +1125,11 @@ public final class MeloXAppKt {
             ComposerKt.sourceInformationMarkerStart($composer3, 839644829, "C301@12443L11,296@12273L205,303@12487L30,307@12625L11,304@12526L154:MeloXApp.kt#5am3v9");
             $composer2 = $composer3;
             TextKt.m3912TextNvy7gAk(title, null, MaterialTheme.INSTANCE.getColorScheme($composer3, MaterialTheme.$stable).getOnBackground(), null, TextUnitKt.getSp(36), null, FontWeight.INSTANCE.getBold(), null, 0L, null, null, TextUnitKt.getSp(40), 0, false, 0, 0, null, null, $composer3, ($dirty & 14) | 1597440, 48, 260010);
-            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(20)), $composer3, 6);
+            SpacerKt.Spacer(SizeKt.m1858height3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(20)), $composer3, 6);
             long sp = TextUnitKt.getSp(16);
             long onBackground = MaterialTheme.INSTANCE.getColorScheme($composer3, MaterialTheme.$stable).getOnBackground();
             str = subtitle;
-            TextKt.m3912TextNvy7gAk(str, null, Color.m6066copywmQWz5c(onBackground, (14 & 1) != 0 ? Color.m6070getAlphaimpl(onBackground) : 0.48f, (14 & 2) != 0 ? Color.m6074getRedimpl(onBackground) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(onBackground) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(onBackground) : 0.0f), null, sp, null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer3, (($dirty >> 3) & 14) | 24576, 0, 262122);
+            TextKt.m3912TextNvy7gAk(str, null, Color.copy_wmQWz5c(onBackground, (14 & 1) != 0 ? Color.getAlpha_impl(onBackground) : 0.48f, (14 & 2) != 0 ? Color.getRed_impl(onBackground) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(onBackground) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(onBackground) : 0.0f), null, sp, null, null, null, 0L, null, null, 0L, 0, false, 0, 0, null, null, $composer3, (($dirty >> 3) & 14) | 24576, 0, 262122);
             ComposerKt.sourceInformationMarkerEnd($composer3);
             ComposerKt.sourceInformationMarkerEnd($composer3);
             $composer3.endNode();
@@ -1214,14 +1212,14 @@ public final class MeloXAppKt {
             final float sizeStage = smoothStep(progress, 0.0f, 0.36f);
             final float shrinkStage = smoothStep(progress, 0.25f, 0.82f);
             float dropStage = smoothStep(progress, 0.78f, 1.0f);
-            final float navHeight = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(56), C1301Dp.m8905constructorimpl(52), sizeStage);
-            final float searchSize = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(56), C1301Dp.m8905constructorimpl(52), sizeStage);
-            float expandedChromeHeight = hasMedia ? C1301Dp.m8905constructorimpl(119) : C1301Dp.m8905constructorimpl(62);
-            float chromeHeight = m9605lerpDpMdfbLM(expandedChromeHeight, C1301Dp.m8905constructorimpl(58), dropStage);
+            final float navHeight = m9605lerpDpMdfbLM(Dp.constructor_impl(56), Dp.constructor_impl(52), sizeStage);
+            final float searchSize = m9605lerpDpMdfbLM(Dp.constructor_impl(56), Dp.constructor_impl(52), sizeStage);
+            float expandedChromeHeight = hasMedia ? Dp.constructor_impl(119) : Dp.constructor_impl(62);
+            float chromeHeight = m9605lerpDpMdfbLM(expandedChromeHeight, Dp.constructor_impl(58), dropStage);
             final float labelAlpha = 1.0f - labelStage;
             final float expandedLayerAlpha = 1.0f - smoothStep(progress, 0.43f, 0.72f);
             final float compactLayerAlpha = smoothStep(progress, 0.52f, 0.82f);
-            Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(WindowInsetsPadding_androidKt.navigationBarsPadding(SizeKt.fillMaxWidth$default(modifier5, 0.0f, 1, null)), 0.0f, 0.0f, 0.0f, C1301Dp.m8905constructorimpl(5), 7, null);
+            Modifier modifierM1809paddingqDBjuR0$default = PaddingKt.m1809paddingqDBjuR0$default(WindowInsetsPadding_androidKt.navigationBarsPadding(SizeKt.fillMaxWidth$default(modifier5, 0.0f, 1, null)), 0.0f, 0.0f, 0.0f, Dp.constructor_impl(5), 7, null);
             ComposerKt.sourceInformationMarkerStart($composer2, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
             MeasurePolicy measurePolicyColumnMeasurePolicy = ColumnKt.columnMeasurePolicy(Arrangement.INSTANCE.getTop(), Alignment.INSTANCE.getStart(), $composer2, ((0 >> 3) & 14) | ((0 >> 3) & 112));
             ComposerKt.sourceInformationMarkerStart($composer2, -1159599143, "CC(Layout)N(content,modifier,measurePolicy)81@3355L27,84@3521L415:Layout.kt#80mrfh");
@@ -1242,12 +1240,12 @@ public final class MeloXAppKt {
                 function0 = constructor;
                 $composer2.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer2);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer2);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i4 = (i3 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer2, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             ColumnScopeInstance columnScopeInstance = ColumnScopeInstance.INSTANCE;
@@ -1304,26 +1302,26 @@ public final class MeloXAppKt {
             if (ComposerKt.isTraceInProgress()) {
                 ComposerKt.traceEventStart(863626782, $dirty, -1, "com.lladlam.melox.ui.MeloXBottomChrome.<anonymous>.<anonymous> (MeloXApp.kt:357)");
             }
-            float horizontalMargin = C1301Dp.m8905constructorimpl(16);
-            float compactSize = C1301Dp.m8905constructorimpl(52);
-            float fM8905constructorimpl = C1301Dp.m8905constructorimpl(8);
-            float fM8905constructorimpl2 = C1301Dp.m8905constructorimpl(6);
-            float navWidth = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() - C1301Dp.m8905constructorimpl(2 * horizontalMargin)) - fM8905constructorimpl) - C1301Dp.m8905constructorimpl(56)), compactSize, $shrinkStage);
-            float navRadius = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(28), C1301Dp.m8905constructorimpl(26), $shrinkStage);
+            float horizontalMargin = Dp.constructor_impl(16);
+            float compactSize = Dp.constructor_impl(52);
+            float fM8905constructorimpl = Dp.constructor_impl(8);
+            float fM8905constructorimpl2 = Dp.constructor_impl(6);
+            float navWidth = m9605lerpDpMdfbLM(Dp.constructor_impl(Dp.constructor_impl(Dp.constructor_impl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() - Dp.constructor_impl(2 * horizontalMargin)) - fM8905constructorimpl) - Dp.constructor_impl(56)), compactSize, $shrinkStage);
+            float navRadius = m9605lerpDpMdfbLM(Dp.constructor_impl(28), Dp.constructor_impl(26), $shrinkStage);
             RoundedCornerShape navShape = RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(navRadius);
-            final List primaryTabs = CollectionsKt.listOf((Object[]) new Pair[]{TuplesKt.m717to(AppTab.Home, RootGlyph.Home), TuplesKt.m717to(AppTab.Explore, RootGlyph.Explore), TuplesKt.m717to(AppTab.Library, RootGlyph.Library), TuplesKt.m717to(AppTab.Settings, RootGlyph.Settings)});
-            float desiredCompactMiniVisibleWidth = ((C1301Dp) RangesKt.coerceAtLeast(C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() - C1301Dp.m8905constructorimpl(2 * horizontalMargin)) - C1301Dp.m8905constructorimpl(2 * compactSize)) - C1301Dp.m8905constructorimpl(2 * fM8905constructorimpl2))), C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(80)))).m8919unboximpl();
-            float compactMiniWrapperWidth = ((C1301Dp) RangesKt.coerceAtMost(C1301Dp.m8903boximpl(C1301Dp.m8905constructorimpl(desiredCompactMiniVisibleWidth + C1301Dp.m8905constructorimpl(32))), C1301Dp.m8903boximpl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM()))).m8919unboximpl();
-            float fM8905constructorimpl3 = C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(horizontalMargin + compactSize) + fM8905constructorimpl2) - C1301Dp.m8905constructorimpl(16));
+            final List primaryTabs = CollectionsKt.listOf((Object[]) new Pair[]{TuplesKt.to(AppTab.Home, RootGlyph.Home), TuplesKt.to(AppTab.Explore, RootGlyph.Explore), TuplesKt.to(AppTab.Library, RootGlyph.Library), TuplesKt.to(AppTab.Settings, RootGlyph.Settings)});
+            float desiredCompactMiniVisibleWidth = ((Dp) RangesKt.coerceAtLeast(Dp.m8903boximpl(Dp.constructor_impl(Dp.constructor_impl(Dp.constructor_impl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM() - Dp.constructor_impl(2 * horizontalMargin)) - Dp.constructor_impl(2 * compactSize)) - Dp.constructor_impl(2 * fM8905constructorimpl2))), Dp.m8903boximpl(Dp.constructor_impl(80)))).m8919unboximpl();
+            float compactMiniWrapperWidth = ((Dp) RangesKt.coerceAtMost(Dp.m8903boximpl(Dp.constructor_impl(desiredCompactMiniVisibleWidth + Dp.constructor_impl(32))), Dp.m8903boximpl(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM()))).m8919unboximpl();
+            float fM8905constructorimpl3 = Dp.constructor_impl(Dp.constructor_impl(Dp.constructor_impl(horizontalMargin + compactSize) + fM8905constructorimpl2) - Dp.constructor_impl(16));
             float miniWrapperWidth = m9605lerpDpMdfbLM(BoxWithConstraints.mo1523getMaxWidthD9Ej5fM(), compactMiniWrapperWidth, $shrinkStage);
             float compactMiniWrapperWidth2 = 0;
-            float miniWrapperX = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(compactMiniWrapperWidth2), fM8905constructorimpl3, $shrinkStage);
+            float miniWrapperX = m9605lerpDpMdfbLM(Dp.constructor_impl(compactMiniWrapperWidth2), fM8905constructorimpl3, $shrinkStage);
             float expandedNavWidth = 62;
-            float miniLift = m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(expandedNavWidth), C1301Dp.m8905constructorimpl(0), $shrinkStage);
+            float miniLift = m9605lerpDpMdfbLM(Dp.constructor_impl(expandedNavWidth), Dp.constructor_impl(0), $shrinkStage);
             if ($hasMedia) {
                 $composer.startReplaceGroup(1452699406);
                 ComposerKt.sourceInformation($composer, "383@15573L374");
-                Modifier modifierM1877width3ABfNKs = SizeKt.m1877width3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomStart()), miniWrapperX, C1301Dp.m8905constructorimpl(C1301Dp.m8905constructorimpl(-C1301Dp.m8905constructorimpl(3)) - miniLift)), miniWrapperWidth);
+                Modifier modifierM1877width3ABfNKs = SizeKt.m1877width3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomStart()), miniWrapperX, Dp.constructor_impl(Dp.constructor_impl(-Dp.constructor_impl(3)) - miniLift)), miniWrapperWidth);
                 ComposerKt.sourceInformationMarkerStart($composer, 1042775818, "CC(Box)N(modifier,contentAlignment,propagateMinConstraints,content)71@3424L131:Box.kt#2w3rfo");
                 MeasurePolicy measurePolicyMaybeCachedBoxMeasurePolicy = BoxKt.maybeCachedBoxMeasurePolicy(Alignment.INSTANCE.getTopStart(), false);
                 ComposerKt.sourceInformationMarkerStart($composer, -1159599143, "CC(Layout)N(content,modifier,measurePolicy)81@3355L27,84@3521L415:Layout.kt#80mrfh");
@@ -1344,12 +1342,12 @@ public final class MeloXAppKt {
                     function0 = constructor;
                     $composer.useNode();
                 }
-                Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-                Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-                Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-                Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-                Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-                Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+                Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+                Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+                Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+                Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+                Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+                Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
                 int i2 = (i >> 6) & 14;
                 ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
                 BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
@@ -1369,7 +1367,7 @@ public final class MeloXAppKt {
             }
             long jBottomLiquidGlassTint = bottomLiquidGlassTint($composer, 0);
             long jBottomGlassFallbackColor = bottomGlassFallbackColor($composer, 0);
-            Modifier modifierM9632meloXLiquidBottomBar9z6LAg8 = MeloXBackdropComponentsKt.m9632meloXLiquidBottomBar9z6LAg8(SizeKt.m1858height3ABfNKs(SizeKt.m1877width3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomStart()), horizontalMargin, C1301Dp.m8905constructorimpl(-C1301Dp.m8905constructorimpl(3))), navWidth), $navHeight), navShape, jBottomLiquidGlassTint, Color.m6066copywmQWz5c(jBottomGlassFallbackColor, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jBottomGlassFallbackColor) : 0.16f, (14 & 2) != 0 ? Color.m6074getRedimpl(jBottomGlassFallbackColor) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jBottomGlassFallbackColor) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jBottomGlassFallbackColor) : 0.0f), $composer, 0);
+            Modifier modifierM9632meloXLiquidBottomBar9z6LAg8 = MeloXBackdropComponentsKt.m9632meloXLiquidBottomBar9z6LAg8(SizeKt.m1858height3ABfNKs(SizeKt.m1877width3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomStart()), horizontalMargin, Dp.constructor_impl(-Dp.constructor_impl(3))), navWidth), $navHeight), navShape, jBottomLiquidGlassTint, Color.copy_wmQWz5c(jBottomGlassFallbackColor, (14 & 1) != 0 ? Color.getAlpha_impl(jBottomGlassFallbackColor) : 0.16f, (14 & 2) != 0 ? Color.getRed_impl(jBottomGlassFallbackColor) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jBottomGlassFallbackColor) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jBottomGlassFallbackColor) : 0.0f), $composer, 0);
             Float fValueOf = Float.valueOf($progress);
             ComposerKt.sourceInformationMarkerStart($composer, 1016723398, "CC(remember):MeloXApp.kt#9igjgp");
             boolean zChanged = $composer.changed($progress) | $composer.changed($onSelect) | $composer.changed($selectedTab.ordinal());
@@ -1380,20 +1378,20 @@ public final class MeloXAppKt {
                 objRememberedValue = obj;
             }
             ComposerKt.sourceInformationMarkerEnd($composer);
-            SurfaceKt.m3769SurfaceT9BRK9s(SuspendingPointerInputFilterKt.pointerInput(modifierM9632meloXLiquidBottomBar9z6LAg8, fValueOf, $selectedTab, (PointerInputEventHandler) objRememberedValue), navShape, Color.INSTANCE.m6103getTransparent0d7_KjU(), 0L, C1301Dp.m8905constructorimpl(0), $dynamicGlassEnabled ? m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(2), C1301Dp.m8905constructorimpl(4), $progress) : C1301Dp.m8905constructorimpl(0), null, ComposableLambdaKt.rememberComposableLambda(1045197411, true, new Function2() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda11
+            SurfaceKt.m3769SurfaceT9BRK9s(SuspendingPointerInputFilterKt.pointerInput(modifierM9632meloXLiquidBottomBar9z6LAg8, fValueOf, $selectedTab, (PointerInputEventHandler) objRememberedValue), navShape, Color.INSTANCE.m6103getTransparent0d7_KjU(), 0L, Dp.constructor_impl(0), $dynamicGlassEnabled ? m9605lerpDpMdfbLM(Dp.constructor_impl(2), Dp.constructor_impl(4), $progress) : Dp.constructor_impl(0), null, ComposableLambdaKt.rememberComposableLambda(1045197411, true, new Function2() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda11
                 @Override // kotlin.jvm.functions.Function2
                 public final Object invoke(Object obj2, Object obj3) {
                     return MeloXAppKt.MeloXBottomChrome$lambda$1$0$2($expandedLayerAlpha, $progress, $compactLayerAlpha, primaryTabs, $selectedTab, $labelAlpha, (Composer) obj2, ((Integer) obj3).intValue());
                 }
             }, $composer, 54), $composer, 14180736, 8);
-            Modifier modifierM1872size3ABfNKs = SizeKt.m1872size3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomEnd()), C1301Dp.m8905constructorimpl(-horizontalMargin), C1301Dp.m8905constructorimpl(-C1301Dp.m8905constructorimpl(3))), $searchSize);
+            Modifier modifierM1872size3ABfNKs = SizeKt.m1872size3ABfNKs(OffsetKt.m1764offsetVpY3zN4(BoxWithConstraints.align(Modifier.INSTANCE, Alignment.INSTANCE.getBottomEnd()), Dp.constructor_impl(-horizontalMargin), Dp.constructor_impl(-Dp.constructor_impl(3))), $searchSize);
             RoundedCornerShape circleShape = RoundedCornerShapeKt.getCircleShape();
             long jBottomLiquidGlassTint2 = bottomLiquidGlassTint($composer, 0);
-            float fM8905constructorimpl4 = C1301Dp.m8905constructorimpl(6);
-            float fM8905constructorimpl5 = C1301Dp.m8905constructorimpl(12);
-            float fM8905constructorimpl6 = C1301Dp.m8905constructorimpl(18);
+            float fM8905constructorimpl4 = Dp.constructor_impl(6);
+            float fM8905constructorimpl5 = Dp.constructor_impl(12);
+            float fM8905constructorimpl6 = Dp.constructor_impl(18);
             long jBottomGlassFallbackColor2 = bottomGlassFallbackColor($composer, 0);
-            Modifier modifierM9633meloXLiquidButtonNsDo4u0 = MeloXBackdropComponentsKt.m9633meloXLiquidButtonNsDo4u0(modifierM1872size3ABfNKs, circleShape, false, jBottomLiquidGlassTint2, Color.m6066copywmQWz5c(jBottomGlassFallbackColor2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jBottomGlassFallbackColor2) : 0.1f, (14 & 2) != 0 ? Color.m6074getRedimpl(jBottomGlassFallbackColor2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jBottomGlassFallbackColor2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jBottomGlassFallbackColor2) : 0.0f), fM8905constructorimpl4, fM8905constructorimpl5, fM8905constructorimpl6, $composer, 14352384, 2);
+            Modifier modifierM9633meloXLiquidButtonNsDo4u0 = MeloXBackdropComponentsKt.m9633meloXLiquidButtonNsDo4u0(modifierM1872size3ABfNKs, circleShape, false, jBottomLiquidGlassTint2, Color.copy_wmQWz5c(jBottomGlassFallbackColor2, (14 & 1) != 0 ? Color.getAlpha_impl(jBottomGlassFallbackColor2) : 0.1f, (14 & 2) != 0 ? Color.getRed_impl(jBottomGlassFallbackColor2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jBottomGlassFallbackColor2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jBottomGlassFallbackColor2) : 0.0f), fM8905constructorimpl4, fM8905constructorimpl5, fM8905constructorimpl6, $composer, 14352384, 2);
             ComposerKt.sourceInformationMarkerStart($composer, 1016883545, "CC(remember):MeloXApp.kt#9igjgp");
             boolean zChanged2 = $composer.changed($onSelect);
             Object objRememberedValue2 = $composer.rememberedValue();
@@ -1408,7 +1406,7 @@ public final class MeloXAppKt {
                 objRememberedValue2 = obj2;
             }
             ComposerKt.sourceInformationMarkerEnd($composer);
-            SurfaceKt.m3769SurfaceT9BRK9s(ClickableKt.m1078clickableoSLSa3U$default(modifierM9633meloXLiquidButtonNsDo4u0, false, null, null, null, (Function0) objRememberedValue2, 15, null), RoundedCornerShapeKt.getCircleShape(), Color.INSTANCE.m6103getTransparent0d7_KjU(), 0L, C1301Dp.m8905constructorimpl(0), $dynamicGlassEnabled ? m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(2), C1301Dp.m8905constructorimpl(4), $progress) : C1301Dp.m8905constructorimpl(0), null, ComposableLambdaKt.rememberComposableLambda(-962456244, true, new Function2() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda13
+            SurfaceKt.m3769SurfaceT9BRK9s(ClickableKt.m1078clickableoSLSa3U$default(modifierM9633meloXLiquidButtonNsDo4u0, false, null, null, null, (Function0) objRememberedValue2, 15, null), RoundedCornerShapeKt.getCircleShape(), Color.INSTANCE.m6103getTransparent0d7_KjU(), 0L, Dp.constructor_impl(0), $dynamicGlassEnabled ? m9605lerpDpMdfbLM(Dp.constructor_impl(2), Dp.constructor_impl(4), $progress) : Dp.constructor_impl(0), null, ComposableLambdaKt.rememberComposableLambda(-962456244, true, new Function2() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda13
                 @Override // kotlin.jvm.functions.Function2
                 public final Object invoke(Object obj3, Object obj4) {
                     return MeloXAppKt.MeloXBottomChrome$lambda$1$0$4($sizeStage, $selectedTab, (Composer) obj3, ((Integer) obj4).intValue());
@@ -1463,12 +1461,12 @@ public final class MeloXAppKt {
                 function0 = constructor2;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
@@ -1483,7 +1481,7 @@ public final class MeloXAppKt {
                 if (objRememberedValue2 == Composer.INSTANCE.getEmpty()) {
                 }
                 ComposerKt.sourceInformationMarkerEnd($composer);
-                BoxWithConstraintsKt.BoxWithConstraints(PaddingKt.m1806paddingVpY3zN4(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default2, (Function1) objRememberedValue2), C1301Dp.m8905constructorimpl(4), C1301Dp.m8905constructorimpl(4)), null, false, ComposableLambdaKt.rememberComposableLambda(882072895, true, new Function3() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda27
+                BoxWithConstraintsKt.BoxWithConstraints(PaddingKt.m1806paddingVpY3zN4(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default2, (Function1) objRememberedValue2), Dp.constructor_impl(4), Dp.constructor_impl(4)), null, false, ComposableLambdaKt.rememberComposableLambda(882072895, true, new Function3() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda27
                     @Override // kotlin.jvm.functions.Function3
                     public final Object invoke(Object obj, Object obj2, Object obj3) {
                         return MeloXAppKt.MeloXBottomChrome$lambda$1$0$2$0$1($primaryTabs, $selectedTab, $labelAlpha, (BoxWithConstraintsScope) obj, (Composer) obj2, ((Integer) obj3).intValue());
@@ -1529,18 +1527,18 @@ public final class MeloXAppKt {
                         function1 = constructor;
                         $composer.useNode();
                     }
-                    Composer composerM5188constructorimpl2 = Updater.m5188constructorimpl($composer);
-                    Updater.m5196setimpl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-                    Updater.m5196setimpl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-                    Updater.m5196setimpl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-                    Updater.m5194reconcileimpl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-                    Updater.m5196setimpl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
+                    Composer composerM5188constructorimpl2 = Updater.constructor_impl($composer);
+                    Updater.set_impl(composerM5188constructorimpl2, measurePolicyMaybeCachedBoxMeasurePolicy2, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+                    Updater.set_impl(composerM5188constructorimpl2, currentCompositionLocalMap2, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+                    Updater.set_impl(composerM5188constructorimpl2, Integer.valueOf(iHashCode2), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+                    Updater.reconcile_impl(composerM5188constructorimpl2, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+                    Updater.set_impl(composerM5188constructorimpl2, modifierMaterializeModifier2, ComposeUiNode.INSTANCE.getSetModifier());
                     int i5 = (i4 >> 6) & 14;
                     ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
                     BoxScopeInstance boxScopeInstance2 = BoxScopeInstance.INSTANCE;
                     int i6 = ((48 >> 6) & 112) | 6;
                     ComposerKt.sourceInformationMarkerStart($composer, 1085787190, "C491@20602L227:MeloXApp.kt#5am3v9");
-                    m9604RootGlyphIconXOJAsU(rootGlyph($selectedTab), SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(25)), MeloXAccent, $composer, 432);
+                    m9604RootGlyphIconXOJAsU(rootGlyph($selectedTab), SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(25)), MeloXAccent, $composer, 432);
                     ComposerKt.sourceInformationMarkerEnd($composer);
                     ComposerKt.sourceInformationMarkerEnd($composer);
                     $composer.endNode();
@@ -1572,7 +1570,7 @@ public final class MeloXAppKt {
             };
             $composer.updateRememberedValue(objRememberedValue2);
             ComposerKt.sourceInformationMarkerEnd($composer);
-            BoxWithConstraintsKt.BoxWithConstraints(PaddingKt.m1806paddingVpY3zN4(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default2, (Function1) objRememberedValue2), C1301Dp.m8905constructorimpl(4), C1301Dp.m8905constructorimpl(4)), null, false, ComposableLambdaKt.rememberComposableLambda(882072895, true, new Function3() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda27
+            BoxWithConstraintsKt.BoxWithConstraints(PaddingKt.m1806paddingVpY3zN4(GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxSize$default2, (Function1) objRememberedValue2), Dp.constructor_impl(4), Dp.constructor_impl(4)), null, false, ComposableLambdaKt.rememberComposableLambda(882072895, true, new Function3() { // from class: com.lladlam.melox.ui.MeloXAppKt$$ExternalSyntheticLambda27
                 @Override // kotlin.jvm.functions.Function3
                 public final Object invoke(Object obj2, Object obj3, Object obj4) {
                     return MeloXAppKt.MeloXBottomChrome$lambda$1$0$2$0$1($primaryTabs, $selectedTab, $labelAlpha, (BoxWithConstraintsScope) obj2, (Composer) obj3, ((Integer) obj4).intValue());
@@ -1618,18 +1616,18 @@ public final class MeloXAppKt {
                     function1 = constructor;
                     $composer.useNode();
                 }
-                Composer composerM5188constructorimpl3 = Updater.m5188constructorimpl($composer);
-                Updater.m5196setimpl(composerM5188constructorimpl3, measurePolicyMaybeCachedBoxMeasurePolicy3, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-                Updater.m5196setimpl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-                Updater.m5196setimpl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-                Updater.m5194reconcileimpl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-                Updater.m5196setimpl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
+                Composer composerM5188constructorimpl3 = Updater.constructor_impl($composer);
+                Updater.set_impl(composerM5188constructorimpl3, measurePolicyMaybeCachedBoxMeasurePolicy3, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+                Updater.set_impl(composerM5188constructorimpl3, currentCompositionLocalMap3, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+                Updater.set_impl(composerM5188constructorimpl3, Integer.valueOf(iHashCode3), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+                Updater.reconcile_impl(composerM5188constructorimpl3, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+                Updater.set_impl(composerM5188constructorimpl3, modifierMaterializeModifier3, ComposeUiNode.INSTANCE.getSetModifier());
                 int i8 = (i7 >> 6) & 14;
                 ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
                 BoxScopeInstance boxScopeInstance3 = BoxScopeInstance.INSTANCE;
                 int i9 = ((48 >> 6) & 112) | 6;
                 ComposerKt.sourceInformationMarkerStart($composer, 1085787190, "C491@20602L227:MeloXApp.kt#5am3v9");
-                m9604RootGlyphIconXOJAsU(rootGlyph($selectedTab), SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(25)), MeloXAccent, $composer, 432);
+                m9604RootGlyphIconXOJAsU(rootGlyph($selectedTab), SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(25)), MeloXAccent, $composer, 432);
                 ComposerKt.sourceInformationMarkerEnd($composer);
                 ComposerKt.sourceInformationMarkerEnd($composer);
                 $composer.endNode();
@@ -1709,13 +1707,13 @@ public final class MeloXAppKt {
             }
             ComposerKt.sourceInformationMarkerEnd($composer);
             Modifier modifierGraphicsLayer = GraphicsLayerModifierKt.graphicsLayer(modifierFillMaxHeight$default, (Function1) objRememberedValue);
-            RoundedCornerShape roundedCornerShapeM2135RoundedCornerShape0680j_4 = RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(C1301Dp.m8905constructorimpl(24));
+            RoundedCornerShape roundedCornerShapeM2135RoundedCornerShape0680j_4 = RoundedCornerShapeKt.m2135RoundedCornerShape0680j_4(Dp.constructor_impl(24));
             if (DarkThemeKt.isSystemInDarkTheme($composer, 0)) {
                 long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-                jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.18f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f);
+                jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.18f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f);
             } else {
                 long jM6105getWhite0d7_KjU2 = Color.INSTANCE.m6105getWhite0d7_KjU();
-                jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU2) : 0.32f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU2) : 0.0f);
+                jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6105getWhite0d7_KjU2, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU2) : 0.32f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU2) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU2) : 0.0f);
             }
             BoxKt.Box(MeloXBackdropComponentsKt.m9634meloXLiquidTabSelectionBx497Mc(modifierGraphicsLayer, roundedCornerShapeM2135RoundedCornerShape0680j_4, true, jM6066copywmQWz5c, $composer, RendererCapabilities.DECODER_SUPPORT_MASK), $composer, 0);
             Modifier modifierFillMaxSize$default = SizeKt.fillMaxSize$default(Modifier.INSTANCE, 0.0f, 1, null);
@@ -1740,12 +1738,12 @@ public final class MeloXAppKt {
                 function0 = constructor;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyRowMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyRowMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i4 = (i3 >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1456264949, "C101@5233L9:Row.kt#2w3rfo");
             int i5 = ((390 >> 6) & 112) | 6;
@@ -1834,19 +1832,19 @@ public final class MeloXAppKt {
                 function0 = constructor;
                 $composer.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyMaybeCachedBoxMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer, 1833054614, "C72@3469L9:Box.kt#2w3rfo");
             BoxScopeInstance boxScopeInstance = BoxScopeInstance.INSTANCE;
             int i3 = ((48 >> 6) & 112) | 6;
             ComposerKt.sourceInformationMarkerStart($composer, 1500761920, "C526@21987L401:MeloXApp.kt#5am3v9");
             RootGlyph rootGlyph = RootGlyph.Search;
-            Modifier modifierM1872size3ABfNKs = SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, m9605lerpDpMdfbLM(C1301Dp.m8905constructorimpl(28), C1301Dp.m8905constructorimpl(27), $sizeStage));
+            Modifier modifierM1872size3ABfNKs = SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, m9605lerpDpMdfbLM(Dp.constructor_impl(28), Dp.constructor_impl(27), $sizeStage));
             if ($selectedTab == AppTab.Search) {
                 $composer.startReplaceGroup(1500963853);
                 $composer.endReplaceGroup();
@@ -1881,10 +1879,10 @@ public final class MeloXAppKt {
         }
         if (DarkThemeKt.isSystemInDarkTheme($composer, 0)) {
             long jM6094getBlack0d7_KjU = Color.INSTANCE.m6094getBlack0d7_KjU();
-            jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6094getBlack0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6094getBlack0d7_KjU) : 0.1f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6094getBlack0d7_KjU) : 0.0f);
+            jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6094getBlack0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6094getBlack0d7_KjU) : 0.1f, (14 & 2) != 0 ? Color.getRed_impl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6094getBlack0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6094getBlack0d7_KjU) : 0.0f);
         } else {
             long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-            jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.12f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f);
+            jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.12f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f);
         }
         if (ComposerKt.isTraceInProgress()) {
             ComposerKt.traceEventEnd();
@@ -1903,13 +1901,13 @@ public final class MeloXAppKt {
             $composer.startReplaceGroup(-630797757);
             ComposerKt.sourceInformation($composer, "552@22745L11");
             long surface = MaterialTheme.INSTANCE.getColorScheme($composer, MaterialTheme.$stable).getSurface();
-            jM6066copywmQWz5c = Color.m6066copywmQWz5c(surface, (14 & 1) != 0 ? Color.m6070getAlphaimpl(surface) : 0.58f, (14 & 2) != 0 ? Color.m6074getRedimpl(surface) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(surface) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(surface) : 0.0f);
+            jM6066copywmQWz5c = Color.copy_wmQWz5c(surface, (14 & 1) != 0 ? Color.getAlpha_impl(surface) : 0.58f, (14 & 2) != 0 ? Color.getRed_impl(surface) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(surface) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(surface) : 0.0f);
             $composer.endReplaceGroup();
         } else {
             $composer.startReplaceGroup(-630724039);
             $composer.endReplaceGroup();
             long jM6105getWhite0d7_KjU = Color.INSTANCE.m6105getWhite0d7_KjU();
-            jM6066copywmQWz5c = Color.m6066copywmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.m6070getAlphaimpl(jM6105getWhite0d7_KjU) : 0.56f, (14 & 2) != 0 ? Color.m6074getRedimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(jM6105getWhite0d7_KjU) : 0.0f);
+            jM6066copywmQWz5c = Color.copy_wmQWz5c(jM6105getWhite0d7_KjU, (14 & 1) != 0 ? Color.getAlpha_impl(jM6105getWhite0d7_KjU) : 0.56f, (14 & 2) != 0 ? Color.getRed_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(jM6105getWhite0d7_KjU) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(jM6105getWhite0d7_KjU) : 0.0f);
         }
         if (ComposerKt.isTraceInProgress()) {
             ComposerKt.traceEventEnd();
@@ -1955,11 +1953,11 @@ public final class MeloXAppKt {
                 $composer2.startReplaceGroup(1725850831);
                 ComposerKt.sourceInformation($composer2, "566@23100L11");
                 long onSurface = MaterialTheme.INSTANCE.getColorScheme($composer2, MaterialTheme.$stable).getOnSurface();
-                jM6066copywmQWz5c = Color.m6066copywmQWz5c(onSurface, (14 & 1) != 0 ? Color.m6070getAlphaimpl(onSurface) : 0.78f, (14 & 2) != 0 ? Color.m6074getRedimpl(onSurface) : 0.0f, (14 & 4) != 0 ? Color.m6073getGreenimpl(onSurface) : 0.0f, (14 & 8) != 0 ? Color.m6071getBlueimpl(onSurface) : 0.0f);
+                jM6066copywmQWz5c = Color.copy_wmQWz5c(onSurface, (14 & 1) != 0 ? Color.getAlpha_impl(onSurface) : 0.78f, (14 & 2) != 0 ? Color.getRed_impl(onSurface) : 0.0f, (14 & 4) != 0 ? Color.getGreen_impl(onSurface) : 0.0f, (14 & 8) != 0 ? Color.getBlue_impl(onSurface) : 0.0f);
                 $composer2.endReplaceGroup();
             }
             State<Color> stateM913animateColorAsStateeuL9pac = SingleValueAnimationKt.m913animateColorAsStateeuL9pac(jM6066copywmQWz5c, AnimationSpecKt.spring$default(0.86f, 420.0f, null, 4, null), "melox-tab-foreground-" + tab.name(), null, $composer2, 48, 8);
-            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(SizeKt.fillMaxHeight$default(RowScope.weight$default(rowScope, Modifier.INSTANCE, 1.0f, false, 2, null), 0.0f, 1, null), C1301Dp.m8905constructorimpl(3), C1301Dp.m8905constructorimpl(3));
+            Modifier modifierM1806paddingVpY3zN4 = PaddingKt.m1806paddingVpY3zN4(SizeKt.fillMaxHeight$default(RowScope.weight$default(rowScope, Modifier.INSTANCE, 1.0f, false, 2, null), 0.0f, 1, null), Dp.constructor_impl(3), Dp.constructor_impl(3));
             Alignment.Horizontal centerHorizontally = Alignment.INSTANCE.getCenterHorizontally();
             Arrangement.Vertical center = Arrangement.INSTANCE.getCenter();
             ComposerKt.sourceInformationMarkerStart($composer2, 1341605231, "CC(Column)N(modifier,verticalArrangement,horizontalAlignment,content)87@4443L61,88@4509L134:Column.kt#2w3rfo");
@@ -1983,18 +1981,18 @@ public final class MeloXAppKt {
                 function0 = constructor;
                 $composer2.useNode();
             }
-            Composer composerM5188constructorimpl = Updater.m5188constructorimpl($composer2);
-            Updater.m5196setimpl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
-            Updater.m5196setimpl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
-            Updater.m5196setimpl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
-            Updater.m5194reconcileimpl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
-            Updater.m5196setimpl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
+            Composer composerM5188constructorimpl = Updater.constructor_impl($composer2);
+            Updater.set_impl(composerM5188constructorimpl, measurePolicyColumnMeasurePolicy, ComposeUiNode.INSTANCE.getSetMeasurePolicy());
+            Updater.set_impl(composerM5188constructorimpl, currentCompositionLocalMap, ComposeUiNode.INSTANCE.getSetResolvedCompositionLocals());
+            Updater.set_impl(composerM5188constructorimpl, Integer.valueOf(iHashCode), ComposeUiNode.INSTANCE.getSetCompositeKeyHash());
+            Updater.reconcile_impl(composerM5188constructorimpl, ComposeUiNode.INSTANCE.getApplyOnDeactivatedNodeAssertion());
+            Updater.set_impl(composerM5188constructorimpl, modifierMaterializeModifier, ComposeUiNode.INSTANCE.getSetModifier());
             int i2 = (i >> 6) & 14;
             ComposerKt.sourceInformationMarkerStart($composer2, 2093002350, "C89@4557L9:Column.kt#2w3rfo");
             ColumnScopeInstance columnScopeInstance = ColumnScopeInstance.INSTANCE;
             int i3 = ((432 >> 6) & 112) | 6;
             ComposerKt.sourceInformationMarkerStart($composer2, -1250886720, "C578@23550L81,581@23722L22,579@23640L291:MeloXApp.kt#5am3v9");
-            m9604RootGlyphIconXOJAsU(glyph, SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, C1301Dp.m8905constructorimpl(24)), RootTabButton$lambda$0(stateM913animateColorAsStateeuL9pac), $composer2, (($dirty2 >> 6) & 14) | 48);
+            m9604RootGlyphIconXOJAsU(glyph, SizeKt.m1872size3ABfNKs(Modifier.INSTANCE, Dp.constructor_impl(24)), RootTabButton$lambda$0(stateM913animateColorAsStateeuL9pac), $composer2, (($dirty2 >> 6) & 14) | 48);
             String title = tab.getTitle();
             Modifier.Companion companion = Modifier.INSTANCE;
             ComposerKt.sourceInformationMarkerStart($composer2, -455988036, "CC(remember):MeloXApp.kt#9igjgp");
@@ -2197,6 +2195,6 @@ public final class MeloXAppKt {
 
     /* JADX INFO: renamed from: lerpDp-Md-fbLM, reason: not valid java name */
     private static final float m9605lerpDpMdfbLM(float start, float end, float progress) {
-        return C1301Dp.m8905constructorimpl(((end - start) * RangesKt.coerceIn(progress, 0.0f, 1.0f)) + start);
+        return Dp.constructor_impl(((end - start) * RangesKt.coerceIn(progress, 0.0f, 1.0f)) + start);
     }
 }

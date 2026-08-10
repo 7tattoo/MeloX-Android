@@ -40,8 +40,6 @@ public final /* data */ class NeteaseAccountProfile {
 
 
 
-
-
     public final NeteaseAccountProfile copy(long userId, String nickname, String avatarUrl, String backgroundUrl, String signature) {
         Intrinsics.checkNotNullParameter(nickname, "nickname");
         return new NeteaseAccountProfile(userId, nickname, avatarUrl, backgroundUrl, signature);
