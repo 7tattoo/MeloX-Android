@@ -1,6 +1,7 @@
 package com.lladlam.melox.ui.player
 
 import android.content.ComponentName
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.animation.AnimatedContent
@@ -64,6 +65,8 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import coil3.compose.AsyncImage
 import com.lladlam.melox.playback.MeloXPlaybackService
+import com.lladlam.melox.playback.MeloXPlaybackModePreferences
+import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -73,16 +76,19 @@ enum class MeloXNowPlayingPage {
     Queue,
 }
 
+enum class MeloXQueueOrigin { Base, Manual }
+
 data class MeloXQueueEntry(
     val index: Int,
     val mediaId: String,
     val title: String,
     val artist: String,
     val artworkUrl: String?,
+    val origin: MeloXQueueOrigin = MeloXQueueOrigin.Base,
 )
 
 @Stable
-class MeloXPlaybackUiState internal constructor() {
+class MeloXPlaybackUiState internal constructor(private val appContext: Context) {
     private var controller: MediaController? = null
     private val sleepTimerHandler = Handler(Looper.getMainLooper())
     private var sleepTimerRunnable: Runnable? = null
@@ -114,6 +120,10 @@ class MeloXPlaybackUiState internal constructor() {
     var repeatMode by mutableIntStateOf(Player.REPEAT_MODE_OFF)
         private set
     var shuffleEnabled by mutableStateOf(false)
+        private set
+    var autoplayEnabled by mutableStateOf(MeloXPlaybackModePreferences.autoplay(appContext))
+        private set
+    var autoMixEnabled by mutableStateOf(MeloXPlaybackModePreferences.autoMix(appContext))
         private set
     var volume by mutableFloatStateOf(1f)
         private set
@@ -186,6 +196,11 @@ class MeloXPlaybackUiState internal constructor() {
                 title = metadata.title?.toString().orEmpty().ifBlank { "未知歌曲" },
                 artist = metadata.artist?.toString().orEmpty(),
                 artworkUrl = metadata.artworkUri?.toString(),
+                origin = if (metadata.extras?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL) {
+                    MeloXQueueOrigin.Manual
+                } else {
+                    MeloXQueueOrigin.Base
+                },
             )
         }
 
@@ -232,6 +247,16 @@ class MeloXPlaybackUiState internal constructor() {
         }
     }
 
+    fun toggleAutoplay() {
+        autoplayEnabled = !autoplayEnabled
+        MeloXPlaybackModePreferences.setAutoplay(appContext, autoplayEnabled)
+    }
+
+    fun toggleAutoMix() {
+        autoMixEnabled = !autoMixEnabled
+        MeloXPlaybackModePreferences.setAutoMix(appContext, autoMixEnabled)
+    }
+
     fun changeVolume(value: Float) {
         controller?.let { player ->
             player.volume = value.coerceIn(0f, 1f)
@@ -242,7 +267,13 @@ class MeloXPlaybackUiState internal constructor() {
     fun addCurrentToQueue() {
         val player = controller ?: return
         val item = player.currentMediaItem ?: return
-        player.addMediaItem(item)
+        val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
+            putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
+        }
+        val copied = item.buildUpon()
+            .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
+            .build()
+        player.addMediaItem(copied)
         refresh()
     }
 
@@ -270,7 +301,7 @@ class MeloXPlaybackUiState internal constructor() {
 @Composable
 fun rememberMeloXPlaybackUiState(): MeloXPlaybackUiState {
     val context = LocalContext.current.applicationContext
-    val state = remember { MeloXPlaybackUiState() }
+    val state = remember(context) { MeloXPlaybackUiState(context) }
 
     DisposableEffect(context) {
         val token = SessionToken(
