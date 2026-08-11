@@ -263,6 +263,7 @@ internal fun MeloXIOSNowPlayingScene(
                     state = state,
                     modifier = Modifier.fillMaxSize(),
                     showSongHeader = false,
+                    interactive = queueVisible,
                 )
             }
 
@@ -314,7 +315,7 @@ internal fun MeloXIOSNowPlayingScene(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .clickable(onClick = onShowActions),
+                        .clickable(enabled = !artworkVisible, onClick = onShowActions),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

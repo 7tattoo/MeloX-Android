@@ -110,6 +110,7 @@ class MeloXPlaybackService : MediaSessionService() {
         override fun run() {
             val active = player
             if (active != null) {
+                applyLocalArtworkMetadata(active)
                 PlaybackCommands.prioritizeManualQueue(active)
                 maybePrepareAutoplay(active)
                 maybeRunAutoMix(active)

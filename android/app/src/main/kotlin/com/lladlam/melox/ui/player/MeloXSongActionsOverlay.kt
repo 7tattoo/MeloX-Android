@@ -50,6 +50,7 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
+import com.lladlam.melox.core.download.MeloXDownloadPlaylistRef
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
@@ -74,6 +75,7 @@ fun MeloXSongActionsOverlay(
     onDismiss: () -> Unit,
     playbackState: MeloXPlaybackUiState? = null,
     onNavigateSearch: ((String, MeloXSearchKind) -> Unit)? = null,
+    sourcePlaylist: MeloXDownloadPlaylistRef? = null,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -167,7 +169,7 @@ fun MeloXSongActionsOverlay(
                             when {
                                 downloads.contains(song.id) -> ActionItem("删除下载", "↓×") { downloads.remove(song.id) }
                                 downloads.isDownloading(song.id) -> ActionItem("取消下载", "↓×") { downloads.cancel(song.id) }
-                                else -> ActionItem("下载歌曲", "↓") { downloads.start(song, MusicQualityPreferences.read(app)) }
+                                else -> ActionItem("下载歌曲", "↓") { downloads.start(song, MusicQualityPreferences.read(app), sourcePlaylist) }
                             }
                             downloads.activeDownloads[song.id]?.let { active ->
                                 val percent = active.fractionCompleted?.let { (it * 100).toInt() }

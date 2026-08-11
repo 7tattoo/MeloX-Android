@@ -66,6 +66,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import coil3.compose.AsyncImage
 import com.lladlam.melox.playback.MeloXPlaybackService
+import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.playback.MeloXPlaybackModePreferences
 import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.delay
@@ -91,6 +92,7 @@ data class MeloXQueueEntry(
 @Stable
 class MeloXPlaybackUiState internal constructor(private val appContext: Context) {
     private var controller: MediaController? = null
+    private val downloadStore = MeloXDownloadStore.get(appContext)
     private val sleepTimerHandler = Handler(Looper.getMainLooper())
     private var sleepTimerRunnable: Runnable? = null
 
@@ -172,7 +174,9 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         title = metadata.title?.toString().orEmpty()
         artist = metadata.artist?.toString().orEmpty()
         album = metadata.albumTitle?.toString().orEmpty()
-        artworkUrl = metadata.artworkUri?.toString()
+        val currentSongId = item?.mediaId?.toLongOrNull()
+        artworkUrl = currentSongId?.let(downloadStore::localArtworkUri)?.toString()
+            ?: metadata.artworkUri?.toString()
         isPlaying = player.isPlaying
         positionMs = player.currentPosition.coerceAtLeast(0L)
         durationMs = player.duration
@@ -198,7 +202,8 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
                 mediaId = item.mediaId,
                 title = metadata.title?.toString().orEmpty().ifBlank { "未知歌曲" },
                 artist = metadata.artist?.toString().orEmpty(),
-                artworkUrl = metadata.artworkUri?.toString(),
+                artworkUrl = item.mediaId.toLongOrNull()?.let(downloadStore::localArtworkUri)?.toString()
+                    ?: metadata.artworkUri?.toString(),
                 origin = if (metadata.extras?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL) {
                     MeloXQueueOrigin.Manual
                 } else {
@@ -222,7 +227,10 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
 
     fun next() {
-        controller?.seekToNextMediaItem()
+        controller?.let { player ->
+            PlaybackCommands.prioritizeManualQueue(player)
+            player.seekToNextMediaItem()
+        }
     }
 
     fun playQueueIndex(index: Int) {
