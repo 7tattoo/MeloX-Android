@@ -25,6 +25,7 @@ import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.library.NeteaseLibraryClient
+import com.lladlam.melox.core.network.MeloXNetworkAvailability
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class MeloXPlaybackService : MediaSessionService() {
     private var incomingPlayer: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
     private lateinit var mediaSourceFactory: DefaultMediaSourceFactory
+    private lateinit var downloadStore: MeloXDownloadStore
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
     private var recommendationJob: Job? = null
@@ -56,22 +58,49 @@ class MeloXPlaybackService : MediaSessionService() {
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
+            val active = player
+            if (active != null && !MeloXNetworkAvailability.isOnline(this@MeloXPlaybackService)) {
+                if (skipToNextDownloaded(active)) {
+                    Log.i(TAG, "Offline playback skipped unavailable item after player error")
+                    return
+                }
+            }
             Log.e(TAG, "Playback failed: code=${error.errorCodeName}, message=${error.message}", error)
         }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             Log.d(TAG, "isPlaying=$isPlaying, ongoing=${isPlaybackOngoing()}")
         }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) ensureAutoplayRecommendations(forceAdvance = true)
+            val active = player ?: return
+            if (playbackState == Player.STATE_ENDED) {
+                if (!MeloXNetworkAvailability.isOnline(this@MeloXPlaybackService)) {
+                    if (!skipToNextDownloaded(active)) active.pause()
+                    return
+                }
+                ensureAutoplayRecommendations(forceAdvance = true)
+            }
         }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             recommendationSeed = null
-            // During an active crossfade the outgoing deck may report an end/transition
-            // before the 100 ms monitor tick performs the handoff. Do not tear down the
-            // prepared incoming deck in that tiny window; the next tick promotes it at
-            // the already-heard position instead of replaying the overlap from zero.
+            val active = player
+            if (active != null) {
+                applyLocalArtworkMetadata(active)
+                if (!MeloXNetworkAvailability.isOnline(this@MeloXPlaybackService)) {
+                    val id = active.currentMediaItem?.mediaId?.toLongOrNull()
+                    if (id != null && !downloadStore.contains(id)) {
+                        skipToNextDownloaded(active)
+                    }
+                }
+            }
+            // An active crossfade owns the handoff. Do not destroy the incoming
+            // deck if the outgoing deck reaches its boundary a few milliseconds
+            // before the monitor promotes the already-playing incoming deck.
             if (mixStartedAt == 0L) cancelPreparedMix()
         }
+
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             if (mixStartedAt == 0L) cancelPreparedMix()
         }
@@ -81,6 +110,7 @@ class MeloXPlaybackService : MediaSessionService() {
         override fun run() {
             val active = player
             if (active != null) {
+                PlaybackCommands.prioritizeManualQueue(active)
                 maybePrepareAutoplay(active)
                 maybeRunAutoMix(active)
             }
@@ -98,7 +128,7 @@ class MeloXPlaybackService : MediaSessionService() {
                     "Referer" to "https://music.163.com/",
                 ),
             )
-        val downloadStore = MeloXDownloadStore.get(this)
+        downloadStore = MeloXDownloadStore.get(this)
         val cookieProvider = { NeteaseSessionStore.readCookie(this@MeloXPlaybackService) }
         val resolving = ResolvingDataSource.Factory(
             DefaultDataSource.Factory(this, httpFactory),
@@ -117,7 +147,9 @@ class MeloXPlaybackService : MediaSessionService() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val sessionActivity = PendingIntent.getActivity(
-            this, 1001, sessionActivityIntent,
+            this,
+            1001,
+            sessionActivityIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         mediaSession = MediaSession.Builder(this, active)
@@ -141,6 +173,7 @@ class MeloXPlaybackService : MediaSessionService() {
             }
 
     private fun maybePrepareAutoplay(active: ExoPlayer) {
+        if (!MeloXNetworkAvailability.isOnline(this)) return
         if (!MeloXPlaybackModePreferences.autoplay(this)) return
         if (active.mediaItemCount <= 0 || active.currentMediaItemIndex < 0) return
         val atTail = active.currentMediaItemIndex >= active.mediaItemCount - 1
@@ -151,12 +184,14 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     private fun ensureAutoplayRecommendations(forceAdvance: Boolean) {
+        if (!MeloXNetworkAvailability.isOnline(this)) return
         if (!MeloXPlaybackModePreferences.autoplay(this)) return
         val active = player ?: return
         val seed = active.currentMediaItem?.mediaId?.toLongOrNull() ?: return
         if (recommendationJob?.isActive == true || recommendationSeed == seed) {
             if (forceAdvance && active.playbackState == Player.STATE_ENDED && active.hasNextMediaItem()) {
-                active.seekToNextMediaItem(); active.play()
+                active.seekToNextMediaItem()
+                active.play()
             }
             return
         }
@@ -173,8 +208,15 @@ class MeloXPlaybackService : MediaSessionService() {
                 .filterNot { it.id.toString() in existing }
                 .take(20)
                 .forEach { song ->
-                    active.addMediaItem(PlaybackCommands.mediaItemFor(song, quality, PlaybackCommands.QUEUE_ORIGIN_BASE))
+                    active.addMediaItem(
+                        PlaybackCommands.mediaItemFor(
+                            song,
+                            quality,
+                            PlaybackCommands.QUEUE_ORIGIN_BASE,
+                        ),
+                    )
                 }
+            PlaybackCommands.prioritizeManualQueue(active)
             if (forceAdvance && active.playbackState == Player.STATE_ENDED && active.hasNextMediaItem()) {
                 active.seekToNextMediaItem()
                 active.prepare()
@@ -190,6 +232,7 @@ class MeloXPlaybackService : MediaSessionService() {
             return
         }
         if (!active.isPlaying || active.repeatMode == Player.REPEAT_MODE_ONE || !active.hasNextMediaItem()) return
+        PlaybackCommands.prioritizeManualQueue(active)
         val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: return
         val remaining = duration - active.currentPosition
         val sourceId = active.currentMediaItem?.mediaId ?: return
@@ -198,11 +241,7 @@ class MeloXPlaybackService : MediaSessionService() {
         }
         val incoming = incomingPlayer ?: return
         if (preparedMixSourceId != sourceId) {
-            if (mixStartedAt > 0L) {
-                completeAutoMix(active, incoming)
-            } else {
-                cancelPreparedMix()
-            }
+            if (mixStartedAt > 0L) completeAutoMix(active, incoming) else cancelPreparedMix()
             return
         }
         if (mixStartedAt == 0L && incoming.playbackState == Player.STATE_READY && remaining <= AUTOMIX_DURATION_MS) {
@@ -228,8 +267,15 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     private fun prepareIncoming(active: ExoPlayer, sourceId: String) {
+        PlaybackCommands.prioritizeManualQueue(active)
         val nextIndex = active.currentMediaItemIndex + 1
         if (nextIndex !in 0 until active.mediaItemCount) return
+        val nextSongId = active.getMediaItemAt(nextIndex).mediaId.toLongOrNull()
+        if (!MeloXNetworkAvailability.isOnline(this) &&
+            (nextSongId == null || !downloadStore.contains(nextSongId))
+        ) {
+            return
+        }
         val incoming = buildPlayer(managesAudioFocus = false, observesSession = false)
         val items = List(active.mediaItemCount) { active.getMediaItemAt(it) }
         incoming.setMediaItems(items, nextIndex, 0L)
@@ -240,11 +286,13 @@ class MeloXPlaybackService : MediaSessionService() {
         mixStartedAt = 0L
     }
 
+    /**
+     * Incoming has already been playing for the entire overlap. Promotion must
+     * therefore never seek it again: seeking at handoff creates the audible
+     * forward/backward jump reported at the outgoing song's original endpoint.
+     */
     private fun completeAutoMix(old: ExoPlayer, incoming: ExoPlayer) {
-        val heardPosition = (SystemClock.elapsedRealtime() - mixStartedAt).coerceAtLeast(0L)
-        if (heardPosition > 0L && kotlin.math.abs(incoming.currentPosition - heardPosition) > 300L) {
-            incoming.seekTo(heardPosition)
-        }
+        old.volume = 0f
         incoming.volume = mixBaseVolume
         incoming.setAudioAttributes(audioAttributes, true)
         incoming.setHandleAudioBecomingNoisy(true)
@@ -258,6 +306,43 @@ class MeloXPlaybackService : MediaSessionService() {
         old.removeListener(playerListener)
         old.pause()
         old.release()
+        applyLocalArtworkMetadata(incoming)
+    }
+
+    private fun applyLocalArtworkMetadata(active: ExoPlayer) {
+        val index = active.currentMediaItemIndex
+        if (index !in 0 until active.mediaItemCount) return
+        val item = active.getMediaItemAt(index)
+        val songId = item.mediaId.toLongOrNull() ?: return
+        val localArtwork = downloadStore.localArtworkUri(songId) ?: return
+        if (item.mediaMetadata.artworkUri == localArtwork) return
+        val localItem = item.buildUpon()
+            .setMediaMetadata(
+                item.mediaMetadata.buildUpon()
+                    .setArtworkUri(localArtwork)
+                    .build(),
+            )
+            .build()
+        active.replaceMediaItem(index, localItem)
+    }
+
+    private fun skipToNextDownloaded(active: ExoPlayer): Boolean {
+        val current = active.currentMediaItemIndex
+        if (current !in 0 until active.mediaItemCount) return false
+        val forward = ((current + 1) until active.mediaItemCount).toList()
+        val wrapped = if (active.repeatMode == Player.REPEAT_MODE_ALL) {
+            (0 until current).toList()
+        } else {
+            emptyList()
+        }
+        val target = (forward + wrapped).firstOrNull { index ->
+            active.getMediaItemAt(index).mediaId.toLongOrNull()?.let(downloadStore::contains) == true
+        } ?: return false
+        cancelPreparedMix()
+        active.seekToDefaultPosition(target)
+        if (active.playbackState == Player.STATE_IDLE) active.prepare()
+        active.play()
+        return true
     }
 
     private fun cancelPreparedMix() {
@@ -284,9 +369,11 @@ class MeloXPlaybackService : MediaSessionService() {
         recommendationJob?.cancel()
         serviceScope.cancel()
         cancelPreparedMix()
-        mediaSession?.release(); mediaSession = null
+        mediaSession?.release()
+        mediaSession = null
         player?.removeListener(playerListener)
-        player?.release(); player = null
+        player?.release()
+        player = null
         super.onDestroy()
     }
 
@@ -296,6 +383,6 @@ class MeloXPlaybackService : MediaSessionService() {
         const val AUTOMIX_PRELOAD_MS = 10_000L
         const val AUTOMIX_DURATION_MS = 6_000L
         const val MIN_AUTOMIX_DURATION_MS = 1_500L
-        const val AUTOMIX_HANDOFF_GUARD_MS = 350L
+        const val AUTOMIX_HANDOFF_GUARD_MS = 700L
     }
 }
