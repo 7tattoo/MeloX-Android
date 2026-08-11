@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
 
 /**
@@ -263,6 +265,7 @@ internal fun MeloXIOSNowPlayingScene(
                 )
             }
 
+            val songHeaderShape = RoundedCornerShape(20.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,7 +275,21 @@ internal fun MeloXIOSNowPlayingScene(
                         alpha = headerAlpha
                         translationY = headerOffset.toPx()
                     }
-                    .padding(start = 84.dp),
+                    .then(
+                        if (queueVisible) {
+                            Modifier
+                                .clip(songHeaderShape)
+                                .meloXLiquidButton(
+                                    shape = songHeaderShape,
+                                    tint = Color.White.copy(alpha = .035f),
+                                    surfaceColor = Color.Black.copy(alpha = .10f),
+                                    blurRadius = 20.dp,
+                                    lensRadius = 14.dp,
+                                    refractionHeight = 18.dp,
+                                )
+                        } else Modifier
+                    )
+                    .padding(start = 84.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -324,17 +341,35 @@ internal fun MeloXIOSNowPlayingScene(
             exit = fadeOut(tween(180, easing = FastOutSlowInEasing)) +
                 slideOutVertically(tween(220, easing = FastOutSlowInEasing)) { it / 8 },
         ) {
-            MeloXNowPlayingCoreControls(
-                state = state,
-                page = page,
-                onShowQuality = onShowQuality,
-                onPageSelected = { destination ->
-                    setLyricsControlsVisible(true)
-                    onPageChanged(
-                        if (page == destination) MeloXNowPlayingPage.Artwork else destination,
+            val controlsShape = RoundedCornerShape(28.dp)
+            val controlsSurface = if (page == MeloXNowPlayingPage.Lyrics) {
+                Modifier
+                    .fillMaxWidth()
+                    .clip(controlsShape)
+                    .meloXLiquidButton(
+                        shape = controlsShape,
+                        tint = Color.White.copy(alpha = .035f),
+                        surfaceColor = Color.Black.copy(alpha = .10f),
+                        blurRadius = 20.dp,
+                        lensRadius = 14.dp,
+                        refractionHeight = 18.dp,
                     )
-                },
-            )
+            } else {
+                Modifier.fillMaxWidth()
+            }
+            Box(modifier = controlsSurface) {
+                MeloXNowPlayingCoreControls(
+                    state = state,
+                    page = page,
+                    onShowQuality = onShowQuality,
+                    onPageSelected = { destination ->
+                        setLyricsControlsVisible(true)
+                        onPageChanged(
+                            if (page == destination) MeloXNowPlayingPage.Artwork else destination,
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -441,6 +476,7 @@ private fun ArtworkDetailsWithoutArtwork(
             }
 
             Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(MeloXNowPlayingControlsHeight.dp))
         }
     }
 }
