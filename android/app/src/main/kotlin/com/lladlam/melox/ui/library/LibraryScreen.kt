@@ -81,6 +81,7 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
+import com.lladlam.melox.core.download.MeloXDownloadPlaylistRef
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.library.NeteaseLibraryCache
 import com.lladlam.melox.core.library.NeteaseLibrarySnapshot
@@ -321,63 +322,333 @@ fun LibraryScreen(
     }
 }
 
+private enum class MeloXDownloadsPage { Root, Active, Playlists, PlaylistDetail }
+
 @Composable
 private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
     val context = LocalContext.current
+    var page by remember { mutableStateOf(MeloXDownloadsPage.Root) }
+    var selectedPlaylistId by remember { mutableStateOf<Long?>(null) }
+    var selecting by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
     val active = downloads.activeDownloads.values.toList()
     val completed = downloads.downloads.toList()
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 146.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (active.isNotEmpty()) {
-            item { Text("正在下载", fontSize=20.sp, fontWeight=FontWeight.Bold, modifier=Modifier.padding(top=6.dp,bottom=8.dp)) }
-            items(active, key={ "active-${it.song.id}" }) { item ->
-                Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment=Alignment.CenterVertically) {
-                    AsyncImage(item.song.artworkUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)))
-                    Column(Modifier.weight(1f).padding(start=12.dp)) {
-                        Text(item.song.name,maxLines=1,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold)
-                        Text(item.fractionCompleted?.let { "${(it*100).toInt()}% · ${item.quality.title}" } ?: item.quality.title,color=MaterialTheme.colorScheme.onBackground.copy(alpha=.48f),fontSize=12.sp)
-                    }
-                    Text("取消",color=MaterialTheme.colorScheme.error,modifier=Modifier.clickable { downloads.cancel(item.song.id) }.padding(10.dp))
-                }
-            }
+    val groups = downloads.downloadedPlaylists
+
+    BackHandler(enabled = page != MeloXDownloadsPage.Root) {
+        page = if (page == MeloXDownloadsPage.PlaylistDetail) MeloXDownloadsPage.Playlists else MeloXDownloadsPage.Root
+        if (page != MeloXDownloadsPage.PlaylistDetail) selectedPlaylistId = null
+    }
+
+    when (page) {
+        MeloXDownloadsPage.Root -> LazyColumn(
+  modifier = Modifier.fillMaxSize(),
+  contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 146.dp),
+  verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+  if (active.isNotEmpty()) {
+      item {
+          DownloadNavigationCard(
+              title = "正在下载",
+              subtitle = "${formatDownloadSpeed(downloads.aggregateDownloadBytesPerSecond)} · 剩余 ${active.size} 首未完成",
+              onClick = { page = MeloXDownloadsPage.Active },
+          )
+      }
+  }
+  if (completed.isNotEmpty()) {
+      item {
+          Row(
+              Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+              Text("已下载", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+              Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                  if (selecting) {
+                      Text(
+                          if (selectedIds.size == completed.size) "取消全选" else "全选",
+                          color = MaterialTheme.colorScheme.primary,
+                          fontWeight = FontWeight.SemiBold,
+                          modifier = Modifier.clickable {
+                              selectedIds = if (selectedIds.size == completed.size) emptySet()
+                                  else completed.map { it.song.id }.toSet()
+                          },
+                      )
+                      Text(
+                          "取消",
+                          color = MaterialTheme.colorScheme.primary,
+                          fontWeight = FontWeight.SemiBold,
+                          modifier = Modifier.clickable {
+                              selecting = false
+                              selectedIds = emptySet()
+                          },
+                      )
+                  } else {
+                      Text(
+                          "多选",
+                          color = MaterialTheme.colorScheme.primary,
+                          fontWeight = FontWeight.SemiBold,
+                          modifier = Modifier.clickable { selecting = true },
+                      )
+                      Text(
+                          "播放全部",
+                          color = MaterialTheme.colorScheme.primary,
+                          fontWeight = FontWeight.SemiBold,
+                          modifier = Modifier.clickable {
+                              downloads.downloadedSongs.firstOrNull()?.let {
+                                  PlaybackCommands.playQueue(context, downloads.downloadedSongs, it.id)
+                              }
+                          },
+                      )
+                  }
+              }
+          }
+      }
+  if (groups.isNotEmpty()) {
+      item {
+          DownloadNavigationCard(
+              title = "已下载歌单",
+              subtitle = "${groups.size} 个歌单",
+              onClick = { page = MeloXDownloadsPage.Playlists },
+          )
+      }
+  }
+      items(completed, key = { "download-${it.song.id}" }) { item ->
+          val checked = item.song.id in selectedIds
+          Row(
+              Modifier
+                  .fillMaxWidth()
+                  .height(62.dp)
+                  .clickable {
+                      if (selecting) {
+                          selectedIds = if (checked) selectedIds - item.song.id else selectedIds + item.song.id
+                      } else {
+                          PlaybackCommands.playQueue(context, downloads.downloadedSongs, item.song.id)
+                      }
+                  },
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+              AsyncImage(
+                  model = downloads.localArtworkUri(item.song.id) ?: item.song.artworkUrl,
+                  contentDescription = null,
+                  contentScale = ContentScale.Crop,
+                  modifier = Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)),
+              )
+              Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                  Text(item.song.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                  Text(
+                      "${item.song.artists} · ${item.quality.title}",
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                      color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f),
+                      fontSize = 12.sp,
+                  )
+              }
+              if (selecting) {
+                  Text(if (checked) "✓" else "○", color = MaterialTheme.colorScheme.primary, fontSize = 20.sp, modifier = Modifier.padding(10.dp))
+              } else {
+                  Text("删除", color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { downloads.remove(item.song.id) }.padding(10.dp))
+              }
+          }
+      }
+      if (selecting) {
+          item {
+              val canDelete = selectedIds.isNotEmpty()
+              Box(
+                  Modifier.fillMaxWidth().padding(top = 16.dp).height(48.dp)
+                      .clip(RoundedCornerShape(18.dp))
+                      .background(MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) .14f else .05f))
+                      .clickable(enabled = canDelete) {
+                          downloads.removeMany(selectedIds)
+                          selectedIds = emptySet()
+                          selecting = false
+                      },
+                  contentAlignment = Alignment.Center,
+              ) {
+                  Text(
+                      if (canDelete) "删除已选 ${selectedIds.size} 首" else "请选择歌曲",
+                      color = MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) 1f else .4f),
+                      fontWeight = FontWeight.SemiBold,
+                  )
+              }
+          }
+      }
+  }
+
+  if (active.isEmpty() && completed.isEmpty()) {
+      item {
+          Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text("还没有下载歌曲", fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                  Text(
+                      "在歌曲的更多操作菜单中选择“下载歌曲”。",
+                      modifier = Modifier.padding(top = 7.dp),
+                      color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f),
+                      fontSize = 13.sp,
+                  )
+              }
+          }
+      }
+  }
         }
-        if (completed.isNotEmpty()) {
-            item {
-                Row(Modifier.fillMaxWidth().padding(top=14.dp,bottom=8.dp),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-                    Text("已下载",fontSize=20.sp,fontWeight=FontWeight.Bold)
-                    Text("播放全部",color=MaterialTheme.colorScheme.primary,fontWeight=FontWeight.SemiBold,modifier=Modifier.clickable {
-                        downloads.downloadedSongs.firstOrNull()?.let { PlaybackCommands.playQueue(context,downloads.downloadedSongs,it.id) }
-                    })
-                }
-            }
-            items(completed,key={ "download-${it.song.id}" }) { item ->
-                Row(
-                    Modifier.fillMaxWidth().height(62.dp).clickable { PlaybackCommands.playQueue(context,downloads.downloadedSongs,item.song.id) },
-                    verticalAlignment=Alignment.CenterVertically,
-                ) {
-                    AsyncImage(item.song.artworkUrl,null,contentScale=ContentScale.Crop,modifier=Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)))
-                    Column(Modifier.weight(1f).padding(start=12.dp)) {
-                        Text(item.song.name,maxLines=1,overflow=TextOverflow.Ellipsis,fontWeight=FontWeight.SemiBold)
-                        Text("${item.song.artists} · ${item.quality.title}",maxLines=1,overflow=TextOverflow.Ellipsis,color=MaterialTheme.colorScheme.onBackground.copy(alpha=.48f),fontSize=12.sp)
-                    }
-                    Text("删除",color=MaterialTheme.colorScheme.error,modifier=Modifier.clickable { downloads.remove(item.song.id) }.padding(10.dp))
-                }
-            }
+
+        MeloXDownloadsPage.Active -> LazyColumn(
+  modifier = Modifier.fillMaxSize(),
+  contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 146.dp),
+  verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+  item { DownloadsSubpageHeader("正在下载") { page = MeloXDownloadsPage.Root } }
+  item {
+      Text(
+          "${formatDownloadSpeed(downloads.aggregateDownloadBytesPerSecond)} · 剩余 ${active.size} 首未完成",
+          color = MaterialTheme.colorScheme.onBackground.copy(alpha = .52f),
+          fontSize = 13.sp,
+          modifier = Modifier.padding(bottom = 10.dp),
+      )
+  }
+  items(active, key = { "active-${it.song.id}" }) { item ->
+      Row(Modifier.fillMaxWidth().height(66.dp), verticalAlignment = Alignment.CenterVertically) {
+          AsyncImage(
+              model = item.song.artworkUrl,
+              contentDescription = null,
+              contentScale = ContentScale.Crop,
+              modifier = Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)),
+          )
+          Column(Modifier.weight(1f).padding(start = 12.dp)) {
+              Text(item.song.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+              val progress = item.fractionCompleted?.let { "${(it * 100).toInt()}%" } ?: "准备中"
+              Text(
+                  "$progress · ${formatDownloadSpeed(item.bytesPerSecond)} · ${item.quality.title}",
+                  color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f),
+                  fontSize = 12.sp,
+              )
+          }
+          Text("取消", color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { downloads.cancel(item.song.id) }.padding(10.dp))
+      }
+  }
+  if (active.isEmpty()) {
+      item { Text("当前没有正在下载的歌曲", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .5f), modifier = Modifier.padding(top = 24.dp)) }
+  }
         }
-        if (active.isEmpty() && completed.isEmpty()) {
-            item {
-                Box(Modifier.fillMaxWidth().height(260.dp),contentAlignment=Alignment.Center) {
-                    Column(horizontalAlignment=Alignment.CenterHorizontally) {
-                        Text("还没有下载歌曲",fontSize=19.sp,fontWeight=FontWeight.SemiBold)
-                        Text("在歌曲的更多操作菜单中选择“下载歌曲”。",modifier=Modifier.padding(top=7.dp),color=MaterialTheme.colorScheme.onBackground.copy(alpha=.48f),fontSize=13.sp)
-                    }
-                }
-            }
+
+        MeloXDownloadsPage.Playlists -> LazyColumn(
+  modifier = Modifier.fillMaxSize(),
+  contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 146.dp),
+  verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+  item { DownloadsSubpageHeader("已下载歌单") { page = MeloXDownloadsPage.Root } }
+  items(groups, key = { "download-playlist-${it.playlist.id}" }) { group ->
+      Row(
+          Modifier.fillMaxWidth().height(68.dp).clickable {
+              selectedPlaylistId = group.playlist.id
+              page = MeloXDownloadsPage.PlaylistDetail
+          },
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+          AsyncImage(
+              model = downloads.localPlaylistArtworkUri(group.playlist.id) ?: group.playlist.artworkUrl,
+              contentDescription = null,
+              contentScale = ContentScale.Crop,
+              modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)),
+          )
+          Column(Modifier.weight(1f).padding(start = 12.dp)) {
+              Text(group.playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+              Text("已下载 ${group.songs.size} 首", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp)
+          }
+          Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
+      }
+  }
+        }
+
+        MeloXDownloadsPage.PlaylistDetail -> {
+  val group = groups.firstOrNull { it.playlist.id == selectedPlaylistId }
+  val songs = group?.songs?.map { it.song }.orEmpty()
+  LazyColumn(
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 146.dp),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+      item { DownloadsSubpageHeader(group?.playlist?.name ?: "已下载歌单") { page = MeloXDownloadsPage.Playlists } }
+      group?.let { existing ->
+          item {
+              Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                  AsyncImage(
+                      model = downloads.localPlaylistArtworkUri(existing.playlist.id) ?: existing.playlist.artworkUrl,
+                      contentDescription = null,
+                      contentScale = ContentScale.Crop,
+                      modifier = Modifier.size(72.dp).clip(RoundedCornerShape(12.dp)),
+                  )
+                  Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                      Text(existing.playlist.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                      Text("${songs.size} 首已下载歌曲", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .5f), fontSize = 12.sp)
+                  }
+                  Text(
+                      "播放全部",
+                      color = MaterialTheme.colorScheme.primary,
+                      fontWeight = FontWeight.SemiBold,
+                      modifier = Modifier.clickable {
+                          songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) }
+                      }.padding(8.dp),
+                  )
+              }
+          }
+      }
+      items(group?.songs.orEmpty(), key = { "playlist-song-${it.song.id}" }) { item ->
+          Row(
+              Modifier.fillMaxWidth().height(62.dp).clickable {
+                  PlaybackCommands.playQueue(context, songs, item.song.id)
+              },
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+              AsyncImage(
+                  model = downloads.localArtworkUri(item.song.id) ?: item.song.artworkUrl,
+                  contentDescription = null,
+                  contentScale = ContentScale.Crop,
+                  modifier = Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)),
+              )
+              Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                  Text(item.song.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                  Text(item.song.artists, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp)
+              }
+          }
+      }
+  }
         }
     }
+}
+
+@Composable
+private fun DownloadNavigationCard(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp).height(66.dp)
+  .clip(RoundedCornerShape(18.dp))
+  .background(MaterialTheme.colorScheme.onBackground.copy(alpha = .055f))
+  .clickable(onClick = onClick)
+  .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+  Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+  Text(subtitle, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+        }
+        Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .42f))
+    }
+}
+
+@Composable
+private fun DownloadsSubpageHeader(title: String, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("‹", fontSize = 30.sp, modifier = Modifier.clickable(onClick = onBack).padding(end = 12.dp))
+        Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private fun formatDownloadSpeed(bytesPerSecond: Long): String = when {
+    bytesPerSecond >= 1024L * 1024L -> "%.1f MB/s".format(bytesPerSecond / (1024.0 * 1024.0))
+    bytesPerSecond >= 1024L -> "%.0f KB/s".format(bytesPerSecond / 1024.0)
+    bytesPerSecond > 0L -> "$bytesPerSecond B/s"
+    else -> "0 KB/s"
 }
 
 @Composable
@@ -913,10 +1184,13 @@ private fun MeloXPlaylistDetailScreen(
                         isSaved = isSaved == true,
                         onDownloadAll = {
                             val quality = MusicQualityPreferences.read(appContext)
+                            val source = MeloXDownloadPlaylistRef(
+                                id = displayed.id,
+                                name = displayed.name,
+                                artworkUrl = displayed.coverUrl,
+                            )
                             songs.forEach { song ->
-                                if (!downloadStore.contains(song.id) && !downloadStore.isDownloading(song.id)) {
-                                    downloadStore.start(song, quality)
-                                }
+                                downloadStore.start(song, quality, source)
                             }
                         },
                         onToggleSaved = {
@@ -1032,6 +1306,11 @@ private fun MeloXPlaylistDetailScreen(
                 queue = songs,
                 visible = true,
                 onDismiss = { selectedTrackAction = null },
+                sourcePlaylist = MeloXDownloadPlaylistRef(
+                    id = displayed.id,
+                    name = displayed.name,
+                    artworkUrl = displayed.coverUrl,
+                ),
             )
         }
     }

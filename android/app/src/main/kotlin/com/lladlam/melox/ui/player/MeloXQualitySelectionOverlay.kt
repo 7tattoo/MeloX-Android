@@ -2,12 +2,11 @@ package com.lladlam.melox.ui.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -45,15 +44,13 @@ import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.audio.SongAudioAvailability
+import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.launch
 
-/**
- * Same-window Liquid Glass quality chooser. Unlike Material DropdownMenu/Popup,
- * this remains in the recorded Now Playing window and therefore samples the
- * artwork-driven player scene instead of drawing an opaque platform menu.
- */
+/** Quality chooser. A downloaded track is physically one encoded file, so its
+ * local quality is locked to the quality recorded at download time. */
 @Composable
 internal fun MeloXQualitySelectionOverlay(
     state: MeloXPlaybackUiState,
@@ -62,22 +59,31 @@ internal fun MeloXQualitySelectionOverlay(
 ) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
+    val downloads = remember(context) { MeloXDownloadStore.get(context) }
     val client = remember(context) {
         NeteaseQualityClient(
             cookieProvider = { NeteaseSessionStore.readCookie(context) },
         )
     }
-    var selected by remember(context, visible) {
-        mutableStateOf(MusicQualityPreferences.read(context))
+    val songId = state.mediaId?.toLongOrNull()
+    val downloadedQuality = songId?.let(downloads::downloadedQuality)
+    var selected by remember(context, visible, songId) {
+        mutableStateOf(downloadedQuality ?: MusicQualityPreferences.read(context))
     }
     var availability by remember(state.mediaId, visible) {
         mutableStateOf(SongAudioAvailability.Unknown)
     }
     var loading by remember(state.mediaId, visible) { mutableStateOf(false) }
 
-    LaunchedEffect(visible, state.mediaId) {
-        if (!visible) return@LaunchedEffect
-        val songId = state.mediaId?.toLongOrNull() ?: return@LaunchedEffect
+    LaunchedEffect(visible, songId, downloadedQuality) {
+        if (!visible || songId == null) return@LaunchedEffect
+        if (downloadedQuality != null) {
+            selected = downloadedQuality
+            loading = false
+            availability = SongAudioAvailability.Unknown
+            return@LaunchedEffect
+        }
+        selected = MusicQualityPreferences.read(context)
         loading = true
         availability = runCatching { client.audioAvailability(songId) }
             .getOrDefault(SongAudioAvailability.Unknown)
@@ -137,7 +143,11 @@ internal fun MeloXQualitySelectionOverlay(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            state.title.ifBlank { "正在播放" },
+                            if (downloadedQuality != null) {
+                                "已下载 · ${downloadedQuality.title}"
+                            } else {
+                                state.title.ifBlank { "正在播放" }
+                            },
                             color = Color.White.copy(alpha = 0.55f),
                             fontSize = 13.sp,
                             maxLines = 1,
@@ -153,7 +163,11 @@ internal fun MeloXQualitySelectionOverlay(
                 }
 
                 MusicQuality.entries.forEach { quality ->
-                    val supported = availability.supports(quality.apiLevel) != false
+                    val supported = if (downloadedQuality != null) {
+                        quality == downloadedQuality
+                    } else {
+                        availability.supports(quality.apiLevel) != false
+                    }
                     val isSelected = quality == selected
                     Row(
                         modifier = Modifier
@@ -177,9 +191,9 @@ internal fun MeloXQualitySelectionOverlay(
                                 refractionHeight = 14.dp,
                             )
                             .clickable(enabled = supported) {
-                                selected = quality
-                                scope.launch {
-                                    PlaybackCommands.changeQuality(context, quality)
+                                if (downloadedQuality == null) {
+                                    selected = quality
+                                    scope.launch { PlaybackCommands.changeQuality(context, quality) }
                                 }
                                 onDismiss()
                             }
@@ -196,7 +210,11 @@ internal fun MeloXQualitySelectionOverlay(
                         if (isSelected) {
                             Text("✓", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         } else if (!supported) {
-                            Text("不可用", color = Color.White.copy(alpha = 0.30f), fontSize = 12.sp)
+                            Text(
+                                if (downloadedQuality != null) "未下载" else "不可用",
+                                color = Color.White.copy(alpha = 0.30f),
+                                fontSize = 12.sp,
+                            )
                         }
                     }
                 }

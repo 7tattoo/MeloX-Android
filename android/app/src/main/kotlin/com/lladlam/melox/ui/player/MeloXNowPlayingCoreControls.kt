@@ -61,6 +61,7 @@ import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.audio.MusicQualityRuntime
+import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
@@ -198,6 +199,8 @@ private fun SceneQualityChip(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
+    val downloads = remember(context) { MeloXDownloadStore.get(context) }
+    val downloadedQuality = state.mediaId?.toLongOrNull()?.let(downloads::downloadedQuality)
     var selected by remember(context) {
         mutableStateOf(
             MusicQualityPreferences.read(context).also { MusicQualityRuntime.selected = it },
@@ -215,7 +218,7 @@ private fun SceneQualityChip(
         }
     }
 
-    val displayQuality = actual ?: selected
+    val displayQuality = downloadedQuality ?: actual ?: selected
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(

@@ -35,6 +35,7 @@ fun MeloXQueuePanel(
     state: MeloXPlaybackUiState,
     modifier: Modifier = Modifier,
     showSongHeader: Boolean = true,
+    interactive: Boolean = true,
 ) {
     val currentEntry = state.queue.getOrNull(state.currentIndex)
     val history = if (state.currentIndex > 0) state.queue.take(state.currentIndex) else emptyList()
@@ -46,9 +47,6 @@ fun MeloXQueuePanel(
     val listState = rememberLazyListState()
     val historyItemCount = if (history.isEmpty()) 0 else history.size + 1
 
-    // The normal resting point is immediately after history. History therefore
-    // lives above the viewport and appears only when the user deliberately
-    // scrolls upward, matching the intended queue interaction.
     LaunchedEffect(state.mediaId, historyItemCount) {
         runCatching { listState.scrollToItem(historyItemCount) }
     }
@@ -58,10 +56,11 @@ fun MeloXQueuePanel(
             QueueSongHeaderSurface(currentEntry)
         }
 
-        QueueModeControlsSurface(state)
+        QueueModeControlsSurface(state, interactive)
 
         LazyColumn(
             state = listState,
+            userScrollEnabled = interactive,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -69,14 +68,14 @@ fun MeloXQueuePanel(
             if (history.isNotEmpty()) {
                 item(key = "history-title") { QueueSectionTitle("历史记录", subdued = true) }
                 items(history, key = { "history-${it.index}-${it.mediaId}" }) { entry ->
-                    QueueRow(entry, state)
+                    QueueRow(entry, state, interactive)
                 }
             }
 
             if (manualQueue.isNotEmpty()) {
                 item(key = "manual-title") { QueueSectionTitle("队列") }
                 items(manualQueue, key = { "manual-${it.index}-${it.mediaId}" }) { entry ->
-                    QueueRow(entry, state)
+                    QueueRow(entry, state, interactive)
                 }
             }
 
@@ -89,7 +88,7 @@ fun MeloXQueuePanel(
                 }
             } else {
                 items(continuing, key = { "continue-${it.index}-${it.mediaId}" }) { entry ->
-                    QueueRow(entry, state)
+                    QueueRow(entry, state, interactive)
                 }
             }
         }
@@ -122,7 +121,7 @@ private fun QueueSongHeaderSurface(entry: MeloXQueueEntry) {
 }
 
 @Composable
-private fun QueueModeControlsSurface(state: MeloXPlaybackUiState) {
+private fun QueueModeControlsSurface(state: MeloXPlaybackUiState, interactive: Boolean) {
     val shape = RoundedCornerShape(28.dp)
     Box(
         modifier = Modifier
@@ -137,10 +136,10 @@ private fun QueueModeControlsSurface(state: MeloXPlaybackUiState) {
             .padding(8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            QueueModeButton("↝", state.shuffleEnabled, onClick = state::toggleShuffle, modifier = Modifier.weight(1f))
-            QueueModeButton(if (state.repeatMode == Player.REPEAT_MODE_ONE) "↻1" else "↻", state.repeatMode != Player.REPEAT_MODE_OFF, onClick = state::cycleRepeatMode, modifier = Modifier.weight(1f))
-            QueueModeButton("∞", state.autoplayEnabled, onClick = state::toggleAutoplay, modifier = Modifier.weight(1f))
-            QueueModeButton("◎", state.autoMixEnabled, onClick = state::toggleAutoMix, modifier = Modifier.weight(1f))
+            QueueModeButton("↝", state.shuffleEnabled, enabled = interactive, onClick = state::toggleShuffle, modifier = Modifier.weight(1f))
+            QueueModeButton(if (state.repeatMode == Player.REPEAT_MODE_ONE) "↻1" else "↻", state.repeatMode != Player.REPEAT_MODE_OFF, enabled = interactive, onClick = state::cycleRepeatMode, modifier = Modifier.weight(1f))
+            QueueModeButton("∞", state.autoplayEnabled, enabled = interactive, onClick = state::toggleAutoplay, modifier = Modifier.weight(1f))
+            QueueModeButton("◎", state.autoMixEnabled, enabled = interactive, onClick = state::toggleAutoMix, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -157,12 +156,12 @@ private fun QueueSectionTitle(title: String, subdued: Boolean = false) {
 }
 
 @Composable
-private fun QueueRow(entry: MeloXQueueEntry, state: MeloXPlaybackUiState) {
+private fun QueueRow(entry: MeloXQueueEntry, state: MeloXPlaybackUiState, interactive: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable { state.playQueueIndex(entry.index) }
+            .clickable(enabled = interactive) { state.playQueueIndex(entry.index) }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
