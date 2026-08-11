@@ -1,0 +1,24 @@
+name: Inspect offline queue v2
+on:
+  push:
+    branches:
+      - fix/offline-queue-download-v2
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect targets
+        run: |
+          echo '=== PLAYER CLICK/NEXT ==='
+          grep -RIn "clickable\|detectTapGestures\|pointerInput\|onTap\|state.next\|state::next\|seekToNext" android/app/src/main/kotlin/com/lladlam/melox/ui/player | head -500 || true
+          echo '=== DOWNLOAD STORE START CALLS ==='
+          grep -RIn "downloadStore.start\|downloads.start\|MeloXDownloadStore" android/app/src/main/kotlin/com/lladlam/melox | head -400 || true
+          echo '=== DOWNLOAD PAGE ==='
+          sed -n '300,410p' android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt
+          echo '=== PLAYLIST DETAIL DOWNLOAD ==='
+          sed -n '880,940p' android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt
+          echo '=== NETWORK CHECKS ==='
+          grep -RIn "ConnectivityManager\|NetworkCapabilities\|isOffline\|isOnline\|activeNetwork" android/app/src/main/kotlin | head -200 || true
+          echo '=== ARTWORK RENDER ==='
+          grep -RIn "fun Artwork\|AsyncImage(.*artwork\|artworkUrl" android/app/src/main/kotlin/com/lladlam/melox/ui/player | head -260 || true
