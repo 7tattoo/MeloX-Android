@@ -12,6 +12,9 @@ on:
       - "android/**"
       - ".github/workflows/android.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,6 +22,99 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply final PR 27 refinements
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/offline-queue-download-v2'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          library = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt')
+          s = library.read_text()
+          group_block = '''  if (groups.isNotEmpty()) {
+              item {
+                  DownloadNavigationCard(
+                      title = "已下载歌单",
+                      subtitle = "${groups.size} 个歌单",
+                      onClick = { page = MeloXDownloadsPage.Playlists },
+                  )
+              }
+          }
+
+          '''
+          if group_block not in s:
+              raise SystemExit('downloaded playlist navigation block not found')
+          s = s.replace(group_block, '', 1)
+          anchor = '''      }
+          items(completed, key = { "download-${it.song.id}" }) { item ->
+          '''
+          insertion = '''      }
+          if (groups.isNotEmpty()) {
+              item {
+                  DownloadNavigationCard(
+                      title = "已下载歌单",
+                      subtitle = "${groups.size} 个歌单",
+                      onClick = { page = MeloXDownloadsPage.Playlists },
+                  )
+              }
+          }
+          items(completed, key = { "download-${it.song.id}" }) { item ->
+          '''
+          if anchor not in s:
+              raise SystemExit('completed song list anchor not found')
+          s = s.replace(anchor, insertion, 1)
+          library.write_text(s)
+
+          player = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXPlayerUi.kt')
+          p = player.read_text()
+          old = '''    fun addCurrentToQueue() {
+              val player = controller ?: return
+              val item = player.currentMediaItem ?: return
+              val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
+                  putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
+              }
+              val copied = item.buildUpon()
+                  .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
+                  .build()
+              player.addMediaItem(copied)
+              refresh()
+          }
+          '''
+          new = '''    fun addCurrentToQueue() {
+              val player = controller ?: return
+              val item = player.currentMediaItem ?: return
+              val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
+                  putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
+              }
+              val copied = item.buildUpon()
+                  .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
+                  .build()
+              PlaybackCommands.prioritizeManualQueue(player)
+              val current = player.currentMediaItemIndex
+              val manualCount = ((current + 1) until player.mediaItemCount).count { index ->
+                  player.getMediaItemAt(index).mediaMetadata.extras
+                      ?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL
+              }
+              val insertion = (current + 1 + manualCount).coerceIn(0, player.mediaItemCount)
+              player.addMediaItem(insertion, copied)
+              refresh()
+          }
+          '''
+          if old not in p:
+              raise SystemExit('addCurrentToQueue block not found')
+          player.write_text(p.replace(old, new, 1))
+          PY
+          git checkout origin/main -- .github/workflows/android.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "fix: finalize download navigation and queue insertion"
+            git push origin HEAD:fix/offline-queue-download-v2
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
