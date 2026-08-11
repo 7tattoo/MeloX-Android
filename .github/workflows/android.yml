@@ -31,11 +31,11 @@ jobs:
         run: |
           python3 - <<'BOOT'
           from pathlib import Path
-          import textwrap
           source = Path('.github/workflows/_apply_offline_queue_v2.yml').read_text()
           begin = source.index("          python3 - <<'PY'\n") + len("          python3 - <<'PY'\n")
           end = source.index("\n          PY\n", begin)
-          script = textwrap.dedent(source[begin:end])
+          block = source[begin:end]
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in block.splitlines())
           exec(compile(script, '<offline-queue-v2>', 'exec'))
           BOOT
           rm -f .github/workflows/_inspect_offline_queue_v2.yml
