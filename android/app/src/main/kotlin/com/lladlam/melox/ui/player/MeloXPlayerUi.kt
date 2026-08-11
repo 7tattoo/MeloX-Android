@@ -279,17 +279,24 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
 
     fun addCurrentToQueue() {
-        val player = controller ?: return
-        val item = player.currentMediaItem ?: return
-        val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
-            putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
-        }
-        val copied = item.buildUpon()
-            .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
-            .build()
-        player.addMediaItem(copied)
-        refresh()
+    val player = controller ?: return
+    val item = player.currentMediaItem ?: return
+    val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
+        putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
     }
+    val copied = item.buildUpon()
+        .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
+        .build()
+    PlaybackCommands.prioritizeManualQueue(player)
+    val current = player.currentMediaItemIndex
+    val manualCount = ((current + 1) until player.mediaItemCount).count { index ->
+        player.getMediaItemAt(index).mediaMetadata.extras
+            ?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL
+    }
+    val insertion = (current + 1 + manualCount).coerceIn(0, player.mediaItemCount)
+    player.addMediaItem(insertion, copied)
+    refresh()
+}
 
     fun setSleepTimer(minutes: Int) {
         cancelSleepTimer()

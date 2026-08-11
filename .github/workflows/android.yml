@@ -12,9 +12,6 @@ on:
       - "android/**"
       - ".github/workflows/android.yml"
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,63 +19,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
-
-      - name: Apply final PR 27 refinements
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/offline-queue-download-v2'
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          library = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt')
-          s = library.read_text()
-          root = s.index('MeloXDownloadsPage.Root -> LazyColumn')
-          group_start = s.index('  if (groups.isNotEmpty()) {', root)
-          completed_start = s.index('  if (completed.isNotEmpty()) {', group_start)
-          group_block = s[group_start:completed_start].rstrip() + '\n'
-          s = s[:group_start] + s[completed_start:]
-          completed_start = s.index('  if (completed.isNotEmpty()) {', root)
-          songs_start = s.index('      items(completed, key = { "download-${it.song.id}" })', completed_start)
-          s = s[:songs_start] + group_block + s[songs_start:]
-          library.write_text(s)
-
-          player = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXPlayerUi.kt')
-          p = player.read_text()
-          fn_start = p.index('    fun addCurrentToQueue() {')
-          fn_end = p.index('    fun setSleepTimer(', fn_start)
-          replacement = '''    fun addCurrentToQueue() {
-              val player = controller ?: return
-              val item = player.currentMediaItem ?: return
-              val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
-                  putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
-              }
-              val copied = item.buildUpon()
-                  .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
-                  .build()
-              PlaybackCommands.prioritizeManualQueue(player)
-              val current = player.currentMediaItemIndex
-              val manualCount = ((current + 1) until player.mediaItemCount).count { index ->
-                  player.getMediaItemAt(index).mediaMetadata.extras
-                      ?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL
-              }
-              val insertion = (current + 1 + manualCount).coerceIn(0, player.mediaItemCount)
-              player.addMediaItem(insertion, copied)
-              refresh()
-          }
-
-          '''
-          player.write_text(p[:fn_start] + replacement + p[fn_end:])
-          PY
-          git checkout origin/main -- .github/workflows/android.yml
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "fix: finalize download navigation and queue insertion"
-            git push origin HEAD:fix/offline-queue-download-v2
-          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5

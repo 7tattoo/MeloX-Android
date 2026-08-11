@@ -356,16 +356,6 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
           )
       }
   }
-  if (groups.isNotEmpty()) {
-      item {
-          DownloadNavigationCard(
-              title = "已下载歌单",
-              subtitle = "${groups.size} 个歌单",
-              onClick = { page = MeloXDownloadsPage.Playlists },
-          )
-      }
-  }
-
   if (completed.isNotEmpty()) {
       item {
           Row(
@@ -415,6 +405,15 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
               }
           }
       }
+  if (groups.isNotEmpty()) {
+      item {
+          DownloadNavigationCard(
+              title = "已下载歌单",
+              subtitle = "${groups.size} 个歌单",
+              onClick = { page = MeloXDownloadsPage.Playlists },
+          )
+      }
+  }
       items(completed, key = { "download-${it.song.id}" }) { item ->
           val checked = item.song.id in selectedIds
           Row(
