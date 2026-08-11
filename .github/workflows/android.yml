@@ -34,56 +34,21 @@ jobs:
 
           library = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/library/LibraryScreen.kt')
           s = library.read_text()
-          group_block = '''  if (groups.isNotEmpty()) {
-              item {
-                  DownloadNavigationCard(
-                      title = "已下载歌单",
-                      subtitle = "${groups.size} 个歌单",
-                      onClick = { page = MeloXDownloadsPage.Playlists },
-                  )
-              }
-          }
-
-          '''
-          if group_block not in s:
-              raise SystemExit('downloaded playlist navigation block not found')
-          s = s.replace(group_block, '', 1)
-          anchor = '''      }
-          items(completed, key = { "download-${it.song.id}" }) { item ->
-          '''
-          insertion = '''      }
-          if (groups.isNotEmpty()) {
-              item {
-                  DownloadNavigationCard(
-                      title = "已下载歌单",
-                      subtitle = "${groups.size} 个歌单",
-                      onClick = { page = MeloXDownloadsPage.Playlists },
-                  )
-              }
-          }
-          items(completed, key = { "download-${it.song.id}" }) { item ->
-          '''
-          if anchor not in s:
-              raise SystemExit('completed song list anchor not found')
-          s = s.replace(anchor, insertion, 1)
+          root = s.index('MeloXDownloadsPage.Root -> LazyColumn')
+          group_start = s.index('  if (groups.isNotEmpty()) {', root)
+          completed_start = s.index('  if (completed.isNotEmpty()) {', group_start)
+          group_block = s[group_start:completed_start].rstrip() + '\n'
+          s = s[:group_start] + s[completed_start:]
+          completed_start = s.index('  if (completed.isNotEmpty()) {', root)
+          songs_start = s.index('      items(completed, key = { "download-${it.song.id}" })', completed_start)
+          s = s[:songs_start] + group_block + s[songs_start:]
           library.write_text(s)
 
           player = Path('android/app/src/main/kotlin/com/lladlam/melox/ui/player/MeloXPlayerUi.kt')
           p = player.read_text()
-          old = '''    fun addCurrentToQueue() {
-              val player = controller ?: return
-              val item = player.currentMediaItem ?: return
-              val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
-                  putString(PlaybackCommands.QUEUE_ORIGIN_KEY, PlaybackCommands.QUEUE_ORIGIN_MANUAL)
-              }
-              val copied = item.buildUpon()
-                  .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
-                  .build()
-              player.addMediaItem(copied)
-              refresh()
-          }
-          '''
-          new = '''    fun addCurrentToQueue() {
+          fn_start = p.index('    fun addCurrentToQueue() {')
+          fn_end = p.index('    fun setSleepTimer(', fn_start)
+          replacement = '''    fun addCurrentToQueue() {
               val player = controller ?: return
               val item = player.currentMediaItem ?: return
               val extras = (item.mediaMetadata.extras ?: android.os.Bundle()).let { android.os.Bundle(it) }.apply {
@@ -102,10 +67,9 @@ jobs:
               player.addMediaItem(insertion, copied)
               refresh()
           }
+
           '''
-          if old not in p:
-              raise SystemExit('addCurrentToQueue block not found')
-          player.write_text(p.replace(old, new, 1))
+          player.write_text(p[:fn_start] + replacement + p[fn_end:])
           PY
           git checkout origin/main -- .github/workflows/android.yml
           git config user.name github-actions[bot]
