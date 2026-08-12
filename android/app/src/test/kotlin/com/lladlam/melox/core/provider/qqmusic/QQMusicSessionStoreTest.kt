@@ -24,4 +24,14 @@ class QQMusicSessionStoreTest {
         assertEquals("wechat-key", session.musicKey)
         assertTrue(session.isLoggedIn)
     }
+
+    @Test
+    fun prefersCurrentQqMusicWebCookieNames() {
+        val session = QQMusicSessionStore.parse(
+            "uin=o111; qqmusic_uin=222333; qm_keyst=current-key; qqmusic_key=compat-key",
+        )
+        assertEquals("222333", session.uin)
+        assertEquals("current-key", session.musicKey)
+        assertTrue(session.isLoggedIn)
+    }
 }
