@@ -3,7 +3,6 @@ package com.lladlam.melox.ui.search
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,12 +49,21 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseLibraryClient
-import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
+import com.lladlam.melox.core.music.model.MusicAlbumSummary
+import com.lladlam.melox.core.music.model.MusicArtistSummary
+import com.lladlam.melox.core.music.model.MusicPlaylistSummary
+import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
+import com.lladlam.melox.core.music.provider.AlbumCapability
+import com.lladlam.melox.core.music.provider.ArtistCapability
+import com.lladlam.melox.core.music.provider.CatalogSearchCapability
+import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
+import com.lladlam.melox.core.music.provider.PlaylistCapability
+import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UnifiedMusicService
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.core.network.MeloXSearchMediaItem
@@ -68,10 +76,11 @@ import com.lladlam.melox.ui.account.MeloXAccountActivity
 import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
-import com.lladlam.melox.ui.provider.ProviderTrackRow
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MeloXSearchLaunch(val query: String, val kind: MeloXSearchKind, val nonce: Long = System.nanoTime())
 object MeloXSearchLaunchBus {
@@ -84,8 +93,71 @@ object MeloXSearchLaunchBus {
 private val SearchAccent = Color(0xFFFF3147)
 private val SearchCategories = listOf("排行榜", "播客", "华语", "欧美", "日语", "韩语", "粤语", "流行", "摇滚", "民谣", "电子", "说唱", "R&B/Soul", "古典", "ACG", "影视原声", "学习", "工作", "放松", "夜晚")
 
+private sealed interface ProviderSearchDestination {
+    val source: MusicSource
+    val key: String
+    val kind: MeloXSearchKind
+    val title: String
+    val subtitle: String
+    val artworkUrl: String?
+
+    data class Playlist(val value: MusicPlaylistSummary) : ProviderSearchDestination {
+        override val source = value.id.source
+        override val key = "playlist:${source.storageValue}:${value.id.value}"
+        override val kind = MeloXSearchKind.Playlists
+        override val title = value.title
+        override val subtitle = value.creatorName.orEmpty()
+        override val artworkUrl = value.artworkUrl
+    }
+
+    data class Album(val value: MusicAlbumSummary) : ProviderSearchDestination {
+        override val source = value.id.source
+        override val key = "album:${source.storageValue}:${value.id.value}"
+        override val kind = MeloXSearchKind.Albums
+        override val title = value.title
+        override val subtitle = value.artists.joinToString(" / ") { it.name }
+        override val artworkUrl = value.artworkUrl
+    }
+
+    data class Artist(val value: MusicArtistSummary) : ProviderSearchDestination {
+        override val source = value.id.source
+        override val key = "artist:${source.storageValue}:${value.id.value}"
+        override val kind = MeloXSearchKind.Artists
+        override val title = value.name
+        override val subtitle = buildList {
+            value.songCount?.let { add("$it 首歌曲") }
+            value.albumCount?.let { add("$it 张专辑") }
+        }.joinToString(" · ")
+        override val artworkUrl = value.artworkUrl
+    }
+}
+
+private sealed interface SearchDetailDestination {
+    val key: String
+    val kind: MeloXSearchKind
+    val title: String
+    val subtitle: String
+    val artworkUrl: String?
+
+    data class Netease(val value: MeloXSearchMediaItem) : SearchDetailDestination {
+        override val key = "netease:${value.kind}:${value.id}"
+        override val kind = value.kind
+        override val title = value.title
+        override val subtitle = value.subtitle
+        override val artworkUrl = value.artworkUrl
+    }
+
+    data class Provider(val value: ProviderSearchDestination) : SearchDetailDestination {
+        override val key = value.key
+        override val kind = value.kind
+        override val title = value.title
+        override val subtitle = value.subtitle
+        override val artworkUrl = value.artworkUrl
+    }
+}
+
 @Composable
-fun SearchScreen() {
+fun SearchScreen(source: MusicSource = MusicSource.Netease) {
     val context = LocalContext.current
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
@@ -93,42 +165,81 @@ fun SearchScreen() {
     val universal = remember(appContext) { NeteaseUniversalSearchClient(cookieProvider = { NeteaseSessionStore.readCookie(appContext) }) }
     val library = remember(appContext) { NeteaseLibraryClient({ NeteaseSessionStore.readCookie(appContext) }) }
     val providerRegistry = remember(appContext) { MeloXMusicProviders.create(appContext) }
+    val currentProvider = remember(source, providerRegistry) { providerRegistry.require(source) }
+    val providerSongSearch = currentProvider as? SearchCapability
+    val providerCatalog = currentProvider as? CatalogSearchCapability
+    val providerHome = currentProvider as? HomeFeedCapability
     val unifiedService = remember(providerRegistry) { UnifiedMusicService(providerRegistry) }
     val unifiedEnabled = MusicProviderSelectionStore.unifiedEnabled(appContext)
     val unifiedSources = MusicProviderSelectionStore.unifiedSources(appContext)
 
-    var query by remember { mutableStateOf("") }
-    var kind by remember { mutableStateOf(MeloXSearchKind.Songs) }
-    var songs by remember { mutableStateOf<List<SearchSong>>(emptyList()) }
-    var providerSongs by remember { mutableStateOf<List<MusicTrack>>(emptyList()) }
-    var unifiedFailures by remember { mutableStateOf<List<UnifiedMusicService.SearchFailure>>(emptyList()) }
-    var media by remember { mutableStateOf<List<MeloXSearchMediaItem>>(emptyList()) }
-    var recommendations by remember { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
-    var categoryTitle by remember { mutableStateOf<String?>(null) }
-    var categoryPlaylists by remember { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
-    var selectedMedia by remember { mutableStateOf<MeloXSearchMediaItem?>(null) }
-    var podcastDiscovery by remember { mutableStateOf(false) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val availableKinds = remember(source, providerCatalog) {
+        if (source == MusicSource.Netease) {
+            MeloXSearchKind.entries.filter { it != MeloXSearchKind.Podcasts || MeloXSettingsRuntime.podcastsEnabled }
+        } else {
+            buildList {
+                add(MeloXSearchKind.Songs)
+                if (providerCatalog != null) {
+                    add(MeloXSearchKind.Playlists)
+                    add(MeloXSearchKind.Albums)
+                    add(MeloXSearchKind.Artists)
+                }
+            }
+        }
+    }
+
+    var query by remember(source) { mutableStateOf("") }
+    var kind by remember(source) { mutableStateOf(MeloXSearchKind.Songs) }
+    var songs by remember(source) { mutableStateOf<List<SearchSong>>(emptyList()) }
+    var providerSongs by remember(source) { mutableStateOf<List<MusicTrack>>(emptyList()) }
+    var providerPlaylists by remember(source) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
+    var providerAlbums by remember(source) { mutableStateOf<List<MusicAlbumSummary>>(emptyList()) }
+    var providerArtists by remember(source) { mutableStateOf<List<MusicArtistSummary>>(emptyList()) }
+    var providerRecommendations by remember(source) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
+    var unifiedFailures by remember(source) { mutableStateOf<List<UnifiedMusicService.SearchFailure>>(emptyList()) }
+    var media by remember(source) { mutableStateOf<List<MeloXSearchMediaItem>>(emptyList()) }
+    var recommendations by remember(source) { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
+    var categoryTitle by remember(source) { mutableStateOf<String?>(null) }
+    var categoryPlaylists by remember(source) { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
+    var selectedDetail by remember(source) { mutableStateOf<SearchDetailDestination?>(null) }
+    var podcastDiscovery by remember(source) { mutableStateOf(false) }
+    var loading by remember(source) { mutableStateOf(false) }
+    var error by remember(source) { mutableStateOf<String?>(null) }
     val launchRequest = MeloXSearchLaunchBus.request
 
-    LaunchedEffect(launchRequest) {
+    LaunchedEffect(source, availableKinds) {
+        if (kind !in availableKinds) kind = MeloXSearchKind.Songs
+    }
+
+    LaunchedEffect(launchRequest, source) {
         launchRequest?.let { request ->
             query = request.query
-            kind = request.kind
+            kind = request.kind.takeIf { it in availableKinds } ?: MeloXSearchKind.Songs
             MeloXSearchLaunchBus.consume(request)
         }
     }
 
-    LaunchedEffect(Unit) {
-        runCatching { library.explorePlaylists("推荐歌单", 10) }.onSuccess { recommendations = it }
+    LaunchedEffect(source) {
+        if (source == MusicSource.Netease) {
+            runCatching { library.explorePlaylists("推荐歌单", 10) }
+                .onSuccess { recommendations = it }
+        } else {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    providerHome?.homeFeed(playlistLimit = 10, newSongLimit = 0, rankingLimit = 0)
+                }
+            }.onSuccess { providerRecommendations = it?.recommendedPlaylists.orEmpty() }
+        }
     }
 
-    LaunchedEffect(query, kind, unifiedEnabled, unifiedSources) {
+    LaunchedEffect(query, kind, source, unifiedEnabled, unifiedSources) {
         val keyword = query.trim()
         if (keyword.isBlank()) {
             songs = emptyList()
             providerSongs = emptyList()
+            providerPlaylists = emptyList()
+            providerAlbums = emptyList()
+            providerArtists = emptyList()
             unifiedFailures = emptyList()
             media = emptyList()
             error = null
@@ -138,10 +249,9 @@ fun SearchScreen() {
         delay(350)
         loading = true
         error = null
-        val linkedId = parseSongLink(keyword)
+
+        val linkedId = if (source == MusicSource.Netease) parseSongLink(keyword) else null
         if (linkedId != null) {
-            // A NetEase share/song link remains a NetEase-specific action even
-            // when aggregate search is enabled; never fan a provider link out.
             providerSongs = emptyList()
             unifiedFailures = emptyList()
             runCatching { universal.songDetail(linkedId) }
@@ -154,46 +264,121 @@ fun SearchScreen() {
             loading = false
             return@LaunchedEffect
         }
-        if (kind == MeloXSearchKind.Songs) {
-            if (unifiedEnabled) {
-                songs = emptyList()
+
+        when (kind) {
+            MeloXSearchKind.Songs -> {
                 media = emptyList()
-                runCatching {
-                    unifiedService.searchSongs(
-                        query = keyword,
-                        sources = unifiedSources,
-                        page = 1,
-                        pageSizePerProvider = 25,
-                    )
-                }.onSuccess { result ->
-                    providerSongs = result.tracks
-                    unifiedFailures = result.failures
-                }.onFailure { failure ->
+                providerPlaylists = emptyList()
+                providerAlbums = emptyList()
+                providerArtists = emptyList()
+                if (unifiedEnabled) {
+                    songs = emptyList()
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            unifiedService.searchSongs(
+                                query = keyword,
+                                sources = unifiedSources,
+                                page = 1,
+                                pageSizePerProvider = 25,
+                            )
+                        }
+                    }.onSuccess { result ->
+                        providerSongs = result.tracks
+                        unifiedFailures = result.failures
+                    }.onFailure { failure ->
+                        providerSongs = emptyList()
+                        unifiedFailures = emptyList()
+                        error = failure.message ?: "搜索失败"
+                    }
+                } else if (source == MusicSource.Netease) {
                     providerSongs = emptyList()
                     unifiedFailures = emptyList()
-                    error = failure.message ?: "搜索失败"
+                    runCatching { songClient.ensureArtwork(songClient.searchSongs(keyword)) }
+                        .onSuccess { songs = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                } else {
+                    songs = emptyList()
+                    unifiedFailures = emptyList()
+                    val capability = providerSongSearch
+                    if (capability == null) {
+                        providerSongs = emptyList()
+                        error = "${source.displayName} 当前没有歌曲搜索能力"
+                    } else {
+                        runCatching {
+                            withContext(Dispatchers.IO) { capability.searchSongs(keyword, page = 1, pageSize = 50).items }
+                        }.onSuccess { providerSongs = it }
+                            .onFailure { error = it.message ?: "搜索失败" }
+                    }
                 }
-            } else {
-                providerSongs = emptyList()
-                unifiedFailures = emptyList()
-                runCatching { songClient.ensureArtwork(songClient.searchSongs(keyword)) }
-                    .onSuccess { songs = it; media = emptyList() }
-                    .onFailure { error = it.message ?: "搜索失败" }
             }
-        } else {
-            providerSongs = emptyList()
-            unifiedFailures = emptyList()
-            runCatching { universal.searchMedia(keyword, kind) }
-                .onSuccess { media = it; songs = emptyList() }
-                .onFailure { error = it.message ?: "搜索失败" }
+
+            MeloXSearchKind.Playlists -> {
+                songs = emptyList(); providerSongs = emptyList(); media = emptyList(); unifiedFailures = emptyList()
+                if (source == MusicSource.Netease) {
+                    runCatching { universal.searchMedia(keyword, kind) }
+                        .onSuccess { media = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                } else {
+                    val capability = providerCatalog
+                    if (capability == null) error = "${source.displayName} 当前没有歌单搜索能力"
+                    else runCatching {
+                        withContext(Dispatchers.IO) { capability.searchPlaylists(keyword, page = 1, pageSize = 40).items }
+                    }.onSuccess { providerPlaylists = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                }
+            }
+
+            MeloXSearchKind.Albums -> {
+                songs = emptyList(); providerSongs = emptyList(); media = emptyList(); unifiedFailures = emptyList()
+                if (source == MusicSource.Netease) {
+                    runCatching { universal.searchMedia(keyword, kind) }
+                        .onSuccess { media = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                } else {
+                    val capability = providerCatalog
+                    if (capability == null) error = "${source.displayName} 当前没有专辑搜索能力"
+                    else runCatching {
+                        withContext(Dispatchers.IO) { capability.searchAlbums(keyword, page = 1, pageSize = 40).items }
+                    }.onSuccess { providerAlbums = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                }
+            }
+
+            MeloXSearchKind.Artists -> {
+                songs = emptyList(); providerSongs = emptyList(); media = emptyList(); unifiedFailures = emptyList()
+                if (source == MusicSource.Netease) {
+                    runCatching { universal.searchMedia(keyword, kind) }
+                        .onSuccess { media = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                } else {
+                    val capability = providerCatalog
+                    if (capability == null) error = "${source.displayName} 当前没有歌手搜索能力"
+                    else runCatching {
+                        withContext(Dispatchers.IO) { capability.searchArtists(keyword, page = 1, pageSize = 40).items }
+                    }.onSuccess { providerArtists = it }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                }
+            }
+
+            else -> {
+                providerSongs = emptyList(); unifiedFailures = emptyList()
+                if (source != MusicSource.Netease) {
+                    media = emptyList()
+                    error = "${source.displayName} 不提供${kind.title}搜索"
+                } else {
+                    runCatching { universal.searchMedia(keyword, kind) }
+                        .onSuccess { media = it; songs = emptyList() }
+                        .onFailure { error = it.message ?: "搜索失败" }
+                }
+            }
         }
         loading = false
     }
 
-    BackHandler(enabled = podcastDiscovery || selectedMedia != null || categoryTitle != null) {
+    BackHandler(enabled = podcastDiscovery || selectedDetail != null || categoryTitle != null) {
         when {
             podcastDiscovery -> podcastDiscovery = false
-            selectedMedia != null -> selectedMedia = null
+            selectedDetail != null -> selectedDetail = null
             else -> { categoryTitle = null; categoryPlaylists = emptyList() }
         }
     }
@@ -203,15 +388,21 @@ fun SearchScreen() {
         return
     }
 
-    selectedMedia?.let { destination ->
-        SearchCollectionDetail(destination, universal, library) { selectedMedia = null }
+    selectedDetail?.let { destination ->
+        SearchCollectionDetail(
+            destination = destination,
+            universal = universal,
+            library = library,
+            providerRegistry = providerRegistry,
+            onBack = { selectedDetail = null },
+        )
         return
     }
 
     categoryTitle?.let { title ->
         SearchCategoryPage(title, categoryPlaylists, loading, error, onBack = {
             categoryTitle = null; categoryPlaylists = emptyList(); error = null
-        }, onPlaylist = { selectedMedia = it.asSearchItem() })
+        }, onPlaylist = { selectedDetail = SearchDetailDestination.Netease(it.asSearchItem()) })
         return
     }
 
@@ -229,16 +420,16 @@ fun SearchScreen() {
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(16.dp))
-        SearchField(query, { query = it })
+        SearchField(query, { query = it }, source)
         if (query.isNotBlank()) {
-            SearchScopes(kind = kind, onKind = { kind = it })
+            SearchScopes(kind = kind, availableKinds = availableKinds, onKind = { kind = it })
         }
 
         Box(Modifier.weight(1f)) {
             when {
-                query.isBlank() -> SearchDiscovery(
+                query.isBlank() && source == MusicSource.Netease -> SearchDiscovery(
                     recommendations = recommendations,
-                    onPlaylist = { selectedMedia = it.asSearchItem() },
+                    onPlaylist = { selectedDetail = SearchDetailDestination.Netease(it.asSearchItem()) },
                     onCategory = { category ->
                         if (category == "播客") {
                             podcastDiscovery = true
@@ -254,11 +445,21 @@ fun SearchScreen() {
                         }
                     },
                 )
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = SearchAccent) }
-                error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error.orEmpty(), color = MaterialTheme.colorScheme.error) }
-                kind == MeloXSearchKind.Songs && unifiedEnabled -> UnifiedSearchSongResults(
+                query.isBlank() -> ProviderSearchDiscovery(
+                    source = source,
+                    recommendations = providerRecommendations,
+                    onPlaylist = { selectedDetail = SearchDetailDestination.Provider(ProviderSearchDestination.Playlist(it)) },
+                )
+                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = SearchAccent)
+                }
+                error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                }
+                kind == MeloXSearchKind.Songs && (unifiedEnabled || source != MusicSource.Netease) -> ProviderSearchSongResults(
                     values = providerSongs,
                     failures = unifiedFailures,
+                    showSource = unifiedEnabled,
                     onPlay = { track ->
                         ProviderPlaybackCommands.playQueue(
                             context = context,
@@ -271,11 +472,23 @@ fun SearchScreen() {
                 kind == MeloXSearchKind.Songs -> SearchSongResults(songs) { song ->
                     PlaybackCommands.playQueue(context, songs, song.id)
                 }
+                source != MusicSource.Netease && kind == MeloXSearchKind.Playlists -> ProviderSearchMediaResults(
+                    values = providerPlaylists.map { ProviderSearchDestination.Playlist(it) },
+                    onOpen = { selectedDetail = SearchDetailDestination.Provider(it) },
+                )
+                source != MusicSource.Netease && kind == MeloXSearchKind.Albums -> ProviderSearchMediaResults(
+                    values = providerAlbums.map { ProviderSearchDestination.Album(it) },
+                    onOpen = { selectedDetail = SearchDetailDestination.Provider(it) },
+                )
+                source != MusicSource.Netease && kind == MeloXSearchKind.Artists -> ProviderSearchMediaResults(
+                    values = providerArtists.map { ProviderSearchDestination.Artist(it) },
+                    onOpen = { selectedDetail = SearchDetailDestination.Provider(it) },
+                )
                 else -> SearchMediaResults(media) { item ->
                     when (item.kind) {
                         MeloXSearchKind.Albums, MeloXSearchKind.Artists, MeloXSearchKind.Podcasts -> MeloXCollectionDetailActivity.launch(context, item)
                         MeloXSearchKind.Users -> MeloXAccountActivity.launch(context, item.id)
-                        else -> selectedMedia = item
+                        else -> selectedDetail = SearchDetailDestination.Netease(item)
                     }
                 }
             }
@@ -284,7 +497,7 @@ fun SearchScreen() {
 }
 
 @Composable
-private fun SearchField(value: String, onValueChange: (String) -> Unit) {
+private fun SearchField(value: String, onValueChange: (String) -> Unit, source: MusicSource) {
     Row(
         modifier = Modifier
             .padding(horizontal = 20.dp)
@@ -302,7 +515,12 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     ) {
         Text("⌕", fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isBlank()) Text("音乐内容或网易云链接", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f))
+            if (value.isBlank()) {
+                Text(
+                    if (source == MusicSource.Netease) "音乐内容或网易云链接" else "搜索音乐内容",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
+                )
+            }
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -318,22 +536,33 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 }
 
 @Composable
-private fun SearchScopes(kind: MeloXSearchKind, onKind: (MeloXSearchKind) -> Unit) {
-    val values = MeloXSearchKind.entries.filter { it != MeloXSearchKind.Podcasts || MeloXSettingsRuntime.podcastsEnabled }
+private fun SearchScopes(
+    kind: MeloXSearchKind,
+    availableKinds: List<MeloXSearchKind>,
+    onKind: (MeloXSearchKind) -> Unit,
+) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(values) { item ->
+        items(availableKinds) { item ->
             Box(
-                Modifier.height(34.dp).meloXLiquidButton(
-                    shape = RoundedCornerShape(17.dp),
-                    tint = if (item == kind) SearchAccent.copy(alpha = .30f) else Color.Transparent,
-                    surfaceColor = if (item == kind) SearchAccent.copy(alpha = .16f) else MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
-                ).clickable { onKind(item) }.padding(horizontal = 15.dp),
+                Modifier
+                    .height(34.dp)
+                    .meloXLiquidButton(
+                        shape = RoundedCornerShape(17.dp),
+                        tint = if (item == kind) SearchAccent.copy(alpha = .30f) else Color.Transparent,
+                        surfaceColor = if (item == kind) SearchAccent.copy(alpha = .16f) else MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
+                    )
+                    .clickable { onKind(item) }
+                    .padding(horizontal = 15.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(item.title, color = if (item == kind) SearchAccent else MaterialTheme.colorScheme.onSurface, fontWeight = if (item == kind) FontWeight.SemiBold else FontWeight.Medium)
+                Text(
+                    item.title,
+                    color = if (item == kind) SearchAccent else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (item == kind) FontWeight.SemiBold else FontWeight.Medium,
+                )
             }
         }
     }
@@ -365,8 +594,39 @@ private fun SearchDiscovery(
         item { Text("浏览类别", modifier = Modifier.padding(start = 20.dp, top = 26.dp, bottom = 12.dp), fontSize = 24.sp, fontWeight = FontWeight.Bold) }
         items(SearchCategories.filter { it != "播客" || MeloXSettingsRuntime.podcastsEnabled }.chunked(2)) { pair ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                pair.forEachIndexed { index, category -> SearchCategoryCard(category, Modifier.weight(1f)) { onCategory(category) } }
+                pair.forEach { category -> SearchCategoryCard(category, Modifier.weight(1f)) { onCategory(category) } }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSearchDiscovery(
+    source: MusicSource,
+    recommendations: List<MusicPlaylistSummary>,
+    onPlaylist: (MusicPlaylistSummary) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
+    ) {
+        if (recommendations.isNotEmpty()) {
+            item { Text("热门推荐", modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 12.dp), fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+            item {
+                LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(recommendations, key = { "${it.id.source.storageValue}:${it.id.value}" }) { p ->
+                        Column(Modifier.width(160.dp).clickable { onPlaylist(p) }) {
+                            AsyncImage(p.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(160.dp).clip(RoundedCornerShape(14.dp)))
+                            Text(p.title, modifier = Modifier.padding(top = 7.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 28.dp), contentAlignment = Alignment.Center) {
+                Text("搜索 ${source.displayName} 的歌曲、歌单、专辑或歌手", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
             }
         }
     }
@@ -384,17 +644,14 @@ private fun SearchCategoryCard(title: String, modifier: Modifier, onClick: () ->
 }
 
 @Composable
-private fun UnifiedSearchSongResults(
+private fun ProviderSearchSongResults(
     values: List<MusicTrack>,
     failures: List<UnifiedMusicService.SearchFailure>,
+    showSource: Boolean,
     onPlay: (MusicTrack) -> Unit,
 ) {
     LazyColumn(
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            bottom = MeloXBottomContentClearance,
-        ),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance),
     ) {
         if (failures.isNotEmpty()) {
             item {
@@ -408,28 +665,58 @@ private fun UnifiedSearchSongResults(
             }
         }
         if (values.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier.fillParentMaxSize().padding(28.dp),
-                    contentAlignment = Alignment.Center,
+            item { SearchEmptyInline("没有找到歌曲") }
+        } else {
+            items(values, key = { "provider:${it.id.source.storageValue}:${it.id.value}" }) { track ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { onPlay(track) }.padding(vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    AsyncImage(track.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+                        val metadata = buildList {
+                            add(track.artistText)
+                            track.album?.name?.takeIf(String::isNotBlank)?.let(::add)
+                            if (showSource) add(track.id.source.displayName)
+                        }.joinToString(" · ")
+                        Text(metadata, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSearchMediaResults(
+    values: List<ProviderSearchDestination>,
+    onOpen: (ProviderSearchDestination) -> Unit,
+) {
+    if (values.isEmpty()) { SearchEmpty("没有找到内容"); return }
+    LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
+        items(values, key = ProviderSearchDestination::key) { item ->
+            Row(Modifier.fillMaxWidth().clickable { onOpen(item) }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    item.artworkUrl,
+                    null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(54.dp).clip(if (item.kind == MeloXSearchKind.Artists) CircleShape else RoundedCornerShape(8.dp)),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 17.sp)
                     Text(
-                        "没有找到歌曲",
+                        item.subtitle.ifBlank { item.kind.title },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f),
+                        fontSize = 13.sp,
                     )
                 }
-            }
-        } else {
-            items(
-                values,
-                key = { "unified:${it.id.source.storageValue}:${it.id.value}" },
-            ) { track ->
-                ProviderTrackRow(
-                    track = track,
-                    showSource = true,
-                    onClick = { onPlay(track) },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+                Text("›", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
             }
         }
     }
@@ -487,7 +774,7 @@ private fun SearchCategoryPage(
             loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             error != null -> SearchEmpty(error)
             values.isEmpty() -> SearchEmpty("暂无内容")
-            else -> LazyColumn(contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp).let { PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = MeloXBottomContentClearance) }) {
+            else -> LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = MeloXBottomContentClearance)) {
                 items(values, key = { it.id }) { p ->
                     Row(Modifier.fillMaxWidth().clickable { onPlaylist(p) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(p.coverUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(58.dp).clip(RoundedCornerShape(9.dp)))
@@ -505,41 +792,126 @@ private fun SearchCategoryPage(
 
 @Composable
 private fun SearchCollectionDetail(
-    item: MeloXSearchMediaItem,
+    destination: SearchDetailDestination,
     universal: NeteaseUniversalSearchClient,
     library: NeteaseLibraryClient,
+    providerRegistry: com.lladlam.melox.core.music.provider.MusicProviderRegistry,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var songs by remember(item.id, item.kind) { mutableStateOf<List<SearchSong>>(emptyList()) }
-    var loading by remember(item.id, item.kind) { mutableStateOf(true) }
-    var error by remember(item.id, item.kind) { mutableStateOf<String?>(null) }
-    LaunchedEffect(item.id, item.kind) {
-        loading = true; error = null
+    var songs by remember(destination.key) { mutableStateOf<List<SearchSong>>(emptyList()) }
+    var providerTracks by remember(destination.key) { mutableStateOf<List<MusicTrack>>(emptyList()) }
+    var loading by remember(destination.key) { mutableStateOf(true) }
+    var error by remember(destination.key) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(destination.key) {
+        loading = true
+        error = null
         runCatching {
-            if (item.kind == MeloXSearchKind.Playlists) library.playlistDetail(item.id).songs else universal.collectionSongs(item)
-        }.onSuccess { songs = it }.onFailure { error = it.message ?: "内容加载失败" }
+            withContext(Dispatchers.IO) {
+                when (destination) {
+                    is SearchDetailDestination.Netease -> {
+                        val item = destination.value
+                        val values = if (item.kind == MeloXSearchKind.Playlists) {
+                            library.playlistDetail(item.id).songs
+                        } else {
+                            universal.collectionSongs(item)
+                        }
+                        values to emptyList<MusicTrack>()
+                    }
+                    is SearchDetailDestination.Provider -> {
+                        val item = destination.value
+                        val provider = providerRegistry.require(item.source)
+                        val tracks = when (item) {
+                            is ProviderSearchDestination.Playlist -> {
+                                val capability = provider as? PlaylistCapability
+                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现歌单详情")
+                                capability.playlistDetail(item.value, page = 1, pageSize = 150).tracks
+                            }
+                            is ProviderSearchDestination.Album -> {
+                                val capability = provider as? AlbumCapability
+                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现专辑详情")
+                                capability.albumDetail(item.value, page = 1, pageSize = 150).tracks
+                            }
+                            is ProviderSearchDestination.Artist -> {
+                                val capability = provider as? ArtistCapability
+                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现歌手详情")
+                                capability.artistDetail(item.value, page = 1, pageSize = 150).tracks
+                            }
+                        }
+                        emptyList<SearchSong>() to tracks
+                    }
+                }
+            }
+        }.onSuccess { (neteaseSongs, commonTracks) ->
+            songs = neteaseSongs
+            providerTracks = commonTracks
+        }.onFailure { error = it.message ?: "内容加载失败" }
         loading = false
     }
+
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 16.dp)) {
-        SearchDetailHeader(item.title, onBack)
+        SearchDetailHeader(destination.title, onBack)
         LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
             item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AsyncImage(item.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(210.dp).clip(if (item.kind == MeloXSearchKind.Artists) CircleShape else RoundedCornerShape(15.dp)))
-                    Text(item.title, modifier = Modifier.padding(top = 16.dp), fontSize = 23.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (item.subtitle.isNotBlank()) Text(item.subtitle, modifier = Modifier.padding(top = 5.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
-                    Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SearchPlayButton("随机") {
-                            val shuffled = songs.shuffled(); shuffled.firstOrNull()?.let { PlaybackCommands.playQueue(context, shuffled, it.id) }
+                    AsyncImage(
+                        destination.artworkUrl,
+                        null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(210.dp).clip(if (destination.kind == MeloXSearchKind.Artists) CircleShape else RoundedCornerShape(15.dp)),
+                    )
+                    Text(
+                        destination.title,
+                        modifier = Modifier.padding(top = 16.dp),
+                        fontSize = 23.sp,
+                        lineHeight = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (destination.subtitle.isNotBlank()) {
+                        Text(destination.subtitle, modifier = Modifier.padding(top = 5.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
+                    }
+                    val hasTracks = songs.isNotEmpty() || providerTracks.isNotEmpty()
+                    if (hasTracks) {
+                        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SearchPlayButton("随机") {
+                                if (providerTracks.isNotEmpty()) {
+                                    val shuffled = providerTracks.shuffled()
+                                    shuffled.firstOrNull()?.let { ProviderPlaybackCommands.playQueue(context, shuffled, it.id) }
+                                } else {
+                                    val shuffled = songs.shuffled()
+                                    shuffled.firstOrNull()?.let { PlaybackCommands.playQueue(context, shuffled, it.id) }
+                                }
+                            }
+                            SearchPlayButton("播放") {
+                                if (providerTracks.isNotEmpty()) {
+                                    providerTracks.firstOrNull()?.let { ProviderPlaybackCommands.playQueue(context, providerTracks, it.id) }
+                                } else {
+                                    songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) }
+                                }
+                            }
                         }
-                        SearchPlayButton("播放") { songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) } }
                     }
                 }
             }
             when {
                 loading -> item { Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 error != null -> item { Text(error.orEmpty(), color = MaterialTheme.colorScheme.error) }
+                providerTracks.isNotEmpty() -> items(providerTracks, key = { "detail:${it.id.source.storageValue}:${it.id.value}" }) { track ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { ProviderPlaybackCommands.playQueue(context, providerTracks, track.id) }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AsyncImage(track.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(7.dp)))
+                        Spacer(Modifier.width(11.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(track.artistText, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+                        }
+                    }
+                }
                 else -> items(songs, key = { it.id }) { song ->
                     Row(Modifier.fillMaxWidth().clickable { PlaybackCommands.playQueue(context, songs, song.id) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         AsyncImage(song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(7.dp)))
@@ -566,14 +938,29 @@ private fun SearchDetailHeader(title: String, onBack: () -> Unit) {
 
 @Composable
 private fun SearchPlayButton(title: String, onClick: () -> Unit) {
-    Box(Modifier.height(44.dp).width(120.dp).meloXLiquidButton(shape = RoundedCornerShape(22.dp), surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .08f)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.height(44.dp).width(120.dp).meloXLiquidButton(
+            shape = RoundedCornerShape(22.dp),
+            surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .08f),
+        ).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
         Text(title, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun SearchEmpty(message: String) {
-    Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) { Text(message, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f)) }
+    Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+        Text(message, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+    }
+}
+
+@Composable
+private fun SearchEmptyInline(message: String) {
+    Box(Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
+        Text(message, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+    }
 }
 
 private fun parseSongLink(value: String): Long? {
