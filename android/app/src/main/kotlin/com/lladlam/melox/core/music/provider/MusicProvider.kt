@@ -7,6 +7,7 @@ import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
 import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
+import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
@@ -89,6 +90,15 @@ interface PlaylistCapability {
         page: Int = 1,
         pageSize: Int = 100,
     ): MusicPlaylistDetail
+}
+
+/** Rankings are not forced into playlist semantics even if a provider implements them similarly. */
+interface RankingCapability {
+    suspend fun rankingTracks(
+        ranking: MusicRankingSummary,
+        page: Int = 1,
+        pageSize: Int = 100,
+    ): MusicPage<MusicTrack>
 }
 
 /** Small registry used by repositories and the provider-aware UI layer. */
