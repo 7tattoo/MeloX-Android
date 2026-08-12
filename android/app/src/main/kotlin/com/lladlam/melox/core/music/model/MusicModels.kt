@@ -84,6 +84,45 @@ data class MusicTrack(
         get() = artists.joinToString(" / ") { it.name }.ifBlank { "未知歌手" }
 }
 
+/** Provider-neutral playlist card used by Home and Library experiences. */
+data class MusicPlaylistSummary(
+    val id: MusicResourceId,
+    val title: String,
+    val artworkUrl: String? = null,
+    val creatorName: String? = null,
+    val description: String? = null,
+    val trackCount: Int? = null,
+    val playCount: Long? = null,
+)
+
+/** A ranking is intentionally not modelled as a playlist: some services expose different semantics. */
+data class MusicRankingSummary(
+    val id: MusicResourceId,
+    val title: String,
+    val artworkUrl: String? = null,
+    val subtitle: String? = null,
+    val previewTracks: List<MusicTrack> = emptyList(),
+)
+
+/** Minimal account information that can be displayed without leaking provider-specific credentials. */
+data class MusicAccountSummary(
+    val source: MusicSource,
+    val id: String,
+    val displayName: String,
+    val avatarUrl: String? = null,
+    val subtitle: String? = null,
+)
+
+/**
+ * Common semantic feed. Empty lists are meaningful: a provider may simply not
+ * expose one of these sections. Experience decides which non-empty sections to render.
+ */
+data class MusicHomeFeed(
+    val recommendedPlaylists: List<MusicPlaylistSummary> = emptyList(),
+    val newSongs: List<MusicTrack> = emptyList(),
+    val rankings: List<MusicRankingSummary> = emptyList(),
+)
+
 data class MusicPage<T>(
     val items: List<T>,
     val page: Int,
