@@ -55,6 +55,7 @@ import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -247,14 +248,18 @@ internal fun MeloXProviderSongActionsOverlay(
                                 }
                                 if (state.album.isNotBlank() && onNavigateSearch != null) {
                                     ProviderActionItem("前往专辑：${state.album}", "▣") {
+                                        val target = state.album
+                                        MeloXSearchLaunchBus.post(target, MeloXSearchKind.Albums)
                                         onDismiss()
-                                        onNavigateSearch(state.album, MeloXSearchKind.Albums)
+                                        onNavigateSearch(target, MeloXSearchKind.Albums)
                                     }
                                 }
                                 if (state.artist.isNotBlank() && onNavigateSearch != null) {
                                     ProviderActionItem("前往艺人：${state.artist}", "♬") {
+                                        val target = state.artist.substringBefore(" /")
+                                        MeloXSearchLaunchBus.post(target, MeloXSearchKind.Artists)
                                         onDismiss()
-                                        onNavigateSearch(state.artist.substringBefore(" / "), MeloXSearchKind.Artists)
+                                        onNavigateSearch(target, MeloXSearchKind.Artists)
                                     }
                                 }
 
