@@ -16,6 +16,9 @@ internal const val QQ_LIKED_DIRECTORY_ID = 201
 internal fun qqFavoriteWriteMethod(favorite: Boolean): String =
     if (favorite) "AddSonglist" else "DelSonglist"
 
+internal fun qqMusicLoginType(musicKey: String): Int =
+    if (musicKey.startsWith("W_X")) 1 else 2
+
 /** Authenticated QQ Music "我喜欢" writer. */
 class QQMusicFavoriteClient(
     private val sessionProvider: () -> QQMusicSession,
@@ -94,23 +97,21 @@ class QQMusicFavoriteClient(
         method: String,
         param: JSONObject,
     ): JSONObject {
-        val gtk = hash33(session.musicKey)
+        // Current QQMusicApi executes both CgiGetTrackInfo and PlaylistDetailWrite
+        // in the Android account context. Keep the same credential semantics here:
+        // qq/authst/tmeLoginType rather than the Web uin/g_tk context.
         val payload = JSONObject()
             .put(
                 "comm",
                 JSONObject()
-                    .put("ct", 24)
-                    .put("cv", 4_747_474)
-                    .put("platform", "yqq.json")
-                    .put("chid", "0")
-                    .put("uin", session.uin.toLongOrNull() ?: 0L)
-                    .put("g_tk", gtk)
-                    .put("g_tk_new_20200303", gtk)
-                    .put("format", "json")
-                    .put("inCharset", "utf-8")
-                    .put("outCharset", "utf-8")
-                    .put("notice", 0)
-                    .put("need_new_code", 1),
+                    .put("ct", AndroidClientType)
+                    .put("cv", AndroidClientVersion)
+                    .put("v", AndroidClientVersion)
+                    .put("chid", "10003505")
+                    .put("qq", session.uin)
+                    .put("authst", session.musicKey)
+                    .put("tmeAppID", "qqmusic")
+                    .put("tmeLoginType", qqMusicLoginType(session.musicKey)),
             )
             .put(
                 "req_0",
@@ -122,9 +123,8 @@ class QQMusicFavoriteClient(
 
         val request = Request.Builder()
             .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
-            .header("User-Agent", DesktopUserAgent)
-            .header("Referer", "https://y.qq.com/")
-            .header("Cookie", session.cookie)
+            .header("User-Agent", "QQMusic $AndroidClientVersion(android 15)")
+            .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
             .post(payload.toString().toRequestBody(JsonMediaType))
             .build()
 
@@ -139,7 +139,9 @@ class QQMusicFavoriteClient(
             val code = req.optInt("code", 0)
             if (code != 0) {
                 throw IOException(
-                    req.optString("message").ifBlank { "QQ音乐账号写入错误码 $code" },
+                    req.optString("message")
+                        .ifBlank { req.optString("msg") }
+                        .ifBlank { "QQ音乐账号写入错误码 $code" },
                 )
             }
             return req.optJSONObject("data") ?: JSONObject()
@@ -192,19 +194,9 @@ class QQMusicFavoriteClient(
             }
         }.firstOrNull()
 
-    private fun hash33(value: String): Long {
-        var hash = 5381L
-        value.forEach { char ->
-            hash += (hash shl 5) + char.code
-            hash = hash and 0xFFFF_FFFFL
-        }
-        return hash and 0x7FFF_FFFFL
-    }
-
     private companion object {
+        const val AndroidClientType = 11
+        const val AndroidClientVersion = 14_090_008
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
-        const val DesktopUserAgent =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }
