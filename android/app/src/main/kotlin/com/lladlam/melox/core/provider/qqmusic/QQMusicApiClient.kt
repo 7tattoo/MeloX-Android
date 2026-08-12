@@ -3,9 +3,13 @@ package com.lladlam.melox.core.provider.qqmusic
 import com.lladlam.melox.core.lyrics.LrcLyricsParser
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.AudioQualityTier
+import com.lladlam.melox.core.music.model.MusicAccountSummary
 import com.lladlam.melox.core.music.model.MusicAlbumRef
 import com.lladlam.melox.core.music.model.MusicArtistRef
+import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
+import com.lladlam.melox.core.music.model.MusicPlaylistSummary
+import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
@@ -17,8 +21,10 @@ import kotlin.random.Random
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,9 +35,8 @@ data class QQMusicAccountProfile(
 )
 
 /**
- * Direct Android port of the request shapes used by QQ Music community API
- * implementations. There is no MeloX relay server: the phone talks to QQ Music
- * endpoints and attaches only the user's locally stored QQ Music session.
+ * Direct Android implementation of QQ Music request shapes. The phone talks to
+ * QQ Music directly; MeloX never proxies or uploads the user's login state.
  */
 class QQMusicApiClient(
     private val sessionProvider: () -> QQMusicSession = { QQMusicSession("", "", "") },
@@ -93,6 +98,96 @@ class QQMusicApiClient(
             uin = session.uin,
             nickname = nickname,
             avatarUrl = avatar,
+        )
+    }
+
+    suspend fun accountSummary(): MusicAccountSummary? = withContext(Dispatchers.IO) {
+        val session = sessionProvider()
+        if (!session.isLoggedIn) return@withContext null
+        val profile = accountProfile(session)
+        MusicAccountSummary(
+            source = MusicSource.QQMusic,
+            id = profile.uin,
+            displayName = profile.nickname,
+            avatarUrl = profile.avatarUrl,
+            subtitle = "QQ ${profile.uin}",
+        )
+    }
+
+    suspend fun homeFeed(
+        playlistLimit: Int = 12,
+        newSongLimit: Int = 12,
+        rankingLimit: Int = 8,
+    ): MusicHomeFeed = withContext(Dispatchers.IO) {
+        val playlists = runCatching {
+            val data = postMusicu(
+                module = "music.playlist.PlaylistSquare",
+                method = "GetRecommendFeed",
+                param = JSONObject()
+                    .put("From", 0)
+                    .put("Size", playlistLimit.coerceIn(1, 30)),
+            )
+            parseRecommendedPlaylists(data, playlistLimit)
+        }.getOrDefault(emptyList())
+
+        val newSongs = runCatching {
+            val data = postMusicu(
+                module = "newsong.NewSongServer",
+                method = "get_new_song_info",
+                param = JSONObject().put("type", 5),
+            )
+            val list = data.optJSONArray("songlist")
+                ?: data.optJSONArray("songs")
+                ?: JSONArray()
+            buildList {
+                for (index in 0 until minOf(list.length(), newSongLimit.coerceAtLeast(1))) {
+                    list.optJSONObject(index)?.let(::parseSearchTrack)?.let(::add)
+                }
+            }
+        }.getOrDefault(emptyList())
+
+        val rankings = runCatching {
+            val data = postMusicu(
+                module = "music.musicToplist.Toplist",
+                method = "GetAll",
+                param = JSONObject(),
+            )
+            parseRankings(data, rankingLimit)
+        }.getOrDefault(emptyList())
+
+        MusicHomeFeed(
+            recommendedPlaylists = playlists,
+            newSongs = newSongs,
+            rankings = rankings,
+        )
+    }
+
+    suspend fun userPlaylists(
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): MusicPage<MusicPlaylistSummary> = withContext(Dispatchers.IO) {
+        val session = sessionProvider()
+        if (!session.isLoggedIn) return@withContext MusicPage(emptyList(), 1, pageSize.coerceAtLeast(1), 0)
+        val safePage = page.coerceAtLeast(1)
+        val safeSize = pageSize.coerceIn(1, 50)
+        val data = postMusicu(
+            module = "music.musicasset.PlaylistBaseRead",
+            method = "GetPlaylistByUin",
+            param = JSONObject().put("uin", session.uin),
+        )
+        val all = data.optJSONArray("v_playlist") ?: JSONArray()
+        val from = ((safePage - 1) * safeSize).coerceAtMost(all.length())
+        val to = (from + safeSize).coerceAtMost(all.length())
+        val items = buildList {
+            for (index in from until to) {
+                all.optJSONObject(index)?.let(::parsePlaylist)?.let(::add)
+            }
+        }
+        MusicPage(
+            items = items,
+            page = safePage,
+            pageSize = safeSize,
+            total = data.optLong("total", all.length().toLong()).coerceAtLeast(all.length().toLong()),
         )
     }
 
@@ -243,6 +338,135 @@ class QQMusicApiClient(
         )
     }
 
+    private fun postMusicu(
+        module: String,
+        method: String,
+        param: JSONObject,
+    ): JSONObject {
+        val session = sessionProvider()
+        val gtk = hash33(session.musicKey)
+        val comm = JSONObject()
+            .put("ct", 24)
+            .put("cv", 4_747_474)
+            .put("platform", "yqq.json")
+            .put("chid", "0")
+            .put("uin", session.uin.toLongOrNull() ?: 0L)
+            .put("g_tk", gtk)
+            .put("g_tk_new_20200303", gtk)
+            .put("format", "json")
+            .put("inCharset", "utf-8")
+            .put("outCharset", "utf-8")
+            .put("notice", 0)
+            .put("need_new_code", 1)
+        val payload = JSONObject()
+            .put("comm", comm)
+            .put(
+                "req_0",
+                JSONObject()
+                    .put("module", module)
+                    .put("method", method)
+                    .put("param", param),
+            )
+        val request = Request.Builder()
+            .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
+            .header("User-Agent", DesktopUserAgent)
+            .header("Accept", "application/json, text/plain, */*")
+            .header("Referer", "https://y.qq.com/")
+            .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
+            .post(payload.toString().toRequestBody(JsonMediaType))
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body.string()
+            if (!response.isSuccessful) throw IOException("QQ音乐请求失败：HTTP ${response.code}")
+            if (body.isBlank()) throw IOException("QQ音乐返回了空响应")
+            val root = JSONObject(body)
+            val req = root.optJSONObject("req_0") ?: throw IOException("QQ音乐返回缺少 req_0")
+            val code = req.optInt("code", 0)
+            if (code != 0) {
+                throw IOException(
+                    req.optString("message")
+                        .ifBlank { req.optString("msg") }
+                        .ifBlank { "QQ音乐接口返回错误码 $code" },
+                )
+            }
+            return req.optJSONObject("data") ?: JSONObject()
+        }
+    }
+
+    private fun parseRecommendedPlaylists(data: JSONObject, limit: Int): List<MusicPlaylistSummary> {
+        val list = data.optJSONArray("List")
+            ?: data.optJSONArray("list")
+            ?: data.optJSONArray("songlists")
+            ?: JSONArray()
+        return buildList {
+            for (index in 0 until minOf(list.length(), limit.coerceAtLeast(1))) {
+                val raw = list.optJSONObject(index) ?: continue
+                val playlist = raw.optJSONObject("Playlist")?.optJSONObject("basic")
+                    ?: raw.optJSONObject("basic")
+                    ?: raw
+                parsePlaylist(playlist)?.let(::add)
+            }
+        }
+    }
+
+    private fun parsePlaylist(item: JSONObject): MusicPlaylistSummary? {
+        val id = firstString(item, "id", "tid", "dissid", "disstid", "playlistId")
+            .ifBlank { firstLong(item, "id", "tid", "dissid", "disstid", "playlistId").takeIf { it > 0 }?.toString().orEmpty() }
+        if (id.isBlank()) return null
+        val coverObject = item.optJSONObject("cover")
+        val artwork = firstString(item, "picurl", "picUrl", "logo", "coverUrl", "bigpicUrl")
+            .ifBlank { coverObject?.optString("default_url").orEmpty() }
+            .takeIf(String::isNotBlank)
+            ?.let(::secureUrl)
+        return MusicPlaylistSummary(
+            id = MusicResourceId(MusicSource.QQMusic, id),
+            title = firstString(item, "title", "dissname", "name", "dirName").ifBlank { "QQ音乐歌单" },
+            artworkUrl = artwork,
+            creatorName = item.optJSONObject("creator")?.let { firstString(it, "nick", "nickname", "name") }
+                ?.takeIf(String::isNotBlank)
+                ?: firstString(item, "nick", "nickname", "creatorNick").takeIf(String::isNotBlank),
+            description = firstString(item, "desc", "description").takeIf(String::isNotBlank),
+            trackCount = firstLong(item, "songnum", "songNum", "song_cnt").takeIf { it >= 0 }?.toInt(),
+            playCount = firstLong(item, "listennum", "playCnt", "play_cnt").takeIf { it >= 0 },
+        )
+    }
+
+    private fun parseRankings(data: JSONObject, limit: Int): List<MusicRankingSummary> {
+        val groups = data.optJSONArray("group") ?: JSONArray()
+        return buildList {
+            outer@ for (groupIndex in 0 until groups.length()) {
+                val group = groups.optJSONObject(groupIndex) ?: continue
+                val tops = group.optJSONArray("toplist") ?: group.optJSONArray("list") ?: JSONArray()
+                for (topIndex in 0 until tops.length()) {
+                    if (size >= limit.coerceAtLeast(1)) break@outer
+                    val top = tops.optJSONObject(topIndex) ?: continue
+                    val id = firstString(top, "topId", "id")
+                        .ifBlank { firstLong(top, "topId", "id").takeIf { it > 0 }?.toString().orEmpty() }
+                    if (id.isBlank()) continue
+                    val previews = top.optJSONArray("song") ?: JSONArray()
+                    val previewText = buildList {
+                        for (index in 0 until minOf(previews.length(), 3)) {
+                            val preview = previews.optJSONObject(index) ?: continue
+                            val title = firstString(preview, "title", "name")
+                            val singer = firstString(preview, "singerName", "singer_name")
+                            if (title.isNotBlank()) add(if (singer.isBlank()) title else "$title · $singer")
+                        }
+                    }.joinToString("  /  ")
+                    add(
+                        MusicRankingSummary(
+                            id = MusicResourceId(MusicSource.QQMusic, id),
+                            title = firstString(top, "title", "titleDetail", "name").ifBlank { "QQ音乐排行榜" },
+                            artworkUrl = firstString(top, "frontPicUrl", "headPicUrl", "cover")
+                                .takeIf(String::isNotBlank)?.let(::secureUrl),
+                            subtitle = previewText.ifBlank { firstString(top, "titleSub", "period", "updateTime") }
+                                .takeIf(String::isNotBlank),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     private fun parseSearchTrack(item: JSONObject): MusicTrack? {
         val songMid = item.optString("songmid")
             .ifBlank { item.optJSONObject("mid")?.optString("song") ?: "" }
@@ -251,6 +475,7 @@ class QQMusicApiClient(
         val name = item.optString("songname")
             .ifBlank { item.optString("songname_hilight") }
             .ifBlank { item.optString("name") }
+            .ifBlank { item.optString("title") }
             .ifBlank { "未知歌曲" }
         val singers = item.optJSONArray("singer") ?: item.optJSONArray("singers") ?: JSONArray()
         val artists = buildList {
@@ -272,13 +497,13 @@ class QQMusicApiClient(
             .ifBlank { albumObject?.optString("mid").orEmpty() }
         val albumName = item.optString("albumname")
             .ifBlank { albumObject?.optString("name").orEmpty() }
+            .ifBlank { albumObject?.optString("title").orEmpty() }
         val artwork = albumMid.takeIf(String::isNotBlank)?.let(::albumArtwork)
         val mediaMid = item.optString("media_mid")
             .ifBlank { item.optJSONObject("file")?.optString("media_mid").orEmpty() }
             .takeIf(String::isNotBlank)
-        val numericId = item.optLong("songid", -1L).takeIf { it > 0L }
-        val durationSeconds = item.optLong("interval", 0L).takeIf { it > 0L }
-            ?: item.optLong("duration", 0L).takeIf { it > 0L }
+        val numericId = firstLong(item, "songid", "id").takeIf { it > 0L }
+        val durationSeconds = firstLong(item, "interval", "duration").takeIf { it > 0L }
         return MusicTrack(
             id = MusicResourceId(MusicSource.QQMusic, songMid),
             title = name,
@@ -336,6 +561,18 @@ class QQMusicApiClient(
         throw IOException("QQ音乐返回了无法解析的数据")
     }
 
+    private fun firstString(value: JSONObject, vararg keys: String): String =
+        keys.asSequence().map(value::optString).firstOrNull(String::isNotBlank).orEmpty()
+
+    private fun firstLong(value: JSONObject, vararg keys: String): Long =
+        keys.asSequence().mapNotNull { key ->
+            when (val raw = value.opt(key)) {
+                is Number -> raw.toLong()
+                is String -> raw.toLongOrNull()
+                else -> null
+            }
+        }.firstOrNull() ?: -1L
+
     private fun decodeBase64Utf8(value: String): String = runCatching {
         if (value.isBlank()) "" else String(Base64.getDecoder().decode(value), Charsets.UTF_8)
     }.getOrDefault("")
@@ -353,6 +590,13 @@ class QQMusicApiClient(
             hash = hash and 0xFFFF_FFFFL
         }
         return hash and 0x7FFF_FFFFL
+    }
+
+    private companion object {
+        val JsonMediaType = "application/json; charset=utf-8".toMediaType()
+        const val DesktopUserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }
 
