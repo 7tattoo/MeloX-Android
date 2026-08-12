@@ -27,6 +27,7 @@ object ProviderPlaybackCommands {
     ) {
         if (tracks.isEmpty()) return
         val appContext = context.applicationContext
+        ProviderPlaybackRuntime.initialize(appContext)
         val neteaseQuality = MusicQualityPreferences.read(appContext)
         val qualityTier = neteaseQuality.toCommonTier()
         val startIndex = tracks.indexOfFirst { it.id == selectedTrackId }.coerceAtLeast(0)
