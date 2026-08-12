@@ -7,6 +7,7 @@ import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
 import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
+import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
@@ -16,6 +17,7 @@ import com.lladlam.melox.core.music.provider.MusicCapability
 import com.lladlam.melox.core.music.provider.MusicProvider
 import com.lladlam.melox.core.music.provider.PlaybackCapability
 import com.lladlam.melox.core.music.provider.PlaylistCapability
+import com.lladlam.melox.core.music.provider.RankingCapability
 import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import okhttp3.OkHttpClient
@@ -29,7 +31,8 @@ class QQMusicProvider(
     PlaybackCapability,
     HomeFeedCapability,
     UserLibraryCapability,
-    PlaylistCapability {
+    PlaylistCapability,
+    RankingCapability {
     override val source: MusicSource = MusicSource.QQMusic
     override val displayName: String = source.displayName
     override val capabilities: Set<MusicCapability> = setOf(
@@ -47,6 +50,10 @@ class QQMusicProvider(
         httpClient = httpClient,
     )
     private val playlists = QQMusicPlaylistClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
+    private val rankings = QQMusicRankingClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
@@ -77,4 +84,10 @@ class QQMusicProvider(
         page: Int,
         pageSize: Int,
     ): MusicPlaylistDetail = playlists.detail(playlist, page, pageSize)
+
+    override suspend fun rankingTracks(
+        ranking: MusicRankingSummary,
+        page: Int,
+        pageSize: Int,
+    ): MusicPage<MusicTrack> = rankings.tracks(ranking, page, pageSize)
 }
