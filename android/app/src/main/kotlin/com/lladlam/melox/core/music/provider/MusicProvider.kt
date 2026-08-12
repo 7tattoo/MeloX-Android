@@ -5,6 +5,7 @@ import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicAccountSummary
 import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
+import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
@@ -79,6 +80,15 @@ interface UserLibraryCapability {
         page: Int = 1,
         pageSize: Int = 30,
     ): MusicPage<MusicPlaylistSummary>
+}
+
+/** Read-only playlist surface shared by provider-specific Experience UIs. */
+interface PlaylistCapability {
+    suspend fun playlistDetail(
+        playlist: MusicPlaylistSummary,
+        page: Int = 1,
+        pageSize: Int = 100,
+    ): MusicPlaylistDetail
 }
 
 /** Small registry used by repositories and the provider-aware UI layer. */
