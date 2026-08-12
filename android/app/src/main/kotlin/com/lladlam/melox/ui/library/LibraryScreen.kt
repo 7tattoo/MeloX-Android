@@ -1900,14 +1900,11 @@ private fun optimized160Artwork(url: String?): String? {
 }
 
 private fun sharePlaylistFromDetail(context: android.content.Context, playlist: NeteasePlaylistSummary) {
-    runCatching {
-        context.startActivity(
-            android.content.Intent.createChooser(
-                android.content.Intent(android.content.Intent.ACTION_SEND)
-                    .setType("text/plain")
-                    .putExtra(android.content.Intent.EXTRA_TEXT, "${playlist.name}\nhttps://music.163.com/playlist?id=${playlist.id}"),
-                "分享歌单",
-            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
+    com.lladlam.melox.ui.sharing.MeloXNeteaseResourceShareActivity.launch(
+        context = context,
+        type = "playlist",
+        id = playlist.id,
+        title = playlist.name,
+        url = "https://music.163.com/playlist?id=${playlist.id}",
+    )
 }

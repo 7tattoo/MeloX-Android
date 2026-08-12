@@ -20,7 +20,7 @@ class NeteaseSocialExtrasClient(cookieProvider: () -> String, httpClient: OkHttp
     private val weapi = NeteaseAuthenticatedWeapi(cookieProvider, httpClient)
 
     suspend fun userPlayRecords(userId: Long, period: MeloXUserPlayRecordPeriod): List<MeloXUserPlayRecord> = withContext(Dispatchers.IO) {
-        val response = socialRead("/api/v1/play/record", JSONObject().put("uid", userId).put("type", period.apiValue))
+        val response = socialRead("/api/v1/play/record", JSONObject().put("uid", userId).put("type", period.apiValue), allowGuest = true)
         val values = when (period) { MeloXUserPlayRecordPeriod.Week -> response.optJSONArray("weekData"); MeloXUserPlayRecordPeriod.AllTime -> response.optJSONArray("allData") } ?: JSONArray()
         buildList {
             for (index in 0 until values.length()) { val value = values.optJSONObject(index) ?: continue; val song = parseSong(value.optJSONObject("song")) ?: continue
@@ -43,8 +43,16 @@ class NeteaseSocialExtrasClient(cookieProvider: () -> String, httpClient: OkHttp
         MeloXCommentRepliesPage(owner, replies, data.optInt("totalCount", data.optInt("total", replies.size)).coerceAtLeast(replies.size), data.optBoolean("hasMore", false) && replies.isNotEmpty(), nextTime)
     }
 
-    suspend fun sendSongToUser(songId: Long, userId: Long, message: String = "") = withContext(Dispatchers.IO) { eapi.post("/api/msg/private/send", JSONObject().put("id", songId).put("msg", message).put("type", "song").put("userIds", "[$userId]")); Unit }
-    suspend fun shareSongToTimeline(songId: Long, message: String = "") = withContext(Dispatchers.IO) { eapi.post("/api/share/friends/resource", JSONObject().put("type", "song").put("msg", message).put("id", songId)); Unit }
+    suspend fun sendSongToUser(songId: Long, userId: Long, message: String = "") = sendResourceToUser("song", songId, userId, message)
+    suspend fun shareSongToTimeline(songId: Long, message: String = "") = shareResourceToTimeline("song", songId, message)
+    suspend fun sendResourceToUser(resourceType: String, resourceId: Long, userId: Long, message: String = "") = withContext(Dispatchers.IO) {
+        require(resourceType in setOf("song", "playlist", "album")) { "不支持的网易云资源类型" }
+        eapi.post("/api/msg/private/send", JSONObject().put("id", resourceId).put("msg", message).put("type", resourceType).put("userIds", "[$userId]")); Unit
+    }
+    suspend fun shareResourceToTimeline(resourceType: String, resourceId: Long, message: String = "") = withContext(Dispatchers.IO) {
+        require(resourceType in setOf("song", "playlist")) { "网易云音乐暂不支持将此类型的内容转发到动态" }
+        eapi.post("/api/share/friends/resource", JSONObject().put("type", resourceType).put("msg", message).put("id", resourceId)); Unit
+    }
 
     private fun socialRead(path: String, data: JSONObject, allowGuest: Boolean = false): JSONObject {
         val loggedIn = NeteaseSessionStore.containsMusicU(cookieProvider()); if (!loggedIn) { if (!allowGuest) throw IOException("请先登录网易云音乐"); return eapi.post(path, data, false) }

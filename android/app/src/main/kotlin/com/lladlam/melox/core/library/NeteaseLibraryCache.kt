@@ -32,15 +32,24 @@ class NeteaseLibraryCache(context: Context) {
 
     suspend fun loadHomeContent(cacheKey: String): NeteaseHomeContent? = readJson(File(directory, "home_${safeCacheKey(cacheKey)}.json")) { value ->
         NeteaseHomeContent(
-            playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()), newSongs = decodeSongs(value.optJSONArray("newSongs") ?: JSONArray()),
-            radarPlaylists = decodePlaylists(value.optJSONArray("radarPlaylists") ?: JSONArray()), personalPlaylists = decodePlaylists(value.optJSONArray("personalPlaylists") ?: JSONArray()),
-            regionalSongs = decodeSongs(value.optJSONArray("regionalSongs") ?: JSONArray()), roamingSongs = decodeSongs(value.optJSONArray("roamingSongs") ?: JSONArray()),
-            similarSongs = decodeSongs(value.optJSONArray("similarSongs") ?: JSONArray()), podcasts = decodeHomePodcasts(value.optJSONArray("podcasts") ?: JSONArray()),
+            playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()),
+            newSongs = decodeSongs(value.optJSONArray("newSongs") ?: JSONArray()),
+            recentlyTrending = decodeSongs(value.optJSONArray("recentlyTrending") ?: JSONArray()),
+            tailoredSongs = decodeSongs(value.optJSONArray("tailoredSongs") ?: JSONArray()),
+            chartPlaylists = decodePlaylists(value.optJSONArray("chartPlaylists") ?: JSONArray()),
+            radarPlaylists = decodePlaylists(value.optJSONArray("radarPlaylists") ?: JSONArray()),
+            personalPlaylists = decodePlaylists(value.optJSONArray("personalPlaylists") ?: JSONArray()),
+            regionalSongs = decodeSongs(value.optJSONArray("regionalSongs") ?: JSONArray()),
+            roamingSongs = decodeSongs(value.optJSONArray("roamingSongs") ?: JSONArray()),
+            similarSongs = decodeSongs(value.optJSONArray("similarSongs") ?: JSONArray()),
+            podcasts = decodeHomePodcasts(value.optJSONArray("podcasts") ?: JSONArray()),
         )
     }
     suspend fun saveHomeContent(cacheKey: String, content: NeteaseHomeContent) {
         writeJson(File(directory, "home_${safeCacheKey(cacheKey)}.json"), JSONObject()
             .put("playlists", encodePlaylists(content.playlists)).put("newSongs", encodeSongs(content.newSongs))
+            .put("recentlyTrending", encodeSongs(content.recentlyTrending)).put("tailoredSongs", encodeSongs(content.tailoredSongs))
+            .put("chartPlaylists", encodePlaylists(content.chartPlaylists))
             .put("radarPlaylists", encodePlaylists(content.radarPlaylists)).put("personalPlaylists", encodePlaylists(content.personalPlaylists))
             .put("regionalSongs", encodeSongs(content.regionalSongs)).put("roamingSongs", encodeSongs(content.roamingSongs))
             .put("similarSongs", encodeSongs(content.similarSongs)).put("podcasts", encodeHomePodcasts(content.podcasts)))

@@ -82,19 +82,19 @@ fun MeloXHomeScreen() {
         return
     }
 
-    fun refresh() {
+    fun refresh(forceServer: Boolean = false) {
         if (refreshing) return
         scope.launch {
             refreshing = true
-            runCatching { if (session.isLoggedIn && session.profile == null) session.refreshProfile(force = true); client.homeContent(area = MeloXSettingsRuntime.musicArea, userId = session.profile?.userId, currentSongId = PlaybackCommands.currentSongId(), podcastsEnabled = MeloXSettingsRuntime.podcastsEnabled) }
+            runCatching { if (session.isLoggedIn && session.profile == null) session.refreshProfile(force = true); client.homeContent(area = MeloXSettingsRuntime.musicArea, userId = session.profile?.userId, podcastsEnabled = MeloXSettingsRuntime.podcastsEnabled, refresh = forceServer) }
                 .onSuccess { content = it; cache.saveHomeContent(homeCacheKey, it); error = null }
                 .onFailure { error = it.message ?: "首页加载失败" }
             refreshing = false
         }
     }
-    LaunchedEffect(homeCacheKey) { content = cache.loadHomeContent(homeCacheKey); if (session.isLoggedIn) session.refreshProfile(); if (NeteaseLibraryCache.beginHomeColdStartRefresh(homeCacheKey)) refresh() }
+    LaunchedEffect(homeCacheKey) { content = cache.loadHomeContent(homeCacheKey); if (session.isLoggedIn) session.refreshProfile(); if (NeteaseLibraryCache.beginHomeColdStartRefresh(homeCacheKey)) refresh(false) }
 
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refresh(true) }, modifier = Modifier.fillMaxSize()) {
         val value = content
         if (value == null) {
             EmptyOrLoading(refreshing, error)
@@ -149,6 +149,9 @@ fun MeloXHomeScreen() {
                         }
                     }
                 }
+                if (value.recentlyTrending.isNotEmpty()) { item { SectionTitle("近期云村热播", "来自网易云首页") }; items(value.recentlyTrending, key = { "recent-trending-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.recentlyTrending, song.id) } } }
+                if (value.tailoredSongs.isNotEmpty()) { item { SectionTitle("根据你的喜好为你推荐", "个性化") }; items(value.tailoredSongs, key = { "tailored-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.tailoredSongs, song.id) } } }
+                if (value.chartPlaylists.isNotEmpty()) { item { SectionTitle("排行榜", "网易云榜单") }; item { PlaylistRow(value.chartPlaylists) { selectedPlaylist = it } } }
                 if (value.radarPlaylists.isNotEmpty()) { item { SectionTitle("私人雷达", "你的雷达歌单") }; item { PlaylistRow(value.radarPlaylists) { selectedPlaylist = it } } }
                 if (value.personalPlaylists.isNotEmpty()) { item { SectionTitle("我的歌单", "为你保留") }; item { PlaylistRow(value.personalPlaylists) { selectedPlaylist = it } } }
                 if (value.regionalSongs.isNotEmpty()) { item { SectionTitle("${MeloXSettingsRuntime.musicArea}最近热门", "地区推荐") }; items(value.regionalSongs, key = { "region-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.regionalSongs, song.id) } } }

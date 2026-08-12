@@ -29,6 +29,13 @@
         <activity android:name=".ui.account.MeloXAccountActivity" android:exported="false" />
         <activity android:name=".ui.collection.MeloXCollectionDetailActivity" android:exported="false" />
         <activity android:name=".ui.player.MeloXListenTogetherInviteActivity" android:exported="false" />
+        <activity android:name=".ui.sharing.MeloXNeteaseResourceShareActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"
