@@ -1,6 +1,8 @@
 package com.lladlam.melox.ui.account
 
 import android.annotation.SuppressLint
+import android.graphics.Color as AndroidColor
+import android.os.SystemClock
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +45,9 @@ import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
 
 private const val QQ_MUSIC_LOGIN_URL = "https://y.qq.com/"
+private const val COOKIE_POLL_INTERVAL_MS = 500L
+private const val COOKIE_STABLE_POLLS_BEFORE_VERIFY = 3
+private const val VERIFY_RETRY_COOLDOWN_MS = 8_000L
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -54,7 +60,6 @@ fun QQMusicLoginScreen(
     var pageLoading by remember { mutableStateOf(true) }
     var verifying by remember { mutableStateOf(false) }
     var verificationError by remember { mutableStateOf<String?>(null) }
-    var handledCookie by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         val view = webView
@@ -62,28 +67,54 @@ fun QQMusicLoginScreen(
     }
 
     LaunchedEffect(webView) {
+        if (webView == null) return@LaunchedEffect
+
+        var previousCandidate = ""
+        var stablePolls = 0
+        var lastAttemptFingerprint: String? = null
+        var lastAttemptAt = 0L
+
         while (true) {
             val candidate = collectQQMusicCookieHeader()
             val session = QQMusicSessionStore.parse(candidate)
-            if (session.isLoggedIn && candidate != handledCookie && !verifying) {
-                handledCookie = candidate
-                verifying = true
-                verificationError = null
-                val result = runCatching {
-                    QQMusicApiClient(sessionProvider = { session }).accountProfile(session)
-                }
-                verifying = false
-                if (result.isSuccess) {
-                    QQMusicSessionStore.write(context, candidate)
-                    CookieManager.getInstance().flush()
-                    onLoggedIn()
-                    return@LaunchedEffect
-                }
-                verificationError = result.exceptionOrNull()?.message
-                    ?: "QQ音乐登录状态验证失败，请稍后重试"
-                handledCookie = null
+
+            if (candidate.isNotBlank() && candidate == previousCandidate) {
+                stablePolls += 1
+            } else {
+                previousCandidate = candidate
+                stablePolls = if (candidate.isBlank()) 0 else 1
             }
-            delay(500)
+
+            if (session.isLoggedIn && stablePolls >= COOKIE_STABLE_POLLS_BEFORE_VERIFY && !verifying) {
+                val fingerprint = "${session.uin}:${session.musicKey}"
+                val now = SystemClock.elapsedRealtime()
+                val shouldAttempt =
+                    fingerprint != lastAttemptFingerprint || now - lastAttemptAt >= VERIFY_RETRY_COOLDOWN_MS
+
+                if (shouldAttempt) {
+                    lastAttemptFingerprint = fingerprint
+                    lastAttemptAt = now
+                    verifying = true
+                    verificationError = null
+
+                    val result = runCatching {
+                        QQMusicApiClient(sessionProvider = { session }).accountProfile(session)
+                    }
+
+                    verifying = false
+                    if (result.isSuccess) {
+                        QQMusicSessionStore.write(context, candidate)
+                        CookieManager.getInstance().flush()
+                        onLoggedIn()
+                        return@LaunchedEffect
+                    }
+
+                    verificationError = result.exceptionOrNull()?.message
+                        ?: "QQ音乐登录状态验证失败，请稍后重试"
+                }
+            }
+
+            delay(COOKIE_POLL_INTERVAL_MS)
         }
     }
 
@@ -144,6 +175,8 @@ fun QQMusicLoginScreen(
                 factory = { viewContext ->
                     WebView(viewContext).apply {
                         webView = this
+                        setBackgroundColor(AndroidColor.TRANSPARENT)
+
                         val cookieManager = CookieManager.getInstance()
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
@@ -160,8 +193,21 @@ fun QQMusicLoginScreen(
 
                         webChromeClient = WebChromeClient()
                         webViewClient = object : WebViewClient() {
+                            private var firstVisiblePageCommitted = false
+
+                            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                                if (!firstVisiblePageCommitted) {
+                                    firstVisiblePageCommitted = true
+                                    pageLoading = false
+                                }
+                                super.onPageCommitVisible(view, url)
+                            }
+
                             override fun onPageFinished(view: WebView?, url: String?) {
-                                pageLoading = false
+                                if (!firstVisiblePageCommitted) {
+                                    firstVisiblePageCommitted = true
+                                    pageLoading = false
+                                }
                                 super.onPageFinished(view, url)
                             }
                         }
@@ -171,20 +217,24 @@ fun QQMusicLoginScreen(
             )
 
             if (verifying) {
-                Box(
+                Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = "正在验证 QQ音乐登录状态…",
-                            modifier = Modifier.padding(top = 12.dp),
-                            color = Color.White,
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                            shape = RoundedCornerShape(18.dp),
                         )
-                    }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = "正在验证 QQ音乐登录状态…",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 13.sp,
+                    )
                 }
             }
 
