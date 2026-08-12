@@ -47,11 +47,14 @@ class MusicProviderArchitectureTest {
                 KugouSession(
                     token = "",
                     userId = 0L,
-                    vipToken = null,
+                    vipToken = "",
                     vipType = 0,
                     dfid = "-",
                     mid = "test-mid",
                     guid = "test-guid",
+                    dev = "test-device",
+                    mac = "00:00:00:00:00:00",
+                    webGl = "test-webgl",
                 )
             },
         )
