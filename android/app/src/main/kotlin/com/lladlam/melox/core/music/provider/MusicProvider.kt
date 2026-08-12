@@ -3,6 +3,10 @@ package com.lladlam.melox.core.music.provider
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicAccountSummary
+import com.lladlam.melox.core.music.model.MusicAlbumDetail
+import com.lladlam.melox.core.music.model.MusicAlbumSummary
+import com.lladlam.melox.core.music.model.MusicArtistDetail
+import com.lladlam.melox.core.music.model.MusicArtistSummary
 import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
 import com.lladlam.melox.core.music.model.MusicPlaylistDetail
@@ -53,6 +57,27 @@ interface SearchCapability {
     ): MusicPage<MusicTrack>
 }
 
+/** Optional richer search surface. Providers only implement types their API actually exposes. */
+interface CatalogSearchCapability {
+    suspend fun searchPlaylists(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): MusicPage<MusicPlaylistSummary>
+
+    suspend fun searchAlbums(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): MusicPage<MusicAlbumSummary>
+
+    suspend fun searchArtists(
+        query: String,
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): MusicPage<MusicArtistSummary>
+}
+
 interface LyricsCapability {
     suspend fun lyrics(track: MusicTrack): LyricsDocument
 }
@@ -99,6 +124,22 @@ interface RankingCapability {
         page: Int = 1,
         pageSize: Int = 100,
     ): MusicPage<MusicTrack>
+}
+
+interface AlbumCapability {
+    suspend fun albumDetail(
+        album: MusicAlbumSummary,
+        page: Int = 1,
+        pageSize: Int = 100,
+    ): MusicAlbumDetail
+}
+
+interface ArtistCapability {
+    suspend fun artistDetail(
+        artist: MusicArtistSummary,
+        page: Int = 1,
+        pageSize: Int = 100,
+    ): MusicArtistDetail
 }
 
 /** Small registry used by repositories and the provider-aware UI layer. */
