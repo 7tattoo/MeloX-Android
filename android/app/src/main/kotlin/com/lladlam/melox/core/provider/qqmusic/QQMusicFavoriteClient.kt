@@ -151,18 +151,20 @@ class QQMusicFavoriteClient(
         else -> null
     }
 
-    private fun findInt(value: Any?, vararg keys: String): Int? = when (value) {
-        is JSONObject -> {
-            for (key in keys) {
-                when (val raw = value.opt(key)) {
-                    is Number -> return raw.toInt()
-                    is String -> raw.toIntOrNull()?.let { return it }
+    private fun findInt(value: Any?, vararg keys: String): Int? {
+        return when (value) {
+            is JSONObject -> {
+                for (key in keys) {
+                    when (val raw = value.opt(key)) {
+                        is Number -> return raw.toInt()
+                        is String -> raw.toIntOrNull()?.let { return it }
+                    }
                 }
+                value.keys().asSequence().mapNotNull { key -> findInt(value.opt(key), *keys) }.firstOrNull()
             }
-            value.keys().asSequence().mapNotNull { key -> findInt(value.opt(key), *keys) }.firstOrNull()
+            is JSONArray -> (0 until value.length()).asSequence().mapNotNull { index -> findInt(value.opt(index), *keys) }.firstOrNull()
+            else -> null
         }
-        is JSONArray -> (0 until value.length()).asSequence().mapNotNull { index -> findInt(value.opt(index), *keys) }.firstOrNull()
-        else -> null
     }
 
     private fun firstString(value: JSONObject, vararg keys: String): String =
