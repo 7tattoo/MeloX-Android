@@ -18,6 +18,7 @@ import com.lladlam.melox.core.music.model.PlaybackResolution
 import com.lladlam.melox.core.music.provider.AlbumCapability
 import com.lladlam.melox.core.music.provider.ArtistCapability
 import com.lladlam.melox.core.music.provider.CatalogSearchCapability
+import com.lladlam.melox.core.music.provider.FavoriteCapability
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.LyricsCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
@@ -37,6 +38,7 @@ class QQMusicProvider(
     CatalogSearchCapability,
     LyricsCapability,
     PlaybackCapability,
+    FavoriteCapability,
     HomeFeedCapability,
     UserLibraryCapability,
     PlaylistCapability,
@@ -53,6 +55,7 @@ class QQMusicProvider(
         MusicCapability.Playlists,
         MusicCapability.Albums,
         MusicCapability.Artists,
+        MusicCapability.Favorites,
         MusicCapability.HomeRecommendations,
         MusicCapability.Rankings,
     )
@@ -66,6 +69,10 @@ class QQMusicProvider(
         httpClient = httpClient,
     )
     private val playback = QQMusicPlaybackVkeyClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
+    private val favorites = QQMusicFavoriteClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
@@ -102,6 +109,10 @@ class QQMusicProvider(
         track: MusicTrack,
         quality: AudioQualityTier,
     ): PlaybackResolution = playback.resolve(track, quality)
+
+    override suspend fun setFavorite(track: MusicTrack, favorite: Boolean) {
+        favorites.setFavorite(track, favorite)
+    }
 
     override suspend fun homeFeed(
         playlistLimit: Int,
