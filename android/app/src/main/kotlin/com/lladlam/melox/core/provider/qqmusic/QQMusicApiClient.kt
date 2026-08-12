@@ -22,15 +22,80 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class QQMusicAccountProfile(
+    val uin: String,
+    val nickname: String,
+    val avatarUrl: String?,
+)
+
 /**
- * Direct Android port of the request shapes used by jsososo/QQMusicApi.
- * There is no MeloX relay server: the phone talks to QQ Music endpoints and
- * attaches only the user's locally stored QQ Music session when required.
+ * Direct Android port of the request shapes used by QQ Music community API
+ * implementations. There is no MeloX relay server: the phone talks to QQ Music
+ * endpoints and attaches only the user's locally stored QQ Music session.
  */
 class QQMusicApiClient(
     private val sessionProvider: () -> QQMusicSession = { QQMusicSession("", "", "") },
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
+    suspend fun accountProfile(
+        session: QQMusicSession = sessionProvider(),
+    ): QQMusicAccountProfile = withContext(Dispatchers.IO) {
+        if (!session.isLoggedIn) throw IOException("QQ音乐登录态不完整")
+        val gtk = hash33(session.musicKey).toString()
+        val response = getJson(
+            baseUrl = "https://c6.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg",
+            params = mapOf(
+                "g_tk" to gtk,
+                "format" to "json",
+                "inCharset" to "utf-8",
+                "outCharset" to "utf-8",
+                "notice" to "0",
+                "cid" to "205360838",
+                "needNewCode" to "0",
+                "loginUin" to session.uin,
+                "hostUin" to "0",
+                "userid" to session.uin,
+                "reqfrom" to "1",
+            ),
+            referer = "https://y.qq.com/",
+            cookie = session.cookie,
+        )
+        val code = response.optInt("code", -1)
+        if (code != 0) {
+            throw IOException(
+                response.optString("message")
+                    .ifBlank { response.optString("msg") }
+                    .ifBlank { "QQ音乐登录状态无效（$code）" },
+            )
+        }
+        val data = response.optJSONObject("data") ?: response
+        val creator = data.optJSONObject("creator")
+            ?: data.optJSONObject("user")
+            ?: data.optJSONObject("profile")
+        val nickname = sequenceOf(
+            creator?.optString("nick"),
+            creator?.optString("nickname"),
+            creator?.optString("name"),
+            data.optString("nick"),
+            data.optString("nickname"),
+            data.optString("name"),
+        ).filterNotNull().firstOrNull(String::isNotBlank)
+            ?: "QQ音乐用户 ${session.uin}"
+        val avatar = sequenceOf(
+            creator?.optString("headpic"),
+            creator?.optString("avatar"),
+            creator?.optString("avatarUrl"),
+            data.optString("headpic"),
+            data.optString("avatar"),
+            data.optString("avatarUrl"),
+        ).filterNotNull().firstOrNull(String::isNotBlank)?.let(::secureUrl)
+        QQMusicAccountProfile(
+            uin = session.uin,
+            nickname = nickname,
+            avatarUrl = avatar,
+        )
+    }
+
     suspend fun searchSongs(
         query: String,
         page: Int = 1,
@@ -280,6 +345,15 @@ class QQMusicApiClient(
 
     private fun secureUrl(value: String): String =
         if (value.startsWith("http://", ignoreCase = true)) "https://${value.substringAfter("://")}" else value
+
+    private fun hash33(value: String, seed: Long = 5381L): Long {
+        var hash = seed
+        value.forEach { char ->
+            hash += (hash shl 5) + char.code
+            hash = hash and 0xFFFF_FFFFL
+        }
+        return hash and 0x7FFF_FFFFL
+    }
 }
 
 private data class QQFileType(
