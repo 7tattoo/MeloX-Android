@@ -56,12 +56,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lladlam.melox.core.account.NeteaseSessionStore
-import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.lyrics.withPseudoTiming
-import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXTextPVStyle
 import kotlinx.coroutines.isActive
@@ -75,21 +72,13 @@ private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeL
     var document by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
     var loading by remember(mediaId) { mutableStateOf(false) }
     var error by remember(mediaId) { mutableStateOf<String?>(null) }
-    val client = remember(context) {
-        NeteaseSearchClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
-    }
-    LaunchedEffect(mediaId) {
-        val songId = mediaId?.toLongOrNull() ?: return@LaunchedEffect
+    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (mediaId.isNullOrBlank()) return@LaunchedEffect
         loading = true
         error = null
-        val downloaded = MeloXDownloadStore.get(context).localLyrics(songId)
-        if (downloaded != null) {
-            document = downloaded
-        } else {
-            runCatching { client.lyrics(songId) }
-                .onSuccess { document = it }
-                .onFailure { error = it.message ?: "歌词加载失败" }
-        }
+        runCatching { MeloXProviderLyricsLoader.load(context, state) }
+            .onSuccess { document = it }
+            .onFailure { error = it.message ?: "歌词加载失败" }
         loading = false
     }
     val rendered = remember(document, MeloXSettingsRuntime.lyricPseudoTimingEnabled) {
