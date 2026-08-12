@@ -8,9 +8,9 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * QQ Music QRC decoder/parser.
  *
- * Current QQ clients return QRC/translation/romanization as hex-encoded,
- * 3DES-encrypted zlib payloads. The decoded QRC line format is roughly:
- * `[lineStart,lineDuration]word(wordStart,wordDuration)...`.
+ * Current QQ clients normally return QRC/translation/romanization as hex-encoded,
+ * 3DES-encrypted zlib payloads. Some gateways/versions can already return decoded
+ * XML or line text, so the parser deliberately accepts both forms.
  */
 object QQMusicQrcLyricsParser {
     private val tripleDesKey = "!@#)(*$%123ZXC!@!@#)(NHL".toByteArray(Charsets.US_ASCII)
@@ -21,7 +21,7 @@ object QQMusicQrcLyricsParser {
 
     fun decryptHex(value: String): String {
         val normalized = value.trim()
-        if (normalized.isBlank() || normalized.length % 2 != 0) return ""
+        if (normalized.isBlank() || normalized.length % 2 != 0 || !normalized.all(Char::isHexDigit)) return ""
         return runCatching {
             val encrypted = ByteArray(normalized.length / 2) { index ->
                 normalized.substring(index * 2, index * 2 + 2).toInt(16).toByte()
@@ -40,9 +40,9 @@ object QQMusicQrcLyricsParser {
         translationHex: String = "",
         romanizationHex: String = "",
     ): LyricsDocument = parse(
-        primary = decryptHex(qrcHex),
-        translation = decryptHex(translationHex),
-        romanization = decryptHex(romanizationHex),
+        primary = decodePayload(qrcHex),
+        translation = decodePayload(translationHex),
+        romanization = decodePayload(romanizationHex),
     )
 
     fun parse(
@@ -76,6 +76,13 @@ object QQMusicQrcLyricsParser {
         )
     }
 
+    private fun decodePayload(value: String): String {
+        val normalized = value.trim().trimEnd('\u0000')
+        if (normalized.isBlank()) return ""
+        if (normalized.startsWith('<') || normalized.startsWith('[')) return normalized
+        return decryptHex(normalized)
+    }
+
     private fun parseQrcLines(source: String): List<LyricLine> = buildList {
         for (raw in source.lineSequence()) {
             val match = lineTiming.find(raw.trim()) ?: continue
@@ -99,8 +106,6 @@ object QQMusicQrcLyricsParser {
                     if (text.isEmpty()) continue
                     val rawStart = timing.groupValues[1].toLongOrNull() ?: continue
                     val duration = timing.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
-                    // Most QRC payloads use absolute word timestamps. A few older
-                    // payloads use a line-relative offset; accept both forms.
                     val start = if (rawStart < lineStart && lineStart > 0L) lineStart + rawStart else rawStart
                     add(
                         LyricSyllable(
@@ -147,11 +152,14 @@ object QQMusicQrcLyricsParser {
     private fun nearest(target: LyricLine, candidates: List<LyricLine>): LyricLine? {
         val candidate = candidates.minByOrNull { kotlin.math.abs(it.timeMs - target.timeMs) }
             ?: return null
-        return candidate.takeIf { kotlin.math.abs(it.timeMs - target.timeMs) <= AnnotationToleranceMs }
+        return candidate.takeIf { kotlin.math.abs(candidate.timeMs - target.timeMs) <= AnnotationToleranceMs }
     }
 
     private fun annotationText(target: LyricLine, candidate: LyricLine?): String? {
         val text = candidate?.text?.trim().orEmpty()
         return text.takeIf { it.isNotBlank() && it != target.text.trim() }
     }
+
+    private fun Char.isHexDigit(): Boolean =
+        this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 }
