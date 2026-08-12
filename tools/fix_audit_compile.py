@@ -34,8 +34,16 @@ patch(
 )
 patch(
     "android/app/src/main/kotlin/com/lladlam/melox/core/network/NeteaseUniversalSearchClient.kt",
-    'val id = value.optLong("id", -1L)',
-    'val id = if (kind == MeloXSearchKind.Users) value.optLong("userId", -1L) else value.optLong("id", -1L)',
+    '''            for (i in 0 until values.length()) {
+                val value = values.optJSONObject(i) ?: continue
+                val id = value.optLong("id", -1L)
+                if (id <= 0L) continue
+''',
+    '''            for (i in 0 until values.length()) {
+                val value = values.optJSONObject(i) ?: continue
+                val id = if (kind == MeloXSearchKind.Users) value.optLong("userId", -1L) else value.optLong("id", -1L)
+                if (id <= 0L) continue
+''',
 )
 
 # This helper is temporary and must not survive the validated repair commit.
