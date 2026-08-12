@@ -38,6 +38,7 @@ class QQMusicPlaybackVkeyClient(
         val candidates = requestedQuality.qqPlaybackCandidates()
 
         var lastReason: String? = null
+        val businessCodes = linkedSetOf<Int>()
         for (candidate in candidates) {
             val result = runCatching {
                 requestUrl(
@@ -57,14 +58,23 @@ class QQMusicPlaybackVkeyClient(
                     format = candidate.extension.removePrefix("."),
                 )
             }
-            lastReason = result.exceptionOrNull()?.message ?: lastReason
+            when (val failure = result.exceptionOrNull()) {
+                is QQVkeyBusinessException -> {
+                    businessCodes += failure.businessCode
+                    lastReason = failure.message
+                }
+                null -> Unit
+                else -> lastReason = failure.message ?: lastReason
+            }
         }
 
         if (!session.isLoggedIn) {
             PlaybackResolution.LoginRequired
         } else {
             PlaybackResolution.Unavailable(
-                lastReason ?: "QQ音乐没有返回可播放的 ${requestedQuality.qqDisplayName()} 音源",
+                reason = businessCodes.qqVkeyFinalReason()
+                    ?: lastReason
+                    ?: "QQ音乐没有返回可播放的 ${requestedQuality.qqDisplayName()} 音源",
             )
         }
     }
@@ -128,6 +138,8 @@ class QQMusicPlaybackVkeyClient(
             }
             val data = req.optJSONObject("data") ?: return null
             val midUrl = data.optJSONArray("midurlinfo")?.optJSONObject(0) ?: return null
+            val businessCode = midUrl.optInt("result", 0)
+            if (businessCode != 0) throw QQVkeyBusinessException(businessCode)
             val purl = midUrl.optString("purl").trim()
             if (purl.isBlank()) return null
             if (purl.startsWith("https://") || purl.startsWith("http://")) return secureUrl(purl)
@@ -153,6 +165,25 @@ class QQMusicPlaybackVkeyClient(
     private companion object {
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
     }
+}
+
+internal class QQVkeyBusinessException(
+    val businessCode: Int,
+) : IOException(qqVkeyBusinessReason(businessCode))
+
+internal fun qqVkeyBusinessReason(code: Int): String = when (code) {
+    104003 -> "当前 QQ音乐账号没有该音源的播放权限（104003）"
+    104004 -> "QQ音乐 VKey 获取失败（104004）"
+    104013 -> "QQ音乐当前播放设备受限（104013）"
+    else -> "QQ音乐音源授权失败（$code）"
+}
+
+internal fun Set<Int>.qqVkeyFinalReason(): String? = when {
+    104013 in this -> qqVkeyBusinessReason(104013)
+    104003 in this -> qqVkeyBusinessReason(104003)
+    104004 in this -> qqVkeyBusinessReason(104004)
+    isNotEmpty() -> qqVkeyBusinessReason(first())
+    else -> null
 }
 
 internal data class QQPlaybackCandidate(
