@@ -10,6 +10,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityPreferences
+import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
@@ -29,6 +30,7 @@ object ProviderPlaybackCommands {
         val appContext = context.applicationContext
         ProviderPlaybackRuntime.initialize(appContext)
         val neteaseQuality = MusicQualityPreferences.read(appContext)
+        MusicQualityRuntime.selected = neteaseQuality
         val qualityTier = neteaseQuality.toCommonTier()
         val startIndex = tracks.indexOfFirst { it.id == selectedTrackId }.coerceAtLeast(0)
         val items = tracks.mapIndexed { index, track ->
