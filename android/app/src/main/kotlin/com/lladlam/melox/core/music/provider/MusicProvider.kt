@@ -24,6 +24,7 @@ enum class MusicCapability {
     Playlists,
     Albums,
     Artists,
+    Favorites,
     Comments,
     HomeRecommendations,
     DailyRecommendations,
@@ -87,6 +88,18 @@ interface PlaybackCapability {
         track: MusicTrack,
         quality: AudioQualityTier,
     ): PlaybackResolution
+}
+
+/**
+ * Optional account write capability for a provider's native "favorite/liked"
+ * collection. Providers must only implement this when the platform exposes a
+ * real authenticated write API with unambiguous semantics.
+ */
+interface FavoriteCapability {
+    suspend fun setFavorite(
+        track: MusicTrack,
+        favorite: Boolean,
+    )
 }
 
 /** Home semantic feed. Providers return only the sections they actually expose. */
