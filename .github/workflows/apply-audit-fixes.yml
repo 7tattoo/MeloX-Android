@@ -31,7 +31,9 @@ jobs:
           gradle-version: "9.5.0"
 
       - name: Apply audited parity fixes
-        run: python3 tools/apply_audit_fixes.py
+        run: |
+          python3 tools/apply_audit_fixes.py
+          python3 tools/fix_audit_compile.py
 
       - name: Check patch formatting
         run: git diff --check
