@@ -65,6 +65,10 @@ class QQMusicProvider(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
+    private val playback = QQMusicPlaybackVkeyClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
     private val playlists = QQMusicPlaylistClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
@@ -97,7 +101,7 @@ class QQMusicProvider(
     override suspend fun resolvePlayback(
         track: MusicTrack,
         quality: AudioQualityTier,
-    ): PlaybackResolution = api.resolvePlayback(track, quality)
+    ): PlaybackResolution = playback.resolve(track, quality)
 
     override suspend fun homeFeed(
         playlistLimit: Int,
