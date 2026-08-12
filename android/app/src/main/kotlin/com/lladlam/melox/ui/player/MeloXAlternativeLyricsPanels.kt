@@ -92,11 +92,6 @@ private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeL
     return AlternativeLyricsState(lines, index, position, loading, error)
 }
 
-/**
- * Alternative lyric scenes used to inherit the 500 ms controller polling tick.
- * Extrapolate from the latest authoritative controller position on every frame so
- * short lines are not skipped and AnimatedContent is not restarted late.
- */
 @Composable
 private fun rememberSmoothPlaybackPosition(state: MeloXPlaybackUiState): Long {
     var position by remember(state.mediaId) { mutableLongStateOf(state.positionMs) }
@@ -128,11 +123,6 @@ private data class AlternativeLyricsState(
     val error: String?,
 )
 
-/**
- * TextPV is a line-level scene, not a word-by-word renderer. Keep its lyric clock
- * separate from the Apple Music/EVA/Skyline presentation so a dense YRC document
- * cannot force the whole TextPV composition through 60 Hz recomposition.
- */
 @Composable
 private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState {
     val context = LocalContext.current.applicationContext
@@ -151,9 +141,6 @@ private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState
         loading = false
     }
 
-    // TextPV only needs line boundaries. Do not synthesize per-grapheme timing here:
-    // it increases object count dramatically for plain LRC and provides no visual
-    // benefit to a scene that changes once per line.
     val lines = document?.lines.orEmpty()
     val advanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
     var index by remember(mediaId, document) {
@@ -175,7 +162,7 @@ private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState
         val anchorPosition = state.positionMs
         if (!state.isPlaying) {
             val nextIndex = activeDocument.highlightedIndex(anchorPosition + advanceMs)
-                .coerceIn(0, lines.lastIndex)
+                ?.coerceIn(0, lines.lastIndex) ?: index
             if (nextIndex != index) index = nextIndex
             return@LaunchedEffect
         }
@@ -185,8 +172,6 @@ private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState
         while (isActive) {
             val frameNanos = withFrameNanos { it }
             if (anchorFrameNanos == 0L) anchorFrameNanos = frameNanos
-            // TextPV switches per line; 30 Hz boundary checks are already much more
-            // precise than the controller tick without invalidating Composition.
             if (lastCheckNanos != 0L && frameNanos - lastCheckNanos < 33_000_000L) continue
             lastCheckNanos = frameNanos
             val elapsedMs = (frameNanos - anchorFrameNanos) / 1_000_000L
@@ -194,7 +179,7 @@ private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState
                 state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
             )
             val nextIndex = activeDocument.highlightedIndex(position + advanceMs)
-                .coerceIn(0, lines.lastIndex)
+                ?.coerceIn(0, lines.lastIndex) ?: index
             if (nextIndex != index) index = nextIndex
         }
     }
@@ -374,8 +359,6 @@ private fun TextPVBackground(
     motionIntensity: Float,
 ) {
     Canvas(Modifier.fillMaxSize()) {
-        // During page transitions Compose can briefly draw a zero-width/height
-        // canvas. Grid templates must never use a zero step in a while loop.
         if (!size.width.isFinite() || !size.height.isFinite() || size.width <= 0f || size.height <= 0f) {
             return@Canvas
         }
@@ -477,8 +460,6 @@ private fun TextPVComposition(
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = alignment) {
         Column(Modifier.fillMaxWidth().clickable(onClick = onSeek)) {
             if (bottom) {
-                // Stable per-line label. The old phase-derived string forced a new
-                // text layout every animation frame.
                 val marker = ((line.timeMs / 10L) % 1000L).toString().padStart(3, '0')
                 Text("LYRIC // $marker", color = Color(0xFF76E8FF), fontSize = 11.sp, letterSpacing = 2.sp)
             }
