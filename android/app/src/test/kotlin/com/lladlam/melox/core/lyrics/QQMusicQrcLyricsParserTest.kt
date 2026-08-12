@@ -39,4 +39,16 @@ class QQMusicQrcLyricsParserTest {
         assertEquals("hello", document.lines[0].romanization)
         assertTrue(document.lines[0].syllables.isNotEmpty())
     }
+
+    @Test
+    fun parseEncryptedAlsoAcceptsAlreadyDecodedGatewayPayload() {
+        val document = QQMusicQrcLyricsParser.parseEncrypted(
+            qrcHex = "[1000,600]A(1000,300)B(1300,300)",
+            translationHex = "[00:01.00]甲乙",
+            romanizationHex = "[00:01.00]a b",
+        )
+        assertEquals("AB", document.lines.single().text)
+        assertEquals("甲乙", document.lines.single().translation)
+        assertEquals("a b", document.lines.single().romanization)
+    }
 }
