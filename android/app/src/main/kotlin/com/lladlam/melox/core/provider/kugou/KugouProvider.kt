@@ -64,6 +64,10 @@ class KugouProvider(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
+    private val lyrics = KugouLyricsClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
     private val discovery = KugouDiscoveryClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
@@ -106,7 +110,7 @@ class KugouProvider(
         pageSize: Int,
     ): MusicPage<MusicArtistSummary> = catalog.searchArtists(query, page, pageSize)
 
-    override suspend fun lyrics(track: MusicTrack): LyricsDocument = api.lyrics(track)
+    override suspend fun lyrics(track: MusicTrack): LyricsDocument = lyrics.lyrics(track)
 
     override suspend fun resolvePlayback(
         track: MusicTrack,
