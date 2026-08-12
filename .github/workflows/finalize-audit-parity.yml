@@ -31,7 +31,9 @@ jobs:
           gradle-version: "9.5.0"
 
       - name: Apply final parity audit
-        run: python3 tools/finalize_audit_parity.py
+        run: |
+          python3 tools/finalize_audit_parity.py
+          python3 tools/finalize_test_environment_fix.py
 
       - name: Check patch formatting
         run: git diff --check
@@ -48,3 +50,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "fix: finish Android migration parity audit"
           git push origin HEAD:main
+
+# parity-validation-attempt: 2
