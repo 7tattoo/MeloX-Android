@@ -26,6 +26,7 @@ object QQMusicSessionStore {
 
     fun write(context: Context, cookie: String): QQMusicSession {
         val session = parse(cookie)
+        require(session.isLoggedIn) { "QQ音乐登录态不完整" }
         context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
             .edit()
@@ -49,11 +50,19 @@ object QQMusicSessionStore {
             .mapNotNull { entry ->
                 val separator = entry.indexOf('=')
                 if (separator <= 0) null
-                else entry.substring(0, separator) to entry.substring(separator + 1)
+                else entry.substring(0, separator).trim() to entry.substring(separator + 1).trim()
             }
+            .filter { (key, _) -> key.isNotBlank() }
             .toMap()
-        val rawUin = if (values["login_type"] == "2") values["wxuin"] else values["uin"]
-        val uin = rawUin.orEmpty().filter(Char::isDigit)
+
+        val rawUin = values["qqmusic_uin"]
+            .orEmpty()
+            .ifBlank {
+                if (values["login_type"] == "2") values["wxuin"].orEmpty()
+                else values["uin"].orEmpty()
+            }
+            .ifBlank { values["wxuin"].orEmpty() }
+        val uin = rawUin.filter(Char::isDigit)
         val musicKey = values["qm_keyst"]
             .orEmpty()
             .ifBlank { values["qqmusic_key"].orEmpty() }
