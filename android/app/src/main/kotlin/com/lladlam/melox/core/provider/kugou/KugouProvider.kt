@@ -24,6 +24,7 @@ import com.lladlam.melox.core.music.provider.MusicCapability
 import com.lladlam.melox.core.music.provider.MusicProvider
 import com.lladlam.melox.core.music.provider.PlaybackCapability
 import com.lladlam.melox.core.music.provider.PlaylistCapability
+import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.RankingCapability
 import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
@@ -40,6 +41,7 @@ class KugouProvider(
     HomeFeedCapability,
     UserLibraryCapability,
     PlaylistCapability,
+    PlaylistWriteCapability,
     RankingCapability,
     AlbumCapability,
     ArtistCapability {
@@ -51,6 +53,7 @@ class KugouProvider(
         MusicCapability.Lyrics,
         MusicCapability.Library,
         MusicCapability.Playlists,
+        MusicCapability.PlaylistWrite,
         MusicCapability.Albums,
         MusicCapability.Artists,
         MusicCapability.HomeRecommendations,
@@ -66,6 +69,10 @@ class KugouProvider(
         httpClient = httpClient,
     )
     private val playlists = KugouPlaylistClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
+    private val playlistWrites = KugouPlaylistWriteClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
@@ -122,6 +129,16 @@ class KugouProvider(
         page: Int,
         pageSize: Int,
     ): MusicPlaylistDetail = playlists.detail(playlist, page, pageSize)
+
+    override suspend fun writablePlaylists(page: Int, pageSize: Int): MusicPage<MusicPlaylistSummary> =
+        playlistWrites.writablePlaylists(page, pageSize)
+
+    override suspend fun addTrackToPlaylist(
+        track: MusicTrack,
+        playlist: MusicPlaylistSummary,
+    ) {
+        playlistWrites.addTrackToPlaylist(track, playlist)
+    }
 
     override suspend fun rankingTracks(
         ranking: MusicRankingSummary,
