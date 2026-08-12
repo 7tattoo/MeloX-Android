@@ -45,19 +45,24 @@ object MusicProviderSelectionStore {
                 setOf(selectedSource(context).storageValue),
             )
         }
+        if (!enabled) {
+            // Automatic fallback must never remain active when aggregation is off.
+            editor.putBoolean(KeyAutomaticFallback, false)
+        }
         editor.apply()
     }
 
     fun automaticFallbackEnabled(context: Context): Boolean =
-        context.applicationContext
+        unifiedEnabled(context) && context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
             .getBoolean(KeyAutomaticFallback, false)
 
     fun setAutomaticFallbackEnabled(context: Context, enabled: Boolean) {
+        val safeEnabled = enabled && unifiedEnabled(context)
         context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean(KeyAutomaticFallback, enabled)
+            .putBoolean(KeyAutomaticFallback, safeEnabled)
             .apply()
     }
 
@@ -65,17 +70,33 @@ object MusicProviderSelectionStore {
         val preferences = context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
         val raw = preferences.getStringSet(KeyUnifiedSources, null)
-        if (raw == null) return linkedSetOf(selectedSource(context))
-        return raw.mapNotNullTo(linkedSetOf()) { value ->
+        val parsed = raw?.mapNotNullTo(linkedSetOf()) { value ->
             MusicSource.entries.firstOrNull { it.storageValue == value }
-        }
+        }.orEmpty()
+        return parsed.ifEmpty { linkedSetOf(selectedSource(context)) }
     }
 
     fun setUnifiedSources(context: Context, sources: Set<MusicSource>) {
+        // An empty whitelist is normalized back to the current provider so a
+        // single switch can never accidentally turn into an "all providers" request.
+        val safeSources = sources.ifEmpty { setOf(selectedSource(context)) }
         context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
             .edit()
-            .putStringSet(KeyUnifiedSources, sources.mapTo(linkedSetOf()) { it.storageValue })
+            .putStringSet(KeyUnifiedSources, safeSources.mapTo(linkedSetOf()) { it.storageValue })
             .apply()
+    }
+
+    fun setUnifiedSourceEnabled(
+        context: Context,
+        source: MusicSource,
+        enabled: Boolean,
+    ): Set<MusicSource> {
+        val updated = unifiedSources(context).toMutableSet().apply {
+            if (enabled) add(source) else remove(source)
+        }
+        val normalized = updated.ifEmpty { mutableSetOf(selectedSource(context)) }
+        setUnifiedSources(context, normalized)
+        return normalized.toSet()
     }
 }
