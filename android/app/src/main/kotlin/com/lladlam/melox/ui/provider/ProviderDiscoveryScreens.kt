@@ -1,10 +1,12 @@
 package com.lladlam.melox.ui.provider
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,11 @@ import com.lladlam.melox.ui.MeloXBottomContentClearance
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Provider-backed discovery/library screens reuse the same visual grammar that
+ * MeloX already migrated from iOS: 40sp large titles, 25sp section titles,
+ * horizontal media strips, plain track rows and content-layer materials.
+ */
 @Composable
 fun ProviderHomeScreen(source: MusicSource) {
     ProviderDiscoveryFeedScreen(
@@ -131,21 +139,26 @@ private fun ProviderDiscoveryFeedScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        contentPadding = PaddingValues(
             start = 20.dp,
-            top = 48.dp,
+            top = 70.dp,
             end = 20.dp,
             bottom = MeloXBottomContentClearance,
         ),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
-            Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-            Text(title, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            Text(
+                title,
+                fontSize = 40.sp,
+                lineHeight = 46.sp,
+                fontWeight = FontWeight.Bold,
+            )
             Text(
                 subtitle,
+                modifier = Modifier.padding(top = 2.dp),
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
             )
         }
 
@@ -161,44 +174,61 @@ private fun ProviderDiscoveryFeedScreen(
             error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
             else -> {
                 val value = feed ?: MusicHomeFeed()
+
                 if (value.recommendedPlaylists.isNotEmpty()) {
-                    item { ProviderSectionTitle("推荐歌单") }
                     item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(
-                                value.recommendedPlaylists,
-                                key = { "playlist:${it.id.source.storageValue}:${it.id.value}" },
-                            ) { playlist ->
-                                ProviderPlaylistCard(playlist) { selectedPlaylist = playlist }
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            ProviderSectionTitle("推荐歌单")
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                items(
+                                    value.recommendedPlaylists,
+                                    key = { "playlist:${it.id.source.storageValue}:${it.id.value}" },
+                                ) { playlist ->
+                                    ProviderPlaylistCard(playlist) { selectedPlaylist = playlist }
+                                }
                             }
                         }
                     }
                 }
 
                 if (value.newSongs.isNotEmpty()) {
-                    item { ProviderSectionTitle("最新歌曲") }
-                    items(
-                        value.newSongs,
-                        key = { "newsong:${it.id.source.storageValue}:${it.id.value}" },
-                    ) { track ->
-                        ProviderTrackRow(track) {
-                            ProviderPlaybackCommands.playQueue(
-                                context = context,
-                                tracks = value.newSongs,
-                                selectedTrackId = track.id,
-                                onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
-                            )
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            ProviderSectionTitle("最新歌曲")
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                items(
+                                    value.newSongs,
+                                    key = { "newsong:${it.id.source.storageValue}:${it.id.value}" },
+                                ) { track ->
+                                    ProviderSongCard(track) {
+                                        ProviderPlaybackCommands.playQueue(
+                                            context = context,
+                                            tracks = value.newSongs,
+                                            selectedTrackId = track.id,
+                                            onFailure = { failure ->
+                                                playbackError = failure.message ?: "播放失败"
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
                 if (value.rankings.isNotEmpty()) {
-                    item { ProviderSectionTitle("排行榜") }
-                    items(
-                        value.rankings,
-                        key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
-                    ) { ranking ->
-                        ProviderRankingCard(ranking) { selectedRanking = ranking }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            ProviderSectionTitle("排行榜")
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                items(
+                                    value.rankings,
+                                    key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
+                                ) { ranking ->
+                                    ProviderRankingCard(ranking) { selectedRanking = ranking }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -207,7 +237,12 @@ private fun ProviderDiscoveryFeedScreen(
                     value.newSongs.isEmpty() &&
                     value.rankings.isEmpty()
                 ) {
-                    item { ProviderSimpleCard("暂无内容", "${source.displayName} 当前没有返回可展示的推荐内容") }
+                    item {
+                        ProviderSimpleCard(
+                            "暂无内容",
+                            "${source.displayName} 当前没有返回可展示的推荐内容",
+                        )
+                    }
                 }
             }
         }
@@ -259,17 +294,27 @@ fun ProviderLibraryScreen(source: MusicSource) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        contentPadding = PaddingValues(
             start = 20.dp,
-            top = 48.dp,
+            top = 70.dp,
             end = 20.dp,
             bottom = MeloXBottomContentClearance,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-            Text(if (source == MusicSource.Netease) "音乐库" else "我的", fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (source == MusicSource.Netease) "音乐库" else "我的",
+                fontSize = 40.sp,
+                lineHeight = 46.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                source.displayName,
+                modifier = Modifier.padding(top = 2.dp),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
+            )
         }
 
         when {
@@ -333,21 +378,31 @@ internal fun ProviderPlaylistDetailScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        contentPadding = PaddingValues(
             start = 20.dp,
             top = 42.dp,
             end = 20.dp,
             bottom = MeloXBottomContentClearance,
         ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(
-                "‹ 返回",
-                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "‹",
+                    modifier = Modifier.clickable(onClick = onBack).padding(end = 10.dp),
+                    fontSize = 44.sp,
+                    lineHeight = 44.sp,
+                )
+                Text(
+                    playlist.title,
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         when {
@@ -371,22 +426,24 @@ internal fun ProviderPlaylistDetailScreen(
                         AsyncImage(
                             model = value.summary.artworkUrl,
                             contentDescription = null,
-                            modifier = Modifier.size(118.dp).clip(RoundedCornerShape(22.dp)),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(156.dp).clip(RoundedCornerShape(22.dp)),
                         )
                         Column(Modifier.weight(1f)) {
                             Text(
                                 value.summary.title,
-                                fontSize = 24.sp,
+                                fontSize = 20.sp,
+                                lineHeight = 25.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             value.summary.creatorName?.takeIf(String::isNotBlank)?.let {
-                                Spacer(Modifier.height(5.dp))
+                                Spacer(Modifier.height(7.dp))
                                 Text(
                                     it,
                                     fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
                                 )
                             }
                             val count = value.total ?: value.tracks.size.toLong()
@@ -396,9 +453,33 @@ internal fun ProviderPlaylistDetailScreen(
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
                             )
+
+                            if (value.tracks.isNotEmpty()) {
+                                Text(
+                                    "▶  播放全部",
+                                    modifier = Modifier
+                                        .padding(top = 15.dp)
+                                        .clip(RoundedCornerShape(22.dp))
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .clickable {
+                                            ProviderPlaybackCommands.playQueue(
+                                                context = context,
+                                                tracks = value.tracks,
+                                                selectedTrackId = value.tracks.first().id,
+                                                onFailure = { failure ->
+                                                    playbackError = failure.message ?: "播放失败"
+                                                },
+                                            )
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                         }
                     }
                 }
+
                 value.summary.description?.takeIf(String::isNotBlank)?.let { description ->
                     item {
                         Text(
@@ -406,25 +487,13 @@ internal fun ProviderPlaylistDetailScreen(
                             maxLines = 4,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            lineHeight = 19.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
                         )
                     }
                 }
+
                 if (value.tracks.isNotEmpty()) {
-                    item {
-                        ProviderSimpleCard(
-                            "播放全部",
-                            "从第一首开始播放 · ${value.tracks.size} 首已加载",
-                            onClick = {
-                                ProviderPlaybackCommands.playQueue(
-                                    context = context,
-                                    tracks = value.tracks,
-                                    selectedTrackId = value.tracks.first().id,
-                                    onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
-                                )
-                            },
-                        )
-                    }
                     items(
                         value.tracks,
                         key = { "detail:${it.id.source.storageValue}:${it.id.value}" },
@@ -434,13 +503,16 @@ internal fun ProviderPlaylistDetailScreen(
                                 context = context,
                                 tracks = value.tracks,
                                 selectedTrackId = track.id,
-                                onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
+                                onFailure = { failure ->
+                                    playbackError = failure.message ?: "播放失败"
+                                },
                             )
                         }
                     }
                 } else {
                     item { ProviderSimpleCard("暂无歌曲", "这个歌单当前没有返回可播放歌曲") }
                 }
+
                 playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
         }
