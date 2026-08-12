@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,9 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,9 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -395,6 +401,7 @@ private fun ProviderAlbumDetailScreen(
     var loading by remember(album.id) { mutableStateOf(capability != null) }
     var error by remember(album.id) { mutableStateOf<String?>(null) }
     var playbackError by remember(album.id) { mutableStateOf<String?>(null) }
+    var trackQuery by remember(album.id) { mutableStateOf("") }
 
     LaunchedEffect(album.id, capability) {
         if (capability == null) return@LaunchedEffect
@@ -407,9 +414,24 @@ private fun ProviderAlbumDetailScreen(
         loading = false
     }
 
+    val value = detail
+    val tracks = value?.tracks.orEmpty()
+    val filteredTracks = remember(tracks, trackQuery) {
+        val normalized = trackQuery.trim().lowercase()
+        if (normalized.isBlank()) {
+            tracks
+        } else {
+            tracks.filter { track ->
+                track.title.lowercase().contains(normalized) ||
+                    track.artistText.lowercase().contains(normalized) ||
+                    track.album?.name?.lowercase()?.contains(normalized) == true
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        contentPadding = PaddingValues(
             start = 20.dp,
             top = 42.dp,
             end = 20.dp,
@@ -418,88 +440,155 @@ private fun ProviderAlbumDetailScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Text(
-                "‹ 返回",
-                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+            ProviderDetailHeader(
+                title = value?.summary?.title ?: album.title,
+                onBack = onBack,
             )
         }
         when {
-            capability == null -> item { ProviderSimpleCard("暂不可用", "${album.id.source.displayName} 尚未实现专辑详情") }
+            capability == null -> item {
+                ProviderSimpleCard("暂不可用", "${album.id.source.displayName} 尚未实现专辑详情")
+            }
             loading -> item {
                 Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
             error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
-            detail != null -> {
-                val value = detail!!
+            value != null -> {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         AsyncImage(
                             model = value.summary.artworkUrl,
                             contentDescription = null,
-                            modifier = Modifier.size(118.dp).clip(RoundedCornerShape(22.dp)),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(210.dp).clip(RoundedCornerShape(16.dp)),
                         )
-                        Column(Modifier.weight(1f)) {
+                        Text(
+                            value.summary.title,
+                            modifier = Modifier.fillMaxWidth().padding(top = 15.dp),
+                            textAlign = TextAlign.Center,
+                            fontSize = 24.sp,
+                            lineHeight = 29.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val artistText = value.summary.artists.joinToString(" / ") { it.name }
+                        if (artistText.isNotBlank()) {
                             Text(
-                                value.summary.title,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 3,
+                                artistText,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f),
                             )
-                            val artistText = value.summary.artists.joinToString(" / ") { it.name }
-                            if (artistText.isNotBlank()) {
-                                Text(
-                                    artistText,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
+                        }
+                        val metadata = buildList {
+                            value.summary.releaseDate?.takeIf(String::isNotBlank)?.let(::add)
+                            val total = value.totalTracks ?: value.summary.trackCount ?: tracks.size.toLong()
+                            if (total > 0L) add("$total 首歌曲")
+                        }.joinToString(" · ")
+                        if (metadata.isNotBlank()) {
+                            Text(
+                                metadata,
+                                modifier = Modifier.padding(top = 5.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
+                            )
+                        }
+                        if (tracks.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                ProviderDetailAction(
+                                    title = "播放",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        ProviderPlaybackCommands.playQueue(
+                                            context = context,
+                                            tracks = tracks,
+                                            selectedTrackId = tracks.first().id,
+                                            onFailure = { playbackError = it.message ?: "播放失败" },
+                                        )
+                                    },
                                 )
-                            }
-                            value.summary.releaseDate?.takeIf(String::isNotBlank)?.let {
-                                Text(
-                                    it,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
+                                ProviderDetailAction(
+                                    title = "随机",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val shuffled = tracks.shuffled()
+                                        shuffled.firstOrNull()?.let { first ->
+                                            ProviderPlaybackCommands.playQueue(
+                                                context = context,
+                                                tracks = shuffled,
+                                                selectedTrackId = first.id,
+                                                onFailure = { playbackError = it.message ?: "播放失败" },
+                                            )
+                                        }
+                                    },
                                 )
                             }
                         }
                     }
                 }
-                val tracks = value.tracks
                 if (tracks.isNotEmpty()) {
                     item {
-                        ProviderSimpleCard(
-                            "播放全部",
-                            "${value.totalTracks ?: tracks.size.toLong()} 首歌曲 · ${album.id.source.displayName}",
-                            onClick = {
-                                ProviderPlaybackCommands.playQueue(
-                                    context = context,
-                                    tracks = tracks,
-                                    selectedTrackId = tracks.first().id,
-                                    onFailure = { playbackError = it.message ?: "播放失败" },
+                        BasicTextField(
+                            value = trackQuery,
+                            onValueChange = { trackQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 16.sp,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .meloXLiquidButton(
+                                    shape = RoundedCornerShape(22.dp),
+                                    surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f),
                                 )
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            decorationBox = { inner ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (trackQuery.isBlank()) {
+                                        Text(
+                                            "在专辑中搜索",
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
+                                            fontSize = 15.sp,
+                                        )
+                                    }
+                                    inner()
+                                }
                             },
                         )
                     }
-                    items(
-                        tracks,
-                        key = { "album-track:${it.id.source.storageValue}:${it.id.value}" },
-                    ) { track ->
-                        ProviderTrackRow(track) {
-                            ProviderPlaybackCommands.playQueue(
-                                context = context,
-                                tracks = tracks,
-                                selectedTrackId = track.id,
-                                onFailure = { playbackError = it.message ?: "播放失败" },
+                    item { ProviderSectionTitle("歌曲") }
+                    if (filteredTracks.isEmpty()) {
+                        item { ProviderSimpleCard("没有匹配歌曲", "换一个关键词试试") }
+                    } else {
+                        itemsIndexed(
+                            filteredTracks,
+                            key = { _, track -> "album-track:${track.id.source.storageValue}:${track.id.value}" },
+                        ) { index, track ->
+                            ProviderAlbumTrackRow(
+                                index = index + 1,
+                                track = track,
+                                onClick = {
+                                    ProviderPlaybackCommands.playQueue(
+                                        context = context,
+                                        tracks = tracks,
+                                        selectedTrackId = track.id,
+                                        onFailure = { playbackError = it.message ?: "播放失败" },
+                                    )
+                                },
                             )
                         }
                     }
@@ -537,9 +626,12 @@ private fun ProviderArtistDetailScreen(
         loading = false
     }
 
+    val value = detail
+    val tracks = value?.tracks.orEmpty()
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+        contentPadding = PaddingValues(
             start = 20.dp,
             top = 42.dp,
             end = 20.dp,
@@ -548,47 +640,69 @@ private fun ProviderArtistDetailScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Text(
-                "‹ 返回",
-                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 8.dp),
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+            ProviderDetailHeader(
+                title = value?.summary?.name ?: artist.name,
+                onBack = onBack,
             )
         }
         when {
-            capability == null -> item { ProviderSimpleCard("暂不可用", "${artist.id.source.displayName} 尚未实现歌手详情") }
+            capability == null -> item {
+                ProviderSimpleCard("暂不可用", "${artist.id.source.displayName} 尚未实现歌手详情")
+            }
             loading -> item {
                 Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
             error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
-            detail != null -> {
-                val value = detail!!
+            value != null -> {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         AsyncImage(
                             model = value.summary.artworkUrl,
                             contentDescription = null,
-                            modifier = Modifier.size(112.dp).clip(RoundedCornerShape(56.dp)),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(176.dp).clip(CircleShape),
                         )
-                        Column(Modifier.weight(1f)) {
-                            Text(value.summary.name, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                            val countText = buildList {
-                                value.summary.songCount?.let { add("$it 首歌曲") }
-                                value.summary.albumCount?.let { add("$it 张专辑") }
-                            }.joinToString(" · ")
-                            if (countText.isNotBlank()) {
-                                Text(
-                                    countText,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
-                                )
-                            }
+                        Text(
+                            value.summary.name,
+                            modifier = Modifier.fillMaxWidth().padding(top = 13.dp),
+                            textAlign = TextAlign.Center,
+                            fontSize = 28.sp,
+                            lineHeight = 33.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val countText = buildList {
+                            value.summary.songCount?.let { add("$it 首歌曲") }
+                            value.summary.albumCount?.let { add("$it 张专辑") }
+                        }.joinToString(" · ")
+                        if (countText.isNotBlank()) {
+                            Text(
+                                countText,
+                                modifier = Modifier.padding(top = 5.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+                            )
+                        }
+                        if (tracks.isNotEmpty()) {
+                            ProviderDetailAction(
+                                title = "播放热门歌曲",
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                onClick = {
+                                    ProviderPlaybackCommands.playQueue(
+                                        context = context,
+                                        tracks = tracks,
+                                        selectedTrackId = tracks.first().id,
+                                        onFailure = { playbackError = it.message ?: "播放失败" },
+                                    )
+                                },
+                            )
                         }
                     }
                 }
@@ -596,30 +710,17 @@ private fun ProviderArtistDetailScreen(
                     item {
                         Text(
                             description,
-                            maxLines = 5,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
+                            maxLines = 6,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
+                            lineHeight = 19.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                         )
                     }
                 }
-                val tracks = value.tracks
                 if (tracks.isNotEmpty()) {
                     item { ProviderSectionTitle("热门歌曲") }
-                    item {
-                        ProviderSimpleCard(
-                            "播放全部",
-                            "${value.totalTracks ?: tracks.size.toLong()} 首已加载 · ${artist.id.source.displayName}",
-                            onClick = {
-                                ProviderPlaybackCommands.playQueue(
-                                    context = context,
-                                    tracks = tracks,
-                                    selectedTrackId = tracks.first().id,
-                                    onFailure = { playbackError = it.message ?: "播放失败" },
-                                )
-                            },
-                        )
-                    }
                     items(
                         tracks,
                         key = { "artist-track:${it.id.source.storageValue}:${it.id.value}" },
@@ -638,6 +739,96 @@ private fun ProviderArtistDetailScreen(
                 }
                 playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProviderDetailHeader(
+    title: String,
+    onBack: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .meloXLiquidButton(shape = CircleShape)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("‹", fontSize = 30.sp, lineHeight = 30.sp)
+        }
+        Spacer(Modifier.size(12.dp))
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            fontSize = 24.sp,
+            lineHeight = 29.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ProviderDetailAction(
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .meloXLiquidButton(
+                shape = RoundedCornerShape(22.dp),
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ProviderAlbumTrackRow(
+    index: Int,
+    track: MusicTrack,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            index.toString(),
+            modifier = Modifier.size(34.dp),
+            textAlign = TextAlign.Center,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                track.artistText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
+            )
         }
     }
 }
