@@ -5,6 +5,7 @@ import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.ResolvingDataSource
+import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
@@ -31,6 +32,7 @@ class ProviderPlaybackResolver(
     private data class ResolveKey(
         val requestUri: String,
         val authKey: String,
+        val quality: AudioQualityTier,
     )
 
     private val resolvedUris = ConcurrentHashMap<ResolveKey, Uri>()
@@ -48,7 +50,8 @@ class ProviderPlaybackResolver(
         if (uri.host == LegacySongHost) return neteaseResolver.resolveReportedUri(uri)
         if (uri.host != ProviderTrackHost) return uri
         val source = parseSource(uri) ?: return uri
-        return resolvedUris[ResolveKey(uri.toString(), authKeyProvider(source))] ?: uri
+        val quality = currentQuality(uri)
+        return resolvedUris[ResolveKey(uri.toString(), authKeyProvider(source), quality)] ?: uri
     }
 
     private fun resolveProviderUri(uri: Uri): Uri {
@@ -58,12 +61,10 @@ class ProviderPlaybackResolver(
             ?.let(Uri::decode)
             ?.takeIf(String::isNotBlank)
             ?: throw IOException("Invalid MeloX provider track ID: $uri")
-        val key = ResolveKey(uri.toString(), authKeyProvider(source))
+        val quality = currentQuality(uri)
+        val key = ResolveKey(uri.toString(), authKeyProvider(source), quality)
         resolvedUris[key]?.let { return it }
 
-        val quality = uri.getQueryParameter(QualityQuery)
-            ?.let { raw -> AudioQualityTier.entries.firstOrNull { it.name == raw } }
-            ?: AudioQualityTier.Standard
         val id = MusicResourceId(source, resourceValue)
         val track = MusicTrack(
             id = id,
@@ -90,6 +91,16 @@ class ProviderPlaybackResolver(
         }
         resolvedUris[key] = result
         return result
+    }
+
+    private fun currentQuality(uri: Uri): AudioQualityTier {
+        // MusicQualityRuntime is updated by the quality selector before Media3 is
+        // re-prepared. Using it here makes a provider item re-resolve even though
+        // its stable melox://track identity does not change.
+        val runtime = MusicQualityRuntime.selected.toCommonTier()
+        val encoded = uri.getQueryParameter(QualityQuery)
+            ?.let { raw -> AudioQualityTier.entries.firstOrNull { it.name == raw } }
+        return if (MusicQualityRuntime.selected.apiLevel.isNotBlank()) runtime else encoded ?: AudioQualityTier.Standard
     }
 
     private fun parseSource(uri: Uri): MusicSource? {
