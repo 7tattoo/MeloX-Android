@@ -1,19 +1,37 @@
 package com.lladlam.melox.playback
 
+import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicResourceId
 import java.util.concurrent.ConcurrentHashMap
 
 /** Process-local bridge from provider VKey resolution to the shared player UI. */
 object ProviderPlaybackQualityRuntime {
-    private val actualByTrack = ConcurrentHashMap<String, AudioQualityTier>()
+    private data class QualityRecord(
+        val requested: AudioQualityTier,
+        val actual: AudioQualityTier,
+    )
 
-    fun recordActual(id: MusicResourceId, quality: AudioQualityTier) {
-        actualByTrack[PlaybackTrackIdentity.encode(id)] = quality
+    private val actualByTrack = ConcurrentHashMap<String, QualityRecord>()
+
+    fun recordActual(
+        id: MusicResourceId,
+        requested: AudioQualityTier,
+        actual: AudioQualityTier,
+    ) {
+        actualByTrack[PlaybackTrackIdentity.encode(id)] = QualityRecord(requested, actual)
     }
 
-    fun actualFor(id: MusicResourceId?): AudioQualityTier? =
-        id?.let { actualByTrack[PlaybackTrackIdentity.encode(it)] }
+    fun actualFor(id: MusicResourceId?): AudioQualityTier? {
+        id ?: return null
+        val record = actualByTrack[PlaybackTrackIdentity.encode(id)] ?: return null
+        // A quality change updates MusicQualityRuntime before Media3 prepares the
+        // same stable provider item. Do not show the old actual tier while the new
+        // VKey request is still in flight.
+        return record.actual.takeIf {
+            record.requested == MusicQualityRuntime.selected.toCommonTier()
+        }
+    }
 
     fun clear(id: MusicResourceId? = null) {
         if (id == null) actualByTrack.clear()
