@@ -51,9 +51,11 @@ import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UnifiedMusicService
+import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,6 +65,14 @@ private enum class ProviderSearchKind(val title: String) {
     Playlists("歌单"),
     Albums("专辑"),
     Artists("歌手"),
+}
+
+private fun MeloXSearchKind.toProviderSearchKind(): ProviderSearchKind? = when (this) {
+    MeloXSearchKind.Songs -> ProviderSearchKind.Songs
+    MeloXSearchKind.Playlists -> ProviderSearchKind.Playlists
+    MeloXSearchKind.Albums -> ProviderSearchKind.Albums
+    MeloXSearchKind.Artists -> ProviderSearchKind.Artists
+    else -> null
 }
 
 @Composable
@@ -75,6 +85,7 @@ fun ProviderSearchScreen(source: MusicSource) {
     val catalogSearch = provider as? CatalogSearchCapability
     val unifiedEnabled = MusicProviderSelectionStore.unifiedEnabled(context)
     val unifiedSources = MusicProviderSelectionStore.unifiedSources(context)
+    val launchRequest = MeloXSearchLaunchBus.request
 
     var query by remember(source) { mutableStateOf("") }
     var kind by remember(source) { mutableStateOf(ProviderSearchKind.Songs) }
@@ -112,8 +123,11 @@ fun ProviderSearchScreen(source: MusicSource) {
         return
     }
 
-    fun submitSearch() {
-        val normalized = query.trim()
+    fun submitSearch(
+        requestedQuery: String = query,
+        requestedKind: ProviderSearchKind = kind,
+    ) {
+        val normalized = requestedQuery.trim()
         if (normalized.isBlank() || loading) return
         loading = true
         error = null
@@ -121,7 +135,7 @@ fun ProviderSearchScreen(source: MusicSource) {
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    when (kind) {
+                    when (requestedKind) {
                         ProviderSearchKind.Songs -> {
                             if (unifiedEnabled) {
                                 val result = UnifiedMusicService(registry).searchSongs(
@@ -167,6 +181,8 @@ fun ProviderSearchScreen(source: MusicSource) {
                     }
                 }
             }.onSuccess { payload ->
+                kind = requestedKind
+                query = requestedQuery
                 when (payload) {
                     is SearchPayload.Songs -> {
                         songResults = payload.tracks
@@ -183,20 +199,35 @@ fun ProviderSearchScreen(source: MusicSource) {
         }
     }
 
+    LaunchedEffect(launchRequest, source) {
+        val request = launchRequest ?: return@LaunchedEffect
+        val requestedKind = request.kind.toProviderSearchKind() ?: return@LaunchedEffect
+        query = request.query
+        kind = requestedKind
+        MeloXSearchLaunchBus.consume(request)
+        submitSearch(request.query, requestedKind)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 18.dp)
             .padding(top = 44.dp, bottom = MeloXBottomContentClearance),
     ) {
-        Text("${source.displayName} · 搜索", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        if (unifiedEnabled) {
-            Text(
-                "跨平台歌曲搜索已开启 · ${unifiedSources.joinToString(" / ") { it.displayName }}",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.78f),
-            )
-        }
+        Text("搜索", fontSize = 36.sp, fontWeight = FontWeight.Bold)
+        Text(
+            if (unifiedEnabled) {
+                "${source.displayName} · 跨平台歌曲搜索：${unifiedSources.joinToString(" / ") { it.displayName }}"
+            } else {
+                source.displayName
+            },
+            fontSize = 12.sp,
+            color = if (unifiedEnabled) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+            },
+        )
         Spacer(Modifier.height(14.dp))
 
         Row(
@@ -234,7 +265,7 @@ fun ProviderSearchScreen(source: MusicSource) {
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable(
                     enabled = query.isNotBlank() && !loading,
-                    onClick = ::submitSearch,
+                    onClick = { submitSearch() },
                 ),
             )
         }
