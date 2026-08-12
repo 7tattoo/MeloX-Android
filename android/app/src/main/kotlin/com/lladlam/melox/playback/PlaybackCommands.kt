@@ -39,6 +39,12 @@ object PlaybackCommands {
 
     fun currentSongId(): Long? = activeController?.currentMediaItem?.mediaId?.toLongOrNull()
 
+    /**
+     * Existing MeloX screens keep calling this legacy entry point. Provider-backed
+     * bridge models are detected here and dispatched without teaching the UI
+     * anything about QQ Music/Kugou. This is the compatibility seam that allows
+     * future iOS UI migrations to reuse the same actions unchanged.
+     */
     fun playQueue(
         context: Context,
         songs: List<SearchSong>,
@@ -47,6 +53,20 @@ object PlaybackCommands {
         heartMode: Boolean = false,
         onFailure: ((Throwable) -> Unit)? = null,
     ) {
+        val selectedProviderTrack = songs.firstOrNull { it.id == selectedSongId }?.providerTrack
+        if (selectedProviderTrack != null) {
+            val providerTracks = songs.mapNotNull(SearchSong::providerTrack)
+            if (providerTracks.isEmpty()) return
+            ProviderPlaybackCommands.playQueue(
+                context = context,
+                tracks = providerTracks,
+                selectedTrackId = selectedProviderTrack.id,
+                startPositionMs = startPositionMs,
+                onFailure = onFailure,
+            )
+            return
+        }
+
         val appContext = context.applicationContext
         val quality = MusicQualityPreferences.read(appContext)
         MusicQualityRuntime.selected = quality
@@ -99,8 +119,7 @@ object PlaybackCommands {
                     }
                     val startIndex = if (useShuffle) 0 else selectedItemIndex
 
-                    activeController?.takeIf { it !== controller }?.release()
-                    activeController = controller
+                    adoptController(controller)
                     controller.shuffleModeEnabled = false
                     controller.setMediaItems(queue, startIndex, startPositionMs)
                     MeloXPlaybackModeRuntime.heartModeActive = heartMode
@@ -122,14 +141,33 @@ object PlaybackCommands {
 
     fun addToQueue(context: Context, song: SearchSong) {
         val appContext = context.applicationContext
-        val downloads = MeloXDownloadStore.get(appContext)
-        if (!MeloXNetworkAvailability.isOnline(appContext) && !downloads.contains(song.id)) return
         val quality = MusicQualityPreferences.read(appContext)
         val controller = activeController
         if (controller == null) {
             playQueue(context, listOf(song), song.id)
             return
         }
+        val providerTrack = song.providerTrack
+        if (providerTrack != null) {
+            prioritizeManualQueue(controller)
+            val current = controller.currentMediaItemIndex.coerceAtLeast(-1)
+            val manualCount = ((current + 1) until controller.mediaItemCount).count { index ->
+                controller.getMediaItemAt(index).queueOrigin() == QUEUE_ORIGIN_MANUAL
+            }
+            val insertion = (current + 1 + manualCount).coerceIn(0, controller.mediaItemCount)
+            controller.addMediaItem(
+                insertion,
+                ProviderPlaybackCommands.mediaItemFor(
+                    track = providerTrack,
+                    neteaseQuality = quality,
+                    queueOrigin = QUEUE_ORIGIN_MANUAL,
+                ),
+            )
+            return
+        }
+
+        val downloads = MeloXDownloadStore.get(appContext)
+        if (!MeloXNetworkAvailability.isOnline(appContext) && !downloads.contains(song.id)) return
         prioritizeManualQueue(controller)
         val current = controller.currentMediaItemIndex.coerceAtLeast(-1)
         val manualCount = ((current + 1) until controller.mediaItemCount).count { index ->
@@ -149,14 +187,29 @@ object PlaybackCommands {
 
     fun playNext(context: Context, song: SearchSong) {
         val appContext = context.applicationContext
-        val downloads = MeloXDownloadStore.get(appContext)
-        if (!MeloXNetworkAvailability.isOnline(appContext) && !downloads.contains(song.id)) return
         val quality = MusicQualityPreferences.read(appContext)
         val controller = activeController
         if (controller == null) {
             playQueue(context, listOf(song), song.id)
             return
         }
+        val providerTrack = song.providerTrack
+        if (providerTrack != null) {
+            prioritizeManualQueue(controller)
+            val insertion = (controller.currentMediaItemIndex + 1).coerceIn(0, controller.mediaItemCount)
+            controller.addMediaItem(
+                insertion,
+                ProviderPlaybackCommands.mediaItemFor(
+                    track = providerTrack,
+                    neteaseQuality = quality,
+                    queueOrigin = QUEUE_ORIGIN_MANUAL,
+                ),
+            )
+            return
+        }
+
+        val downloads = MeloXDownloadStore.get(appContext)
+        if (!MeloXNetworkAvailability.isOnline(appContext) && !downloads.contains(song.id)) return
         prioritizeManualQueue(controller)
         val insertion = (controller.currentMediaItemIndex + 1).coerceIn(0, controller.mediaItemCount)
         controller.addMediaItem(
@@ -239,6 +292,11 @@ object PlaybackCommands {
         reorderFutureInPlace(player, manual + base)
     }
 
+    internal fun adoptController(controller: MediaController) {
+        activeController?.takeIf { it !== controller }?.release()
+        activeController = controller
+    }
+
     internal fun mediaItemFor(
         song: SearchSong,
         quality: MusicQuality = MusicQualityRuntime.selected,
@@ -246,7 +304,14 @@ object PlaybackCommands {
         originalIndex: Int = QUEUE_ORIGINAL_INDEX_UNSET,
         artworkOverride: Uri? = null,
         heartMode: Boolean = MeloXPlaybackModeRuntime.heartModeActive,
-    ): MediaItem = song.toMediaItem(quality, queueOrigin, originalIndex, artworkOverride, heartMode)
+    ): MediaItem = song.providerTrack?.let { track ->
+        ProviderPlaybackCommands.mediaItemFor(
+            track = track,
+            neteaseQuality = quality,
+            queueOrigin = queueOrigin,
+            originalIndex = originalIndex,
+        )
+    } ?: song.toMediaItem(quality, queueOrigin, originalIndex, artworkOverride, heartMode)
 
     private fun reorderFutureInPlace(player: Player, desiredFuture: List<MediaItem>) {
         val start = player.currentMediaItemIndex + 1
