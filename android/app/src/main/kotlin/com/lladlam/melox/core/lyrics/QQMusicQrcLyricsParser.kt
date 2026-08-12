@@ -17,7 +17,7 @@ object QQMusicQrcLyricsParser {
     private val lineTiming = Regex("^\\[(\\d+),(\\d+)](.*)$")
     private val wordTiming = Regex("\\((\\d+),(\\d+)\\)")
     private val lyricContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
-    private const val AnnotationToleranceMs = 900L
+    private const val AnnotationToleranceMs = 1_500L
 
     fun decryptHex(value: String): String {
         val normalized = value.trim()
@@ -64,9 +64,9 @@ object QQMusicQrcLyricsParser {
             .ifEmpty { NeteaseLyricParser.parseLrc(extractLyricText(romanization)) }
 
         return LyricsDocument(
-            primaryLines.map { line ->
-                val translationLine = nearest(line, translated)
-                val romanizationLine = nearest(line, romanized)
+            primaryLines.mapIndexed { index, line ->
+                val translationLine = alignedAnnotation(line, index, primaryLines.size, translated)
+                val romanizationLine = alignedAnnotation(line, index, primaryLines.size, romanized)
                 line.copy(
                     translation = annotationText(line, translationLine),
                     romanization = annotationText(line, romanizationLine),
@@ -79,6 +79,8 @@ object QQMusicQrcLyricsParser {
     private fun decodePayload(value: String): String {
         val normalized = value.trim().trimEnd('\u0000')
         if (normalized.isBlank()) return ""
+        // QQ changed translation delivery on some endpoints in 2026: the QRC
+        // original can still be encrypted while translation is already plain LRC.
         if (normalized.startsWith('<') || normalized.startsWith('[')) return normalized
         return decryptHex(normalized)
     }
@@ -148,6 +150,17 @@ object QQMusicQrcLyricsParser {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&amp;", "&")
+
+    private fun alignedAnnotation(
+        target: LyricLine,
+        index: Int,
+        primarySize: Int,
+        candidates: List<LyricLine>,
+    ): LyricLine? {
+        nearest(target, candidates)?.let { return it }
+        if (candidates.isEmpty() || kotlin.math.abs(candidates.size - primarySize) > 2) return null
+        return candidates.getOrNull(index)
+    }
 
     private fun nearest(target: LyricLine, candidates: List<LyricLine>): LyricLine? {
         val candidate = candidates.minByOrNull { kotlin.math.abs(it.timeMs - target.timeMs) }
