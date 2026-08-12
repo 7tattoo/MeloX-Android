@@ -562,7 +562,7 @@ fun MeloXSongActionsOverlay(
                                     )
                                     ActionItem("加入邀请房间", "→") {
                                         val parsed = parseListenTogetherInvitation(invitationText)
-                                        if (parsed == null) message = "邀请链接缺少 roomId 或 inviterId"
+                                        if (parsed == null) message = "邀请链接缺少 roomId 或 inviterId/inviterUid"
                                         else if (!busy) {
                                             busy = true
                                             message = null
@@ -701,12 +701,9 @@ private fun shareSong(context: Context, song: SearchSong) {
     }
 }
 
-private fun parseListenTogetherInvitation(value: String): Pair<String, String>? = runCatching {
-    val uri = Uri.parse(value.trim())
-    val room = uri.getQueryParameter("roomId").orEmpty()
-    val inviter = uri.getQueryParameter("inviterId").orEmpty()
-    if (room.isBlank() || inviter.isBlank()) null else room to inviter
-}.getOrNull()
+private fun parseListenTogetherInvitation(value: String): Pair<String, String>? =
+    com.lladlam.melox.core.network.parseNeteaseListenTogetherInvitation(value)
+        ?.let { it.roomId to it.inviterId }
 
 private fun shareListenTogether(context: Context, songId: Long, room: MeloXListenTogetherRoom) {
     val inviter = room.creatorId.ifBlank { room.users.firstOrNull()?.id.orEmpty() }
