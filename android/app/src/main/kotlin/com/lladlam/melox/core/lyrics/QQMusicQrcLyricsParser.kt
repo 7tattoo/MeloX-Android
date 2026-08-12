@@ -21,7 +21,7 @@ object QQMusicQrcLyricsParser {
 
     fun decryptHex(value: String): String {
         val normalized = value.trim()
-        if (normalized.isBlank() || normalized.length % 2 != 0 || !normalized.all(Char::isHexDigit)) return ""
+        if (normalized.isBlank() || normalized.length % 2 != 0 || !normalized.all { it.isHexDigit() }) return ""
         return runCatching {
             val encrypted = ByteArray(normalized.length / 2) { index ->
                 normalized.substring(index * 2, index * 2 + 2).toInt(16).toByte()
