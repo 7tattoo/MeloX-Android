@@ -68,7 +68,10 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.playback.MeloXPlaybackService
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.playback.MeloXPlaybackModePreferences
+import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.settings.MeloXVolumeControlMode
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -94,7 +97,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     private var controller: MediaController? = null
     private val downloadStore = MeloXDownloadStore.get(appContext)
     private val sleepTimerHandler = Handler(Looper.getMainLooper())
-    private var sleepTimerRunnable: Runnable? = null
+    private var pendingMediaClearRunnable: Runnable? = null
 
     var mediaId by mutableStateOf<String?>(null)
         private set
@@ -157,22 +160,34 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
 
     internal fun unbind() {
+        cancelPendingMediaClear()
         controller?.removeListener(listener)
         controller?.release()
         controller = null
-        cancelSleepTimer()
     }
 
     internal fun refresh() {
         val player = controller ?: return
         val item = player.currentMediaItem
+        if (item == null) {
+            // MediaSession.setPlayer() briefly exposes an empty controller while
+            // AutoMix promotes the already-playing incoming deck. Clearing the UI
+            // in that gap collapses Now Playing and strands its back gesture.
+            if (mediaId != null) scheduleDeferredMediaClear(player) else clearMediaState(player)
+            return
+        }
+        cancelPendingMediaClear()
+        MeloXPlaybackModeRuntime.heartModeActive = item.mediaMetadata.extras
+            ?.getBoolean(PlaybackCommands.HEART_MODE_KEY, false) == true
         val metadata = player.mediaMetadata.takeUnless { it == MediaMetadata.EMPTY }
             ?: item?.mediaMetadata
             ?: MediaMetadata.EMPTY
 
         mediaId = item?.mediaId
-        title = metadata.title?.toString().orEmpty()
-        artist = metadata.artist?.toString().orEmpty()
+        val originalTitle = metadata.extras?.getString("melox.system.original_title")
+        val originalArtist = metadata.extras?.getString("melox.system.original_artist")
+        title = originalTitle ?: metadata.title?.toString().orEmpty()
+        artist = originalArtist ?: metadata.artist?.toString().orEmpty()
         album = metadata.albumTitle?.toString().orEmpty()
         val currentSongId = item?.mediaId?.toLongOrNull()
         artworkUrl = currentSongId?.let(downloadStore::localArtworkUri)?.toString()
@@ -187,9 +202,55 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         currentIndex = player.currentMediaItemIndex
         repeatMode = player.repeatMode
         shuffleEnabled = MeloXPlaybackModePreferences.shuffle(appContext)
-        val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-        volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume.toFloat()
+        volume = if (MeloXSettingsRuntime.volumeControlMode == MeloXVolumeControlMode.Player) {
+            player.volume
+        } else {
+            val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume.toFloat()
+        }
+        sleepTimerEndRealtimeMs = com.lladlam.melox.ui.settings.MeloXSettingsPreferences.long(
+            appContext,
+            SLEEP_TIMER_END_KEY,
+            0L,
+        ).takeIf { it > System.currentTimeMillis() } ?: 0L
+        queue = buildQueue(player)
+    }
+
+    private fun scheduleDeferredMediaClear(player: Player) {
+        if (pendingMediaClearRunnable != null) return
+        val runnable = Runnable {
+            pendingMediaClearRunnable = null
+            val active = controller
+            if (active === player && active.currentMediaItem == null) {
+                clearMediaState(active)
+            } else {
+                refresh()
+            }
+        }
+        pendingMediaClearRunnable = runnable
+        sleepTimerHandler.postDelayed(runnable, MEDIA_CLEAR_GRACE_MS)
+    }
+
+    private fun cancelPendingMediaClear() {
+        pendingMediaClearRunnable?.let(sleepTimerHandler::removeCallbacks)
+        pendingMediaClearRunnable = null
+    }
+
+    private fun clearMediaState(player: Player) {
+        cancelPendingMediaClear()
+        MeloXPlaybackModeRuntime.heartModeActive = false
+        mediaId = null
+        title = ""
+        artist = ""
+        album = ""
+        artworkUrl = null
+        isPlaying = false
+        positionMs = 0L
+        durationMs = 0L
+        hasPrevious = false
+        hasNext = false
+        currentIndex = player.currentMediaItemIndex
         queue = buildQueue(player)
     }
 
@@ -200,8 +261,10 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
             MeloXQueueEntry(
                 index = index,
                 mediaId = item.mediaId,
-                title = metadata.title?.toString().orEmpty().ifBlank { "未知歌曲" },
-                artist = metadata.artist?.toString().orEmpty(),
+                title = metadata.extras?.getString("melox.system.original_title")
+                    ?: metadata.title?.toString().orEmpty().ifBlank { "未知歌曲" },
+                artist = metadata.extras?.getString("melox.system.original_artist")
+                    ?: metadata.artist?.toString().orEmpty(),
                 artworkUrl = item.mediaId.toLongOrNull()?.let(downloadStore::localArtworkUri)?.toString()
                     ?: metadata.artworkUri?.toString(),
                 origin = if (metadata.extras?.getString(PlaybackCommands.QUEUE_ORIGIN_KEY) == PlaybackCommands.QUEUE_ORIGIN_MANUAL) {
@@ -223,7 +286,13 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
 
     fun previous() {
-        controller?.seekToPreviousMediaItem()
+        controller?.let { player ->
+            if (MeloXSettingsRuntime.previousRestartsAfterFiveSeconds && player.currentPosition >= 5_000L) {
+                player.seekTo(0L)
+            } else {
+                player.seekToPreviousMediaItem()
+            }
+        }
     }
 
     fun next() {
@@ -271,11 +340,24 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
 
     fun changeVolume(value: Float) {
+        if (MeloXSettingsRuntime.volumeControlMode == MeloXVolumeControlMode.Player) {
+            controller?.volume = value.coerceIn(0f, 1f)
+            volume = controller?.volume ?: value.coerceIn(0f, 1f)
+            return
+        }
         val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val target = (value.coerceIn(0f, 1f) * maxVolume).toInt().coerceIn(0, maxVolume)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
         volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume.toFloat()
+    }
+
+    fun moveQueueItem(from: Int, to: Int) {
+        val player = controller ?: return
+        if (from == player.currentMediaItemIndex || from !in 0 until player.mediaItemCount) return
+        val safeTarget = to.coerceIn(player.currentMediaItemIndex + 1, player.mediaItemCount - 1)
+        if (from != safeTarget) player.moveMediaItem(from, safeTarget)
+        refresh()
     }
 
     fun addCurrentToQueue() {
@@ -299,23 +381,24 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
 }
 
     fun setSleepTimer(minutes: Int) {
-        cancelSleepTimer()
         if (minutes <= 0) return
         val delayMillis = minutes * 60_000L
-        sleepTimerEndRealtimeMs = android.os.SystemClock.elapsedRealtime() + delayMillis
-        val runnable = Runnable {
-            controller?.pause()
-            sleepTimerEndRealtimeMs = 0L
-            sleepTimerRunnable = null
-        }
-        sleepTimerRunnable = runnable
-        sleepTimerHandler.postDelayed(runnable, delayMillis)
+        sleepTimerEndRealtimeMs = System.currentTimeMillis() + delayMillis
+        com.lladlam.melox.ui.settings.MeloXSettingsPreferences.setLong(
+            appContext,
+            SLEEP_TIMER_END_KEY,
+            sleepTimerEndRealtimeMs,
+        )
     }
 
     fun cancelSleepTimer() {
-        sleepTimerRunnable?.let(sleepTimerHandler::removeCallbacks)
-        sleepTimerRunnable = null
         sleepTimerEndRealtimeMs = 0L
+        com.lladlam.melox.ui.settings.MeloXSettingsPreferences.setLong(appContext, SLEEP_TIMER_END_KEY, 0L)
+    }
+
+    private companion object {
+        const val MEDIA_CLEAR_GRACE_MS = 500L
+        const val SLEEP_TIMER_END_KEY = "playback_sleep_timer_end_epoch_ms"
     }
 }
 

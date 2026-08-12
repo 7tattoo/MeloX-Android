@@ -97,6 +97,10 @@ import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
 import com.lladlam.melox.ui.player.MeloXSongActionsOverlay
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
+import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.cloud.MeloXCloudMusicScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.launch
@@ -105,8 +109,18 @@ import kotlin.math.roundToInt
 private enum class MeloXLibraryPage(val title: String) {
     Songs("歌曲"),
     Playlists("歌单"),
+    Podcasts("播客"),
+    Cloud("云盘"),
     History("最近播放"),
     Downloads("下载"),
+}
+
+private fun MeloXLibraryPage.isEnabled(): Boolean = when (this) {
+    MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled
+    MeloXLibraryPage.History -> MeloXSettingsRuntime.listeningHistoryEnabled
+    MeloXLibraryPage.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled
+    MeloXLibraryPage.Downloads -> MeloXSettingsRuntime.downloadsEnabled
+    else -> true
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -128,7 +142,16 @@ fun LibraryScreen(
     val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
     val downloadStore = remember(appContext) { MeloXDownloadStore.get(appContext) }
 
-    var selectedPage by remember { mutableStateOf(MeloXLibraryPage.Songs) }
+    val initialLibraryPage = remember {
+        val name = if (MeloXSettingsRuntime.rememberLibraryPage) {
+            MeloXSettingsPreferences.string(appContext, "library_last_page", MeloXSettingsRuntime.defaultLibraryPage)
+        } else MeloXSettingsRuntime.defaultLibraryPage
+        runCatching { MeloXLibraryPage.valueOf(name) }
+            .getOrDefault(MeloXLibraryPage.Songs)
+            .takeIf { it.isEnabled() }
+            ?: MeloXLibraryPage.Songs
+    }
+    var selectedPage by remember { mutableStateOf(initialLibraryPage) }
     var selectedPlaylist by remember(session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
     var snapshot by remember(session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
     var loading by remember(session.cookie) { mutableStateOf(false) }
@@ -156,6 +179,21 @@ fun LibraryScreen(
         if (NeteaseLibraryCache.beginLibraryColdStartRefresh(userId)) {
             refreshLibrary()
         }
+    }
+
+    LaunchedEffect(selectedPage) {
+        if (MeloXSettingsRuntime.rememberLibraryPage) {
+            MeloXSettingsPreferences.setString(appContext, "library_last_page", selectedPage.name)
+        }
+    }
+
+    LaunchedEffect(
+        MeloXSettingsRuntime.podcastsEnabled,
+        MeloXSettingsRuntime.listeningHistoryEnabled,
+        MeloXSettingsRuntime.cloudMusicEnabled,
+        MeloXSettingsRuntime.downloadsEnabled,
+    ) {
+        if (!selectedPage.isEnabled()) selectedPage = MeloXLibraryPage.Songs
     }
 
     BackHandler(enabled = playlistBackEnabled && selectedPlaylist != null) {
@@ -284,6 +322,15 @@ fun LibraryScreen(
                                         )
                                     }
                                 },
+                                onHeartMode = {
+                                    val seed = data.likedSongs.randomOrNull()
+                                    val playlistId = data.playlists.firstOrNull()?.id
+                                    if (seed != null && playlistId != null) scope.launch {
+                                        runCatching { client.intelligenceModeSongs(seed.id, playlistId) }
+                                            .onSuccess { songs -> songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id, heartMode = true) } }
+                                            .onFailure { errorMessage = it.message ?: "无法启动心动模式" }
+                                    }
+                                },
                             )
 
                             MeloXLibraryPage.Playlists -> MeloXLibraryPlaylistsPage(
@@ -293,6 +340,10 @@ fun LibraryScreen(
                                 sharedTransitionScope = sharedScope,
                                 animatedVisibilityScope = playlistTransitionVisibilityScope,
                             )
+
+                            MeloXLibraryPage.Podcasts -> MeloXPodcastScreen(subscriptionsOnly = true)
+
+                            MeloXLibraryPage.Cloud -> MeloXCloudMusicScreen()
 
                             MeloXLibraryPage.History -> MeloXLibrarySongsPage(
                                 songs = data.recentSongs,
@@ -711,7 +762,7 @@ private fun MeloXLibrarySegmentedPicker(
     onSelected: (MeloXLibraryPage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val pages = MeloXLibraryPage.entries
+    val pages = MeloXLibraryPage.entries.filter { it.isEnabled() }
     val panelShape = RoundedCornerShape(16.dp)
     val lensShape = RoundedCornerShape(15.dp)
     val panelBackdrop = rememberLayerBackdrop()
@@ -823,6 +874,7 @@ private fun MeloXLibrarySongsPage(
     songs: List<SearchSong>,
     onPlay: (SearchSong) -> Unit,
     onPlayAll: () -> Unit,
+    onHeartMode: (() -> Unit)? = null,
 ) {
     if (songs.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -841,6 +893,16 @@ private fun MeloXLibrarySongsPage(
     ) {
         item {
             MeloXPlayAllRow(onPlayAll)
+            onHeartMode?.let { action ->
+                Row(
+                    Modifier.fillMaxWidth().height(52.dp).clickable(onClick = action).padding(start = 20.dp, end = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text("♥", color = Color(0xFFFF3147), fontSize = 23.sp)
+                    Text("心动模式", fontSize = 17.sp, color = MaterialTheme.colorScheme.onBackground)
+                }
+            }
             MeloXInsetDivider(leading = 68.dp)
         }
         items(songs, key = { it.id }) { song ->
@@ -1487,7 +1549,10 @@ private fun MeloXStandardPlaylistHero(
             )
 
             Text(
-                text = "${if (playlist.trackCount > 0) playlist.trackCount else tracks.size} 首歌曲 · ${compactPlayCount(playlist.playCount)} 次播放",
+                text = buildString {
+                    append("${if (playlist.trackCount > 0) playlist.trackCount else tracks.size} 首歌曲")
+                    if (MeloXSettingsRuntime.showPlaylistPlayCount && playlist.playCount > 0) append(" · ${compactPlayCount(playlist.playCount)} 次播放")
+                },
                 modifier = Modifier.padding(top = 7.dp),
                 color = secondary,
                 fontSize = 15.sp,

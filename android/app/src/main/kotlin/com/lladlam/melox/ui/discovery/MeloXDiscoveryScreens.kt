@@ -46,16 +46,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseHomeContent
 import com.lladlam.melox.core.library.NeteaseLibraryCache
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import kotlinx.coroutines.launch
 
 private val Accent = Color(0xFFFF3147)
-private val Categories = listOf("推荐歌单", "排行榜", "精品歌单", "全部", "华语", "欧美", "流行", "摇滚", "民谣", "电子", "轻音乐", "影视原声", "ACG")
+private val Categories = listOf("推荐歌单", "排行榜", "精品歌单", "播客", "全部", "华语", "欧美", "流行", "摇滚", "民谣", "电子", "轻音乐", "影视原声", "ACG")
 
 @Composable
 fun MeloXHomeScreen() {
@@ -63,10 +66,12 @@ fun MeloXHomeScreen() {
     val cache = remember(context) { NeteaseLibraryCache(context) }
     val client = remember(context) { NeteaseLibraryClient({ NeteaseSessionStore.readCookie(context) }) }
     val scope = rememberCoroutineScope()
+    val session = rememberNeteaseSessionStore()
     var content by remember { mutableStateOf<NeteaseHomeContent?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var selectedPlaylist by remember { mutableStateOf<NeteasePlaylistSummary?>(null) }
+    var activeAction by remember { mutableStateOf<String?>(null) }
 
     selectedPlaylist?.let { playlist ->
         DiscoveryPlaylistDetail(playlist = playlist, onBack = { selectedPlaylist = null })
@@ -77,7 +82,7 @@ fun MeloXHomeScreen() {
         if (refreshing) return
         scope.launch {
             refreshing = true
-            runCatching { client.homeContent() }
+            runCatching { client.homeContent(area = MeloXSettingsRuntime.musicArea) }
                 .onSuccess { content = it; cache.saveHomeContent(it); error = null }
                 .onFailure { error = it.message ?: "首页加载失败" }
             refreshing = false
@@ -85,6 +90,7 @@ fun MeloXHomeScreen() {
     }
     LaunchedEffect(Unit) {
         content = cache.loadHomeContent()
+        if (session.isLoggedIn) session.refreshProfile()
         if (NeteaseLibraryCache.beginHomeColdStartRefresh()) refresh()
     }
 
@@ -99,11 +105,75 @@ fun MeloXHomeScreen() {
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 item { LargeTitle("首页") }
-                item { SectionTitle("每日推荐", "下拉可刷新") }
-                item { PlaylistRow(value.playlists) { selectedPlaylist = it } }
-                item { SectionTitle("为你推荐", "新歌") }
-                items(value.newSongs, key = { it.id }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.newSongs, song.id) } }
+                MeloXSettingsRuntime.homeSectionOrder.forEach { section ->
+                    when (section) {
+                        "QuickActions" -> if (MeloXSettingsRuntime.homeQuickActionsEnabled) item {
+                            HomeQuickActions(activeAction) { action ->
+                                activeAction = action
+                                scope.launch {
+                                    runCatching {
+                                        when (action) {
+                                            "每日推荐" -> client.dailyRecommendedSongs()
+                                            "热歌榜" -> client.hotSongs()
+                                            "私人漫游" -> client.personalFm(explore = true)
+                                            "相似歌曲" -> PlaybackCommands.currentSongId()?.let { client.similarSongsBlocking(it) }
+                                                ?: throw IllegalStateException("请先播放一首歌曲")
+                                            "心动模式" -> {
+                                                val userId = session.profile?.userId ?: throw IllegalStateException("请先登录网易云音乐")
+                                                val snapshot = client.snapshot(userId)
+                                                val seed = snapshot.likedSongs.randomOrNull() ?: throw IllegalStateException("收藏歌曲为空")
+                                                val playlist = snapshot.playlists.firstOrNull() ?: throw IllegalStateException("没有可用歌单")
+                                                client.intelligenceModeSongs(seed.id, playlist.id)
+                                            }
+                                            else -> emptyList()
+                                        }
+                                    }.onSuccess { songs ->
+                                        songs.firstOrNull()?.let {
+                                            PlaybackCommands.playQueue(context, songs, it.id, heartMode = action == "心动模式")
+                                        }
+                                            ?: run { error = "没有可播放的推荐歌曲" }
+                                    }.onFailure { error = it.message ?: "$action 加载失败" }
+                                    activeAction = null
+                                }
+                            }
+                        }
+                        "Playlists" -> if (MeloXSettingsRuntime.homePlaylistsEnabled) {
+                            item { SectionTitle("每日推荐", "下拉刷新") }
+                            item { PlaylistRow(value.playlists) { selectedPlaylist = it } }
+                        }
+                        "NewSongs" -> if (MeloXSettingsRuntime.homeNewSongsEnabled) {
+                            item { SectionTitle("为你推荐", "新歌") }
+                            items(value.newSongs, key = { it.id }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.newSongs, song.id) } }
+                        }
+                    }
+                }
                 error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
+    val actions = listOf(
+        Triple("每日推荐", "每日更新", Color(0xFFFF3155)),
+        Triple("热歌榜", "全站热门", Color(0xFFFF7A28)),
+        Triple("心动模式", "为你心动", Color(0xFFEF4F9A)),
+        Triple("私人漫游", "探索模式", Color(0xFF4285F4)),
+        Triple("相似歌曲", "从当前歌曲出发", Color(0xFF17A589)),
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(actions, key = { it.first }) { (title, eyebrow, tint) ->
+            Column(
+                Modifier.width(172.dp).height(102.dp).clip(RoundedCornerShape(18.dp))
+                    .background(tint).clickable(enabled = active == null) { perform(title) }.padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(eyebrow, color = Color.White.copy(alpha = .76f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    if (active == title) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                }
             }
         }
     }
@@ -115,7 +185,11 @@ fun MeloXExploreScreen() {
     val cache = remember(context) { NeteaseLibraryCache(context) }
     val client = remember(context) { NeteaseLibraryClient({ NeteaseSessionStore.readCookie(context) }) }
     val scope = rememberCoroutineScope()
-    var category by remember { mutableStateOf(Categories.first()) }
+    val visibleCategories = Categories.filter { item ->
+        (item != "精品歌单" || MeloXSettingsRuntime.showHighQualityPlaylists) &&
+            (item != "播客" || MeloXSettingsRuntime.podcastsEnabled)
+    }
+    var category by remember { mutableStateOf(visibleCategories.first()) }
     var playlists by remember { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -127,6 +201,7 @@ fun MeloXExploreScreen() {
     }
 
     fun refresh() {
+        if (category == "播客") return
         if (refreshing) return
         val requested = category
         scope.launch {
@@ -138,6 +213,7 @@ fun MeloXExploreScreen() {
         }
     }
     LaunchedEffect(category) {
+        if (category == "播客") return@LaunchedEffect
         playlists = cache.loadExplore(category).orEmpty()
         if (NeteaseLibraryCache.beginExploreColdStartRefresh(category)) refresh()
     }
@@ -148,7 +224,7 @@ fun MeloXExploreScreen() {
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(Categories) { item ->
+            items(visibleCategories) { item ->
                 Text(
                     text = item.removeSuffix("歌单"),
                     modifier = Modifier
@@ -162,8 +238,14 @@ fun MeloXExploreScreen() {
                 )
             }
         }
-        PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.weight(1f)) {
-            if (playlists.isEmpty()) EmptyOrLoading(refreshing, error) else PlaylistGrid(playlists) { selectedPlaylist = it }
+        Box(modifier = Modifier.weight(1f)) {
+            if (category == "播客") {
+                MeloXPodcastScreen()
+            } else {
+                PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
+                    if (playlists.isEmpty()) EmptyOrLoading(refreshing, error) else PlaylistGrid(playlists) { selectedPlaylist = it }
+                }
+            }
         }
     }
 }
@@ -193,7 +275,16 @@ private fun PlaylistCard(value: NeteasePlaylistSummary, modifier: Modifier, onCl
     Column(modifier.clickable(onClick = onClick)) {
         AsyncImage(value.coverUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(174.dp).clip(RoundedCornerShape(14.dp)))
         Text(value.name, modifier = Modifier.padding(top = 7.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+        if (MeloXSettingsRuntime.showPlaylistPlayCount && value.playCount > 0L) {
+            Text("${compactCount(value.playCount)} 次播放", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .42f), fontSize = 11.sp)
+        }
     }
+}
+
+private fun compactCount(value: Long): String = when {
+    value >= 100_000_000L -> "%.1f亿".format(value / 100_000_000.0)
+    value >= 10_000L -> "%.1f万".format(value / 10_000.0)
+    else -> value.toString()
 }
 
 @Composable

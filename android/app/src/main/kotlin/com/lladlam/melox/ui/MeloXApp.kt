@@ -1,5 +1,7 @@
 package com.lladlam.melox.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
@@ -36,6 +38,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +69,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -72,6 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
+import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.BuildConfig
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
@@ -90,8 +97,18 @@ import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.search.SearchScreen
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import com.lladlam.melox.ui.settings.SettingsScreen
+import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.core.network.MeloXSearchKind
+import com.lladlam.melox.core.network.NeteaseClipboardLink
+import com.lladlam.melox.core.network.NeteaseClipboardTarget
+import com.lladlam.melox.core.library.NeteaseLibraryClient
+import com.lladlam.melox.core.update.MeloXRelease
+import com.lladlam.melox.core.update.MeloXUpdateClient
+import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 enum class AppTab(val title: String) {
@@ -108,13 +125,28 @@ private val MeloXAccent = Color(0xFFFF3147)
 @Composable
 fun MeloXApp(
     openNowPlayingRequest: Int = 0,
+    clipboardLinkRequest: String? = null,
+    onClipboardLinkConsumed: () -> Unit = {},
 ) {
-    var selectedTab by remember { mutableStateOf(AppTab.Home) }
+    val context = LocalContext.current.applicationContext
+    val initialTab = runCatching {
+        AppTab.valueOf(
+            if (MeloXSettingsRuntime.rememberLastTab) {
+                MeloXSettingsPreferences.string(context, "general_last_tab", MeloXSettingsRuntime.defaultTab)
+            } else MeloXSettingsRuntime.defaultTab,
+        )
+    }.getOrDefault(AppTab.Home)
+    var selectedTab by remember { mutableStateOf(initialTab) }
     var showNeteaseLogin by remember { mutableStateOf(false) }
     var loginReturnTab by remember { mutableStateOf(AppTab.Settings) }
     var tabBarMinimized by remember { mutableStateOf(false) }
     var scrollAccumulator by remember { mutableFloatStateOf(0f) }
     var libraryModalVisible by remember { mutableStateOf(false) }
+    var onboardingPage by remember {
+        mutableStateOf(if (MeloXSettingsPreferences.boolean(context, "onboarding_completed", false)) -1 else 0)
+    }
+    var availableUpdate by remember { mutableStateOf<MeloXRelease?>(null) }
+    var heartModeLaunchAttempted by remember { mutableStateOf(false) }
     val playbackState = rememberMeloXPlaybackUiState()
     val playerTransitionState = remember { SeekableTransitionState(false) }
     val playerTransition = rememberTransition(
@@ -122,6 +154,7 @@ fun MeloXApp(
         label = "melox-player-transition",
     )
     val playerScope = rememberCoroutineScope()
+    val clipboardTarget = remember(clipboardLinkRequest) { clipboardLinkRequest?.let(NeteaseClipboardLink::parse) }
     val openPlayer: () -> Unit = {
         if (playbackState.hasMedia) {
             playerScope.launch {
@@ -156,6 +189,20 @@ fun MeloXApp(
         )
     }
     val bottomChromeBackdrop = rememberLayerBackdrop()
+
+    LaunchedEffect(Unit) {
+        if (MeloXSettingsPreferences.boolean(context, "update_auto_check", true)) {
+            val now = System.currentTimeMillis()
+            val last = MeloXSettingsPreferences.string(context, "update_last_check_ms", "0").toLongOrNull() ?: 0L
+            if (now - last >= 24L * 60L * 60L * 1000L) {
+                MeloXSettingsPreferences.setString(context, "update_last_check_ms", now.toString())
+                val client = MeloXUpdateClient()
+                runCatching { client.latestStableRelease() }.getOrNull()?.let { release ->
+                    if (client.isNewer(release.version, BuildConfig.VERSION_NAME)) availableUpdate = release
+                }
+            }
+        }
+    }
 
     val tabBarMinimizeConnection = remember {
         object : NestedScrollConnection {
@@ -194,6 +241,10 @@ fun MeloXApp(
         }
     }
 
+    LaunchedEffect(clipboardLinkRequest, clipboardTarget) {
+        if (clipboardLinkRequest != null && clipboardTarget == null) onClipboardLinkConsumed()
+    }
+
     LaunchedEffect(playbackState.hasMedia) {
         if (!playbackState.hasMedia) {
             playerTransitionState.snapTo(false)
@@ -206,10 +257,53 @@ fun MeloXApp(
         }
     }
 
+    LaunchedEffect(
+        neteaseSession.cookie,
+        onboardingPage,
+        MeloXSettingsRuntime.startsHeartModeOnLaunch,
+        playbackState.hasMedia,
+    ) {
+        if (heartModeLaunchAttempted || onboardingPage >= 0 || playbackState.hasMedia ||
+            !MeloXSettingsRuntime.startsHeartModeOnLaunch || !neteaseSession.isLoggedIn
+        ) return@LaunchedEffect
+        heartModeLaunchAttempted = true
+        if (neteaseSession.profile == null) neteaseSession.refreshProfile(force = true)
+        val userId = neteaseSession.profile?.userId ?: return@LaunchedEffect
+        val client = NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
+        val songs = runCatching {
+            val snapshot = client.snapshot(userId)
+            val seed = snapshot.likedSongs.randomOrNull() ?: error("收藏歌曲为空")
+            val playlist = snapshot.playlists.firstOrNull() ?: error("没有可用歌单")
+            client.intelligenceModeSongs(seed.id, playlist.id)
+        }.getOrNull().orEmpty()
+        songs.firstOrNull()?.let { first ->
+            PlaybackCommands.playQueue(context, songs, first.id, heartMode = true)
+        }
+    }
+
     LaunchedEffect(selectedTab) {
         tabBarMinimized = false
         scrollAccumulator = 0f
         if (selectedTab != AppTab.Library) libraryModalVisible = false
+        if (MeloXSettingsRuntime.rememberLastTab) {
+            MeloXSettingsPreferences.setString(context, "general_last_tab", selectedTab.name)
+        }
+    }
+
+    val visibleRootTabs = MeloXSettingsRuntime.tabOrder.mapNotNull { runCatching { AppTab.valueOf(it) }.getOrNull() }
+        .filter {
+            when (it) {
+                AppTab.Home -> MeloXSettingsRuntime.homeTabEnabled
+                AppTab.Explore -> MeloXSettingsRuntime.exploreTabEnabled
+                AppTab.Library -> MeloXSettingsRuntime.libraryTabEnabled
+                AppTab.Settings -> true
+                AppTab.Search -> false
+            }
+        }.let { if (AppTab.Settings in it) it else it + AppTab.Settings }
+    LaunchedEffect(visibleRootTabs, selectedTab) {
+        if (selectedTab !in visibleRootTabs && selectedTab != AppTab.Search) {
+            selectedTab = visibleRootTabs.first()
+        }
     }
 
     CompositionLocalProvider(LocalMeloXBackdrop provides screenControlBackdrop) {
@@ -269,6 +363,7 @@ fun MeloXApp(
                     },
                     hasMedia = playbackState.hasMedia,
                     minimized = tabBarMinimized,
+                    visibleRootTabs = visibleRootTabs,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     miniPlayer = { compactProgress ->
                         playerTransition.AnimatedVisibility(
@@ -352,6 +447,82 @@ fun MeloXApp(
                 },
             )
         }
+        clipboardTarget?.let { target ->
+            AlertDialog(
+                onDismissRequest = onClipboardLinkConsumed,
+                title = { Text("打开剪贴板链接？") },
+                text = { Text(if (target is NeteaseClipboardTarget.Song) "检测到网易云歌曲，是否立即播放？" else "检测到网易云歌单，是否立即打开并播放？") },
+                dismissButton = { TextButton(onClick = onClipboardLinkConsumed) { Text("取消") } },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onClipboardLinkConsumed()
+                        playerScope.launch {
+                            val client = NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
+                            val songs = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    when (target) {
+                                        is NeteaseClipboardTarget.Song -> client.songDetailsBlocking(listOf(target.id))
+                                        is NeteaseClipboardTarget.Playlist -> client.playlistDetailBlocking(target.id).songs
+                                    }
+                                }.getOrDefault(emptyList())
+                            }
+                            songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) }
+                        }
+                    }) { Text("打开") }
+                },
+            )
+        }
+        if (onboardingPage >= 0) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(if (onboardingPage == 0) "欢迎使用 MeloX" else "连接网易云音乐") },
+                text = {
+                    Text(
+                        if (onboardingPage == 0) {
+                            "用原生方式发现、播放和收藏网易云音乐。MeloX 是非官方第三方客户端，与网易云音乐及其关联公司不存在隶属、合作或授权关系。"
+                        } else {
+                            "登录后可以同步收藏歌曲、歌单和播放历史，并使用每日推荐等账号功能。登录不是开始使用 MeloX 的必要条件，Cookie 只保存在本机。"
+                        },
+                    )
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        if (onboardingPage == 0) {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/lladlam/MeloX-Android"))) }
+                        } else {
+                            MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
+                            onboardingPage = -1
+                        }
+                    }) { Text(if (onboardingPage == 0) "项目与许可" else "稍后再说") }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (onboardingPage == 0) {
+                            onboardingPage = 1
+                        } else {
+                            MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
+                            onboardingPage = -1
+                            loginReturnTab = AppTab.Settings
+                            showNeteaseLogin = true
+                        }
+                    }) { Text(if (onboardingPage == 0) "继续" else "登录网易云音乐") }
+                },
+            )
+        }
+        availableUpdate?.takeIf { onboardingPage < 0 }?.let { release ->
+            AlertDialog(
+                onDismissRequest = { availableUpdate = null },
+                title = { Text("发现 MeloX ${release.version}") },
+                text = { Text(release.name + release.notes.takeIf(String::isNotBlank)?.let { "\n\n${it.take(500)}" }.orEmpty()) },
+                dismissButton = { TextButton(onClick = { availableUpdate = null }) { Text("稍后") } },
+                confirmButton = {
+                    TextButton(onClick = {
+                        availableUpdate = null
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl ?: release.pageUrl))) }
+                    }) { Text(if (release.apkUrl != null) "下载 APK" else "查看发布") }
+                },
+            )
+        }
       }
     }
 }
@@ -388,6 +559,7 @@ private fun MeloXBottomChrome(
     onSelect: (AppTab) -> Unit,
     hasMedia: Boolean,
     minimized: Boolean,
+    visibleRootTabs: List<AppTab>,
     modifier: Modifier = Modifier,
     miniPlayer: @Composable (compactProgress: Float) -> Unit,
 ) {
@@ -439,7 +611,7 @@ private fun MeloXBottomChrome(
                 AppTab.Explore to RootGlyph.Explore,
                 AppTab.Library to RootGlyph.Library,
                 AppTab.Settings to RootGlyph.Settings,
-            )
+            ).filter { it.first in visibleRootTabs }
 
             val desiredCompactMiniVisibleWidth =
                 (maxWidth - horizontalMargin * 2 - compactSize * 2 - compactGap * 2)
@@ -491,8 +663,9 @@ private fun MeloXBottomChrome(
                     .pointerInput(progress, selectedTab) {
                         detectTapGestures { tap ->
                             if (progress < 0.56f) {
-                                val segmentWidth = size.width / 4f
-                                val index = (tap.x / segmentWidth).toInt().coerceIn(0, 3)
+                                val segmentWidth = size.width / primaryTabs.size.coerceAtLeast(1).toFloat()
+                                val index = (tap.x / segmentWidth).toInt()
+                                    .coerceIn(0, primaryTabs.lastIndex.coerceAtLeast(0))
                                 onSelect(primaryTabs[index].first)
                             } else if (progress >= 0.68f) {
                                 onSelect(selectedTab)
@@ -505,8 +678,9 @@ private fun MeloXBottomChrome(
                 val selectionEdgeInset = 5.dp
                 val selectionEdgeInsetPx = with(density) { selectionEdgeInset.toPx() }
                 val selectionTravelWidthPx = (tabBarMaxWidthPx - selectionEdgeInsetPx * 2f).coerceAtLeast(1f)
-                val selectionSegmentPx = selectionTravelWidthPx / 4f
-                val selectionWidth = (maxWidth - selectionEdgeInset * 2f) / 4f
+                val tabCount = primaryTabs.size.coerceAtLeast(1)
+                val selectionSegmentPx = selectionTravelWidthPx / tabCount.toFloat()
+                val selectionWidth = (maxWidth - selectionEdgeInset * 2f) / tabCount.toFloat()
                 Box(Modifier.fillMaxSize()) {
                     Row(
                         modifier = Modifier

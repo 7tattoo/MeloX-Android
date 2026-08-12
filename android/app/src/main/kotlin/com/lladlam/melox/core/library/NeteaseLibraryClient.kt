@@ -39,7 +39,7 @@ class NeteaseLibraryClient(
     suspend fun playlistDetail(playlistId: Long): NeteasePlaylistDetail =
         withContext(Dispatchers.IO) { playlistDetailBlocking(playlistId) }
 
-    suspend fun homeContent(limit: Int = 12): NeteaseHomeContent = withContext(Dispatchers.IO) {
+    suspend fun homeContent(limit: Int = 12, area: String = "全部"): NeteaseHomeContent = withContext(Dispatchers.IO) {
         val authenticated = NeteaseSessionStore.containsMusicU(cookieProvider())
         val playlistsResponse = eapi(
             uri = "/api/personalized/playlist",
@@ -48,7 +48,16 @@ class NeteaseLibraryClient(
         )
         val songsResponse = eapi(
             uri = "/api/personalized/newsong",
-            data = JSONObject().put("type", "recommend").put("limit", limit).put("areaId", 0),
+            data = JSONObject().put("type", "recommend").put("limit", limit).put(
+                "areaId",
+                when (area) {
+                    "华语" -> 7
+                    "日本" -> 8
+                    "韩国" -> 16
+                    "欧美" -> 96
+                    else -> 0
+                },
+            ),
             authenticated = authenticated,
         )
         val songItems = songsResponse.optJSONArray("result") ?: JSONArray()
@@ -93,6 +102,57 @@ class NeteaseLibraryClient(
             } ?: JSONArray()
             parsePlaylists(values)
         }
+
+    suspend fun intelligenceModeSongs(seedSongId: Long, playlistId: Long): List<SearchSong> = withContext(Dispatchers.IO) {
+        ensureLoggedIn()
+        val response = eapi(
+            uri = "/api/playmode/intelligence/list",
+            data = JSONObject().put("songId", seedSongId).put("type", "fromPlayOne")
+                .put("playlistId", playlistId).put("startMusicId", seedSongId).put("count", 1),
+            authenticated = true,
+        )
+        val data = response.optJSONArray("data") ?: JSONArray()
+        val ids = buildList {
+            for (index in 0 until data.length()) data.optJSONObject(index)?.optLong("id", 0L)?.takeIf { it > 0L }?.let(::add)
+        }
+        if (ids.isEmpty()) throw IOException("网易云暂时没有返回可播放的心动模式歌曲")
+        val byId = ids.chunked(100).flatMap { page -> songDetailsBlocking(page) }.associateBy(SearchSong::id)
+        ids.mapNotNull(byId::get)
+    }
+
+    suspend fun dailyRecommendedSongs(): List<SearchSong> = withContext(Dispatchers.IO) {
+        ensureLoggedIn()
+        val response = eapi(
+            "/api/v3/discovery/recommend/songs",
+            JSONObject().put("offset", 0).put("total", true).put("limit", 100),
+            true,
+        )
+        val values = response.optJSONObject("data")?.optJSONArray("dailySongs")
+            ?: response.optJSONArray("recommend") ?: JSONArray()
+        buildList {
+            for (index in 0 until values.length()) parseSong(values.optJSONObject(index))?.let(::add)
+        }
+    }
+
+    suspend fun personalFm(explore: Boolean = true, limit: Int = 30): List<SearchSong> = withContext(Dispatchers.IO) {
+        ensureLoggedIn()
+        val response = eapi(
+            "/api/v1/radio/get",
+            JSONObject().put("mode", if (explore) "EXPLORE" else "FAMILIAR").put("limit", limit.coerceIn(1, 50)),
+            true,
+        )
+        val values = response.optJSONArray("data") ?: JSONArray()
+        buildList {
+            for (index in 0 until values.length()) parseSong(values.optJSONObject(index))?.let(::add)
+        }
+    }
+
+    suspend fun hotSongs(): List<SearchSong> = withContext(Dispatchers.IO) {
+        val charts = explorePlaylists("排行榜", 80)
+        val hot = charts.firstOrNull { it.name.contains("热歌") } ?: charts.firstOrNull()
+            ?: throw IOException("网易云没有返回排行榜")
+        playlistDetailBlocking(hot.id).songs
+    }
 
     fun similarSongsBlocking(songId: Long, limit: Int = 50): List<SearchSong> {
         if (songId <= 0L) return emptyList()
