@@ -7,13 +7,17 @@
 1. **统一数据，不强行统一产品能力。**
    - `MusicTrack`、`MusicResourceId`、`PlaybackResolution`、`LyricsDocument` 等是跨平台语义。
    - 云盘、私人 FM、心动模式、一起听、网易云播客、私信、识曲等能力不要求 QQ/酷狗提供伪实现。
-2. **统一 MeloX 视觉语言，不统一页面内容。**
-   - MiniPlayer、Now Playing、歌词、Liquid Glass、转场等属于 MeloX Shell。
-   - 首页、发现、音乐库/我的、推荐模块由 `MusicExperience` 决定。
+2. **统一 MeloX 页面骨架，Provider 只决定数据、模块可见性与额外能力。**
+   - 首页、发现、搜索、音乐库、歌单/专辑/歌手详情、MiniPlayer、Now Playing、歌词、Liquid Glass、转场等都优先复用从 MeloX iOS 迁移到 Android 的现有 UI。
+   - 不为网易云、QQ、酷狗长期维护三套同用途页面；同一音乐概念必须优先使用同一 Renderer / Layout。
+   - Provider 缺少某项能力时隐藏对应 section/action，不显示假数据或“占位功能”。
+   - Provider 比网易云多出的真实能力，以附加 section/action 插入共享 MeloX 页面，不为此复制整页 UI。
+   - Provider 名称/来源是内容元数据，不应让整个 App 变成不同品牌的视觉界面。
 3. **网易云模式继续以 MeloX iOS 为迁移基准。**
    - Android 的多 Provider 架构不得反向要求 iOS 支持 QQ/酷狗。
-   - iOS 新增的网易云专属功能应优先进入 Android 的 NetEase capability / experience，而不是扩大所有 Provider 的强制接口。
-4. **Provider 只负责“怎么从平台得到数据”，Core 负责“播放器需要什么”。**
+   - iOS 新增 UI 功能首先进入共享 MeloX UI；若它依赖网易云专属能力，则该 section 只对 NetEase 可见。
+   - iOS 新增的网易云专属业务应优先进入 Android 的 NetEase capability，而不是扩大所有 Provider 的强制接口。
+4. **Provider 只负责“怎么从平台得到数据/执行平台操作”，Core 负责“播放器和 UI 需要什么”。**
 5. **用户登录态只保存在本机。**
    - MeloX 不要求中转服务器保存用户的音乐平台 Cookie / Token。
 6. **跨平台聚合显式 opt-in。**
@@ -24,11 +28,11 @@
 ## 四层结构
 
 ```text
-MeloX Shell
-  Player / MiniPlayer / Lyrics / Liquid Glass / transitions
+Shared MeloX UI (iOS migration target)
+  Home / Explore / Search / Library / Detail / Player / Lyrics / Glass
         |
-Experience Layer
-  NeteaseExperience / QQMusicExperience / KugouExperience
+UI Capability Adapter
+  show/hide shared sections + inject provider-only sections
         |
 Capability + Domain
   Search / Playback / Lyrics / Album / Artist / Playlist / ...
@@ -36,6 +40,8 @@ Capability + Domain
 Provider Protocol
   NetEase EAPI/WEAPI / QQ Music requests / Kugou requests
 ```
+
+`MusicExperience` 只描述功能布局/可见能力，不能演变成三套互不兼容的视觉页面。
 
 ## Domain ID
 
@@ -63,10 +69,10 @@ MusicResourceId(
 - Search
 - Playback
 - Lyrics
-- Playlist（实现后）
-- Album（实现后）
-- Artist（实现后）
-- Library（实现后）
+- Playlist
+- Album
+- Artist
+- Library
 
 可选第二层能力：
 
@@ -74,6 +80,7 @@ MusicResourceId(
 - Rankings
 - HomeRecommendations
 - DailyRecommendations
+- Favorite / PlaylistWrite
 
 Provider-native 第三层能力示例（网易云）：
 
@@ -92,17 +99,19 @@ QQ/酷狗没有对应能力时不要显示入口，不要返回“假数据”�
 每次 MeloX iOS 更新按以下顺序分类：
 
 1. **纯 UI / 播放器 / 歌词表现**
-   - 进入 MeloX Shell / common core。
-   - 所有 Provider 自动受益。
-2. **通用音乐概念，且至少两个 Provider 有等价能力**
-   - 新增或扩展 Capability。
-   - 各 Provider 按真实语义实现。
+   - 直接进入共享 MeloX UI / common core。
+   - 所有 Provider 自动受益，不在 QQ/Kugou 下复制一份页面。
+2. **通用音乐概念，且 Provider 有等价能力**
+   - 新增或扩展 Capability / adapter。
+   - 仍复用同一 MeloX UI，只替换数据和操作实现。
 3. **网易云业务功能**
    - 保持 `Netease*` 实现或新增 NetEase-specific capability。
-   - `NeteaseExperience` 增加对应入口。
-   - QQ/Kugou 不需要修改。
+   - 共享页面对应 section 在 NetEase 模式显示，QQ/Kugou 隐藏。
+4. **其他 Provider 独有功能**
+   - 新增 provider-specific capability。
+   - 作为共享页面的附加 section/action 出现，除非交互模型完全无法复用才允许新增专用页面。
 
-因此，Android 多平台扩展不能破坏“iOS 新功能 -> Android 网易云模式”的单向迁移通道。
+因此，Android 多平台扩展不能破坏“iOS 新功能 -> Android 共享 UI -> Provider 能力适配”的迁移通道。
 
 ## 播放兼容策略
 
@@ -128,23 +137,26 @@ NetEase 的播放历史、相似歌曲自动推荐、云盘、下载、智能 Au
 
 ## UI 规则
 
-Provider 切换后允许变化：
+**默认统一：**
 
-- 底部标签标题/内容语义
-- 首页 section
-- 音乐库/“我的”内容
-- 推荐、排行榜、电台等入口
-- 登录账号卡片
-- Provider-specific 设置
+- 根导航：`首页 / 发现 / 音乐库 / 设置 / 搜索`
+- 搜索框、分类选择、歌曲/歌单/专辑/歌手结果布局
+- 首页 section 的视觉组件和排列体系
+- 音乐库列表/卡片/详情骨架
+- 歌单、专辑、歌手、排行榜详情 Renderer
+- MiniPlayer / Now Playing / 队列 / 更多操作 Sheet
+- 歌词四种样式及其动画
+- Liquid Glass、转场、手势、字体与间距体系
 
-保持一致：
+**Provider 只允许改变：**
 
-- MeloX 视觉语言
-- MiniPlayer / Now Playing
-- 播放队列交互
-- 歌词渲染能力
-- Liquid Glass
-- 页面转场与通用手势
+- 某个 section/action 是否可见
+- section 的实际数据
+- 平台来源标记、账号信息和版权/音质状态
+- 平台独有的真实额外 section/action
+- 登录流程和 Provider-specific 设置
+
+例如：QQ 没有网易云云盘就隐藏“云盘”；网易云有心动模式就仅网易云显示；酷狗有平台特有能力则作为额外卡片插入，而不是把整个“发现”页改成另一套 UI。
 
 ## 聚合模式
 
@@ -161,17 +173,28 @@ UnifiedMusicService
 
 聚合开启后仍应由用户明确选择参与的平台；“某平台不可播 -> 自动偷换另一个来源”不得作为默认行为。
 
+聚合搜索返回的每一项必须保留来源和完整展示元数据（包括封面）；聚合器不得为了统一结果而丢掉 Provider 已提供的 artwork / album / artist 信息。
+
+## 歌词性能规则
+
+- 网络请求、QRC/KRC 解密、LRC 解析必须在渲染热路径之外完成。
+- 同一歌曲的 `LyricsDocument` 应在不同歌词样式间复用，不因切换 Apple Music / EVA / TextPV / Skyline 重复请求与解析。
+- 只有平台真实返回的逐字时间轴才默认进入高频逐字绘制。
+- 普通 Provider LRC fallback 不应自动膨胀为 synthetic per-grapheme timing；否则会在没有真实逐字数据的情况下额外增加 60Hz glyph 绘制开销。
+- 网易云已有的用户可选“伪逐字”行为保持兼容，不因多 Provider 改造被全局关闭。
+
 ## 当前实现阶段
 
 当前分支已建立：
 
 - Provider-neutral domain models
 - Capability contract
-- Experience descriptors
-- 本地 Provider selection store
+- 本地 Provider selection store 与显式聚合白名单
 - `NeteaseProvider` 兼容适配
-- `QQMusicProvider` 搜索 / 歌词 / vkey 播放
-- `KugouProvider` Android 签名 / 搜索 / KRC 逐字歌词 / HTTPS 播放
+- `QQMusicProvider` 登录 / Catalog / LRC / vkey / 写操作
+- `KugouProvider` Android 签名 / Catalog / KRC / HTTPS 播放 / 歌单写操作
 - Provider-aware Media3 URI / queue bridge
+- 统一 Search launch event；Provider 专辑/歌手操作会进入指定搜索类别并自动搜索
+- Provider 歌词 LRU cache；普通 Provider LRC 禁止 synthetic word timing
 
-后续 UI 接入应消费这些稳定接口，不允许 UI 直接解析 QQ/酷狗原始 JSON。
+后续 UI 工作必须持续把当前临时 `Provider*Screen` 的功能收敛进 MeloX iOS 迁移页面/共享 Renderer。`Provider*Screen` 只作为过渡适配层，不得继续发展为另一套独立设计系统。
