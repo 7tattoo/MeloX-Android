@@ -1,7 +1,6 @@
 package com.lladlam.melox.ui.provider
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,7 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,19 +47,21 @@ import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Provider-backed discovery/library screens reuse the same visual grammar that
- * MeloX already migrated from iOS: 40sp large titles, 25sp section titles,
- * horizontal media strips, plain track rows and content-layer materials.
+ * Provider-backed discovery/library screens reuse MeloX's root presentation.
+ * Provider differences stay in the returned content, not in a second navigation
+ * vocabulary or a separate provider-only visual language.
  */
 @Composable
 fun ProviderHomeScreen(source: MusicSource) {
@@ -74,14 +80,10 @@ fun ProviderHomeScreen(source: MusicSource) {
 fun ProviderExploreScreen(source: MusicSource) {
     ProviderDiscoveryFeedScreen(
         source = source,
-        title = when (source) {
-            MusicSource.QQMusic -> "发现"
-            MusicSource.Kugou -> "乐库"
-            MusicSource.Netease -> "发现"
-        },
+        title = "发现",
         subtitle = when (source) {
-            MusicSource.QQMusic -> "推荐歌单 · 新歌 · 排行榜"
-            MusicSource.Kugou -> "乐库推荐 · 新歌 · 排行榜"
+            MusicSource.QQMusic -> "QQ音乐 · 推荐歌单 · 新歌 · 排行榜"
+            MusicSource.Kugou -> "酷狗音乐 · 推荐歌单 · 新歌 · 排行榜"
             MusicSource.Netease -> "发现"
         },
     )
@@ -304,7 +306,7 @@ fun ProviderLibraryScreen(source: MusicSource) {
     ) {
         item {
             Text(
-                if (source == MusicSource.Netease) "音乐库" else "我的",
+                "音乐库",
                 fontSize = 40.sp,
                 lineHeight = 46.sp,
                 fontWeight = FontWeight.Bold,
@@ -362,6 +364,7 @@ internal fun ProviderPlaylistDetailScreen(
     var loading by remember(playlist.id) { mutableStateOf(capability != null) }
     var error by remember(playlist.id) { mutableStateOf<String?>(null) }
     var playbackError by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var trackQuery by remember(playlist.id) { mutableStateOf("") }
 
     LaunchedEffect(playlist.id, capability) {
         if (capability == null) return@LaunchedEffect
@@ -376,6 +379,21 @@ internal fun ProviderPlaylistDetailScreen(
         loading = false
     }
 
+    val value = detail
+    val tracks = value?.tracks.orEmpty()
+    val filteredTracks = remember(tracks, trackQuery) {
+        val normalized = trackQuery.trim().lowercase()
+        if (normalized.isBlank()) {
+            tracks
+        } else {
+            tracks.filter { track ->
+                track.title.lowercase().contains(normalized) ||
+                    track.artistText.lowercase().contains(normalized) ||
+                    track.album?.name?.lowercase()?.contains(normalized) == true
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -384,25 +402,13 @@ internal fun ProviderPlaylistDetailScreen(
             end = 20.dp,
             bottom = MeloXBottomContentClearance,
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "‹",
-                    modifier = Modifier.clickable(onClick = onBack).padding(end = 10.dp),
-                    fontSize = 44.sp,
-                    lineHeight = 44.sp,
-                )
-                Text(
-                    playlist.title,
-                    fontSize = 30.sp,
-                    lineHeight = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            PlaylistDetailHeader(
+                title = value?.summary?.title ?: playlist.title,
+                onBack = onBack,
+            )
         }
 
         when {
@@ -414,66 +420,85 @@ internal fun ProviderPlaylistDetailScreen(
                     CircularProgressIndicator()
                 }
             }
-            error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty(), onClick = onBack) }
-            detail != null -> {
-                val value = detail!!
+            error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
+            value != null -> {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         AsyncImage(
                             model = value.summary.artworkUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(156.dp).clip(RoundedCornerShape(22.dp)),
+                            modifier = Modifier.size(210.dp).clip(RoundedCornerShape(16.dp)),
                         )
-                        Column(Modifier.weight(1f)) {
+                        Text(
+                            value.summary.title,
+                            modifier = Modifier.fillMaxWidth().padding(top = 15.dp),
+                            textAlign = TextAlign.Center,
+                            fontSize = 24.sp,
+                            lineHeight = 29.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        value.summary.creatorName?.takeIf(String::isNotBlank)?.let { creator ->
                             Text(
-                                value.summary.title,
-                                fontSize = 20.sp,
-                                lineHeight = 25.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 3,
+                                creator,
+                                modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f),
                             )
-                            value.summary.creatorName?.takeIf(String::isNotBlank)?.let {
-                                Spacer(Modifier.height(7.dp))
-                                Text(
-                                    it,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
-                                )
-                            }
-                            val count = value.total ?: value.tracks.size.toLong()
-                            Spacer(Modifier.height(4.dp))
+                        }
+                        val metadata = buildList {
+                            val total = value.total ?: value.summary.trackCount?.toLong() ?: tracks.size.toLong()
+                            if (total > 0L) add("$total 首歌曲")
+                            value.summary.playCount?.takeIf { it > 0L }?.let { add("$it 次播放") }
+                        }.joinToString(" · ")
+                        if (metadata.isNotBlank()) {
                             Text(
-                                "$count 首歌曲",
+                                metadata,
+                                modifier = Modifier.padding(top = 5.dp),
+                                textAlign = TextAlign.Center,
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
                             )
-
-                            if (value.tracks.isNotEmpty()) {
-                                Text(
-                                    "▶  播放全部",
-                                    modifier = Modifier
-                                        .padding(top = 15.dp)
-                                        .clip(RoundedCornerShape(22.dp))
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .clickable {
+                        }
+                        if (tracks.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                PlaylistDetailAction(
+                                    title = "播放",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        ProviderPlaybackCommands.playQueue(
+                                            context = context,
+                                            tracks = tracks,
+                                            selectedTrackId = tracks.first().id,
+                                            onFailure = { playbackError = it.message ?: "播放失败" },
+                                        )
+                                    },
+                                )
+                                PlaylistDetailAction(
+                                    title = "随机",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        val shuffled = tracks.shuffled()
+                                        shuffled.firstOrNull()?.let { first ->
                                             ProviderPlaybackCommands.playQueue(
                                                 context = context,
-                                                tracks = value.tracks,
-                                                selectedTrackId = value.tracks.first().id,
-                                                onFailure = { failure ->
-                                                    playbackError = failure.message ?: "播放失败"
-                                                },
+                                                tracks = shuffled,
+                                                selectedTrackId = first.id,
+                                                onFailure = { playbackError = it.message ?: "播放失败" },
                                             )
                                         }
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold,
+                                    },
                                 )
                             }
                         }
@@ -484,27 +509,65 @@ internal fun ProviderPlaylistDetailScreen(
                     item {
                         Text(
                             description,
-                            maxLines = 4,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
+                            maxLines = 5,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 13.sp,
                             lineHeight = 19.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.52f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                         )
                     }
                 }
 
-                if (value.tracks.isNotEmpty()) {
-                    items(
-                        value.tracks,
-                        key = { "detail:${it.id.source.storageValue}:${it.id.value}" },
-                    ) { track ->
-                        ProviderTrackRow(track) {
-                            ProviderPlaybackCommands.playQueue(
-                                context = context,
-                                tracks = value.tracks,
-                                selectedTrackId = track.id,
-                                onFailure = { failure ->
-                                    playbackError = failure.message ?: "播放失败"
+                if (tracks.isNotEmpty()) {
+                    item {
+                        BasicTextField(
+                            value = trackQuery,
+                            onValueChange = { trackQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 16.sp,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .meloXLiquidButton(
+                                    shape = RoundedCornerShape(22.dp),
+                                    surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.05f),
+                                )
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            decorationBox = { inner ->
+                                Box(contentAlignment = Alignment.CenterStart) {
+                                    if (trackQuery.isBlank()) {
+                                        Text(
+                                            "在歌单中搜索",
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f),
+                                            fontSize = 15.sp,
+                                        )
+                                    }
+                                    inner()
+                                }
+                            },
+                        )
+                    }
+                    item { ProviderSectionTitle("歌曲") }
+                    if (filteredTracks.isEmpty()) {
+                        item { ProviderSimpleCard("没有匹配歌曲", "换一个关键词试试") }
+                    } else {
+                        itemsIndexed(
+                            filteredTracks,
+                            key = { _, track -> "detail:${track.id.source.storageValue}:${track.id.value}" },
+                        ) { index, track ->
+                            PlaylistTrackRow(
+                                index = index + 1,
+                                track = track,
+                                onClick = {
+                                    ProviderPlaybackCommands.playQueue(
+                                        context = context,
+                                        tracks = tracks,
+                                        selectedTrackId = track.id,
+                                        onFailure = { playbackError = it.message ?: "播放失败" },
+                                    )
                                 },
                             )
                         }
@@ -515,6 +578,96 @@ internal fun ProviderPlaylistDetailScreen(
 
                 playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistDetailHeader(
+    title: String,
+    onBack: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .meloXLiquidButton(shape = CircleShape)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("‹", fontSize = 30.sp, lineHeight = 30.sp)
+        }
+        Spacer(Modifier.size(12.dp))
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            fontSize = 24.sp,
+            lineHeight = 29.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun PlaylistDetailAction(
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .meloXLiquidButton(
+                shape = RoundedCornerShape(22.dp),
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun PlaylistTrackRow(
+    index: Int,
+    track: MusicTrack,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            index.toString(),
+            modifier = Modifier.size(34.dp),
+            textAlign = TextAlign.Center,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                track.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                track.artistText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
+            )
         }
     }
 }
