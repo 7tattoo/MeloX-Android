@@ -28,7 +28,7 @@ class NeteaseLibraryClient(
         ensureLoggedIn()
         val allPlaylists = userPlaylistsBlocking(userId)
         val likedPlaylistId = allPlaylists.firstOrNull()?.id
-        val playlists = if (allPlaylists.isEmpty()) emptyList() else allPlaylists.drop(1)
+        val playlists = allPlaylists
         val likedIds = likedSongIdsBlocking(userId)
         val likedById = likedIds.chunked(100).flatMap(::songDetailsBlocking).associateBy(SearchSong::id)
         val liked = likedIds.mapNotNull(likedById::get)
