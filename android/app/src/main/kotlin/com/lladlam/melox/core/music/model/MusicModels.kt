@@ -35,6 +35,36 @@ data class MusicAlbumRef(
     val artworkUrl: String? = null,
 )
 
+data class MusicArtistSummary(
+    val id: MusicResourceId,
+    val name: String,
+    val artworkUrl: String? = null,
+    val description: String? = null,
+    val songCount: Long? = null,
+    val albumCount: Long? = null,
+)
+
+data class MusicArtistDetail(
+    val summary: MusicArtistSummary,
+    val tracks: List<MusicTrack>,
+    val totalTracks: Long? = null,
+)
+
+data class MusicAlbumSummary(
+    val id: MusicResourceId,
+    val title: String,
+    val artworkUrl: String? = null,
+    val artists: List<MusicArtistRef> = emptyList(),
+    val releaseDate: String? = null,
+    val trackCount: Long? = null,
+)
+
+data class MusicAlbumDetail(
+    val summary: MusicAlbumSummary,
+    val tracks: List<MusicTrack>,
+    val totalTracks: Long? = null,
+)
+
 enum class TrackAvailability {
     Unknown,
     Playable,
