@@ -95,6 +95,12 @@ data class MusicPlaylistSummary(
     val playCount: Long? = null,
 )
 
+data class MusicPlaylistDetail(
+    val summary: MusicPlaylistSummary,
+    val tracks: List<MusicTrack>,
+    val total: Long? = null,
+)
+
 /** A ranking is intentionally not modelled as a playlist: some services expose different semantics. */
 data class MusicRankingSummary(
     val id: MusicResourceId,
