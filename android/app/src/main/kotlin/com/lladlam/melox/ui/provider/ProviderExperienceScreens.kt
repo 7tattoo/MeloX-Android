@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,13 +41,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
-import com.lladlam.melox.core.music.experience.HomeSectionKind
-import com.lladlam.melox.core.music.experience.MusicExperiences
+import com.lladlam.melox.core.music.model.MusicAccountSummary
+import com.lladlam.melox.core.music.model.MusicHomeFeed
+import com.lladlam.melox.core.music.model.MusicPlaylistSummary
+import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
+import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.core.music.provider.SearchCapability
+import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
 import com.lladlam.melox.playback.ProviderPlaybackCommands
@@ -59,49 +66,156 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun ProviderHomeScreen(source: MusicSource) {
-    val experience = MusicExperiences.forSource(source)
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 48.dp, bottom = MeloXBottomContentClearance),
-    ) {
-        Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-        Text("首页", fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(22.dp))
-        experience.homeSections.forEach { kind ->
-            ProviderSectionCard(kind)
-            Spacer(Modifier.height(14.dp))
-        }
-    }
+    ProviderDiscoveryFeedScreen(
+        source = source,
+        title = "首页",
+        subtitle = when (source) {
+            MusicSource.QQMusic -> "QQ音乐推荐"
+            MusicSource.Kugou -> "酷狗音乐推荐"
+            MusicSource.Netease -> "推荐"
+        },
+    )
 }
 
 @Composable
 fun ProviderExploreScreen(source: MusicSource) {
-    val title = when (source) {
-        MusicSource.QQMusic -> "发现"
-        MusicSource.Kugou -> "乐库"
-        MusicSource.Netease -> "发现"
+    ProviderDiscoveryFeedScreen(
+        source = source,
+        title = when (source) {
+            MusicSource.QQMusic -> "发现"
+            MusicSource.Kugou -> "乐库"
+            MusicSource.Netease -> "发现"
+        },
+        subtitle = when (source) {
+            MusicSource.QQMusic -> "歌单 · 新歌 · 排行榜"
+            MusicSource.Kugou -> "乐库 · 新歌 · 排行榜"
+            MusicSource.Netease -> "发现"
+        },
+    )
+}
+
+@Composable
+private fun ProviderDiscoveryFeedScreen(
+    source: MusicSource,
+    title: String,
+    subtitle: String,
+) {
+    val context = LocalContext.current
+    val provider = remember(source) { MeloXMusicProviders.create(context).require(source) }
+    val home = provider as? HomeFeedCapability
+    var feed by remember(source) { mutableStateOf<MusicHomeFeed?>(null) }
+    var loading by remember(source) { mutableStateOf(home != null) }
+    var error by remember(source) { mutableStateOf<String?>(null) }
+    var playbackError by remember(source) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(source, home) {
+        if (home == null) return@LaunchedEffect
+        loading = true
+        error = null
+        runCatching {
+            withContext(Dispatchers.IO) {
+                home.homeFeed(
+                    playlistLimit = 12,
+                    newSongLimit = 16,
+                    rankingLimit = 10,
+                )
+            }
+        }.onSuccess { feed = it }
+            .onFailure { error = it.message ?: "无法加载 ${source.displayName} 内容" }
+        loading = false
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 48.dp, bottom = MeloXBottomContentClearance),
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 20.dp,
+            top = 48.dp,
+            end = 20.dp,
+            bottom = MeloXBottomContentClearance,
+        ),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-        Text(title, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(20.dp))
-        val descriptions = when (source) {
-            MusicSource.QQMusic -> listOf("歌单与新歌", "排行榜", "电台与推荐")
-            MusicSource.Kugou -> listOf("推荐与歌单", "排行榜", "电台与乐库")
-            MusicSource.Netease -> listOf("推荐", "歌单", "排行榜")
+        item {
+            Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+            Text(title, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+            Text(
+                subtitle,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+            )
         }
-        descriptions.forEach { label ->
-            ProviderSimpleCard(label, "内容由 ${source.displayName} Provider 按平台实际能力提供")
-            Spacer(Modifier.height(12.dp))
+
+        if (home == null) {
+            item { ProviderSimpleCard("暂不可用", "当前音乐服务没有提供首页 Feed Capability") }
+        } else if (loading) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 38.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (error != null) {
+            item {
+                ProviderSimpleCard("加载失败", error.orEmpty())
+            }
+        } else {
+            val value = feed ?: MusicHomeFeed()
+            if (value.recommendedPlaylists.isNotEmpty()) {
+                item { ProviderSectionTitle("推荐歌单") }
+                item {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(
+                            value.recommendedPlaylists,
+                            key = { "playlist:${it.id.source.storageValue}:${it.id.value}" },
+                        ) { playlist ->
+                            ProviderPlaylistCard(playlist)
+                        }
+                    }
+                }
+            }
+
+            if (value.newSongs.isNotEmpty()) {
+                item { ProviderSectionTitle("最新歌曲") }
+                items(
+                    value.newSongs,
+                    key = { "newsong:${it.id.source.storageValue}:${it.id.value}" },
+                ) { track ->
+                    ProviderTrackRow(track) {
+                        ProviderPlaybackCommands.playQueue(
+                            context = context,
+                            tracks = value.newSongs,
+                            selectedTrackId = track.id,
+                            onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
+                        )
+                    }
+                }
+            }
+
+            if (value.rankings.isNotEmpty()) {
+                item { ProviderSectionTitle("排行榜") }
+                items(
+                    value.rankings,
+                    key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
+                ) { ranking ->
+                    ProviderRankingCard(ranking)
+                }
+            }
+
+            if (
+                value.recommendedPlaylists.isEmpty() &&
+                value.newSongs.isEmpty() &&
+                value.rankings.isEmpty()
+            ) {
+                item {
+                    ProviderSimpleCard(
+                        "暂无内容",
+                        "${source.displayName} 当前没有返回可展示的推荐内容",
+                    )
+                }
+            }
+        }
+
+        playbackError?.let { message ->
+            item { ProviderSimpleCard("播放失败", message) }
         }
     }
 }
@@ -109,39 +223,84 @@ fun ProviderExploreScreen(source: MusicSource) {
 @Composable
 fun ProviderLibraryScreen(source: MusicSource) {
     val context = LocalContext.current
-    val accountText = when (source) {
-        MusicSource.QQMusic -> QQMusicSessionStore.read(context).let {
-            if (it.isLoggedIn) "QQ ${it.uin}" else "尚未登录 QQ音乐"
-        }
-        MusicSource.Kugou -> KugouSessionStore.read(context).let {
-            if (it.isLoggedIn) "酷狗用户 ${it.userId}" else "尚未登录酷狗音乐"
-        }
-        MusicSource.Netease -> "网易云音乐库"
+    val provider = remember(source) { MeloXMusicProviders.create(context).require(source) }
+    val library = provider as? UserLibraryCapability
+    var account by remember(source) { mutableStateOf<MusicAccountSummary?>(null) }
+    var playlists by remember(source) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
+    var loading by remember(source) { mutableStateOf(library != null) }
+    var error by remember(source) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(source, library) {
+        if (library == null) return@LaunchedEffect
+        loading = true
+        error = null
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val accountResult = library.accountSummary()
+                val playlistsResult = if (accountResult != null) {
+                    library.userPlaylists(page = 1, pageSize = 50).items
+                } else {
+                    emptyList()
+                }
+                accountResult to playlistsResult
+            }
+        }.onSuccess { (accountResult, playlistResult) ->
+            account = accountResult
+            playlists = playlistResult
+        }.onFailure { error = it.message ?: "无法加载音乐库" }
+        loading = false
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 48.dp, bottom = MeloXBottomContentClearance),
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 20.dp,
+            top = 48.dp,
+            end = 20.dp,
+            bottom = MeloXBottomContentClearance,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-        Text(if (source == MusicSource.Netease) "音乐库" else "我的", fontSize = 40.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(20.dp))
-        ProviderSimpleCard("账户", accountText)
-        Spacer(Modifier.height(12.dp))
-        when (source) {
-            MusicSource.QQMusic -> {
-                ProviderSimpleCard("收藏与歌单", "仅显示 QQ音乐实际提供并已接入的个人内容")
-                Spacer(Modifier.height(12.dp))
-                ProviderSimpleCard("数字内容", "QQ音乐特有内容将在对应 Capability 接入后显示")
+        item {
+            Text(source.displayName, fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+            Text(if (source == MusicSource.Netease) "音乐库" else "我的", fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        }
+
+        when {
+            library == null -> item {
+                ProviderSimpleCard("暂不可用", "当前音乐服务没有提供个人音乐库 Capability")
             }
-            MusicSource.Kugou -> {
-                ProviderSimpleCard("收藏与歌单", "仅显示酷狗音乐实际提供并已接入的个人内容")
-                Spacer(Modifier.height(12.dp))
-                ProviderSimpleCard("云端内容", "酷狗 Provider 独有能力不会伪装成网易云功能")
+            loading -> item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 38.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
-            MusicSource.Netease -> Unit
+            error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
+            account == null -> item {
+                ProviderSimpleCard(
+                    "尚未登录",
+                    "请先在设置中登录 ${source.displayName} 账号",
+                )
+            }
+            else -> {
+                item { ProviderAccountCard(account!!) }
+                if (playlists.isNotEmpty()) {
+                    item { ProviderSectionTitle("我的歌单") }
+                    items(
+                        playlists,
+                        key = { "library:${it.id.source.storageValue}:${it.id.value}" },
+                    ) { playlist ->
+                        ProviderLibraryPlaylistRow(playlist)
+                    }
+                } else {
+                    item {
+                        ProviderSimpleCard(
+                            "我的歌单",
+                            "当前账号没有返回可展示的歌单",
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -367,7 +526,7 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showQQLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放；其余功能按 QQ音乐真实 Capability 接入")
+                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放 · 推荐 · 排行榜 · 我的歌单")
             }
             MusicSource.Kugou -> {
                 val session = remember(loginRevision, currentSource) { KugouSessionStore.read(context) }
@@ -377,7 +536,153 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showKugouLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · KRC 逐字歌词 · 播放；其余功能按酷狗真实 Capability 接入")
+                ProviderSimpleCard("当前能力", "搜索 · KRC逐字歌词 · 播放 · 乐库推荐 · 排行榜 · 我的歌单")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSectionTitle(title: String) {
+    Text(
+        title,
+        modifier = Modifier.padding(top = 6.dp),
+        fontSize = 23.sp,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+@Composable
+private fun ProviderPlaylistCard(playlist: MusicPlaylistSummary) {
+    Column(modifier = Modifier.width(126.dp)) {
+        AsyncImage(
+            model = playlist.artworkUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(126.dp)
+                .clip(RoundedCornerShape(18.dp)),
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(
+            playlist.title,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        val secondary = playlist.creatorName
+            ?: playlist.trackCount?.let { "$it 首" }
+            ?: playlist.description
+        secondary?.takeIf(String::isNotBlank)?.let {
+            Text(
+                it,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderRankingCard(ranking: MusicRankingSummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .meloXLiquidButton(
+                shape = RoundedCornerShape(22.dp),
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f),
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AsyncImage(
+            model = ranking.artworkUrl,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(ranking.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            ranking.subtitle?.takeIf(String::isNotBlank)?.let {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    it,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderAccountCard(account: MusicAccountSummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .meloXLiquidButton(
+                shape = RoundedCornerShape(24.dp),
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
+            )
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        AsyncImage(
+            model = account.avatarUrl,
+            contentDescription = null,
+            modifier = Modifier.size(58.dp).clip(RoundedCornerShape(20.dp)),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(account.displayName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            account.subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(
+                    it,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.48f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderLibraryPlaylistRow(playlist: MusicPlaylistSummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AsyncImage(
+            model = playlist.artworkUrl,
+            contentDescription = null,
+            modifier = Modifier.size(58.dp).clip(RoundedCornerShape(13.dp)),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                playlist.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val secondary = listOfNotNull(
+                playlist.trackCount?.let { "$it 首" },
+                playlist.creatorName,
+            ).joinToString(" · ")
+            if (secondary.isNotBlank()) {
+                Text(
+                    secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
+                )
             }
         }
     }
@@ -410,21 +715,6 @@ private fun ProviderTrackRow(track: MusicTrack, onClick: () -> Unit) {
         }
         Text("▶", color = MaterialTheme.colorScheme.primary)
     }
-}
-
-@Composable
-private fun ProviderSectionCard(kind: HomeSectionKind) {
-    val label = when (kind) {
-        HomeSectionKind.QuickActions -> "快捷入口"
-        HomeSectionKind.Recommendations -> "为你推荐"
-        HomeSectionKind.Playlists -> "歌单"
-        HomeSectionKind.NewSongs -> "新歌"
-        HomeSectionKind.Rankings -> "排行榜"
-        HomeSectionKind.Artists -> "歌手"
-        HomeSectionKind.Radio -> "电台"
-        HomeSectionKind.Podcasts -> "播客"
-    }
-    ProviderSimpleCard(label, "由当前音乐服务的 Experience 与 Capability 提供")
 }
 
 @Composable
