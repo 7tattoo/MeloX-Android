@@ -81,8 +81,9 @@ class ProviderPlaybackResolver(
         val result = when (resolution) {
             is PlaybackResolution.Playable -> {
                 ProviderPlaybackQualityRuntime.recordActual(
-                    id,
-                    resolution.actualQuality ?: resolution.requestedQuality,
+                    id = id,
+                    requested = quality,
+                    actual = resolution.actualQuality ?: resolution.requestedQuality,
                 )
                 Uri.parse(resolution.url)
             }
