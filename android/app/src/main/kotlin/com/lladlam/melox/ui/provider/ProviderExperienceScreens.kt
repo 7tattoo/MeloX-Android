@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +49,8 @@ import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
+import com.lladlam.melox.ui.account.KugouLoginScreen
+import com.lladlam.melox.ui.account.QQMusicLoginScreen
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.settings.SettingsScreen
 import kotlinx.coroutines.Dispatchers
@@ -240,6 +241,9 @@ fun ProviderSettingsHub(
 ) {
     val context = LocalContext.current
     var showNeteaseSettings by remember(currentSource) { mutableStateOf(false) }
+    var showQQLogin by remember(currentSource) { mutableStateOf(false) }
+    var showKugouLogin by remember(currentSource) { mutableStateOf(false) }
+    var loginRevision by remember(currentSource) { mutableStateOf(0) }
     var unifiedEnabled by remember { mutableStateOf(MusicProviderSelectionStore.unifiedEnabled(context)) }
     var automaticFallback by remember { mutableStateOf(MusicProviderSelectionStore.automaticFallbackEnabled(context)) }
 
@@ -247,6 +251,26 @@ fun ProviderSettingsHub(
         SettingsScreen(
             session = neteaseSession,
             onLogin = onNeteaseLogin,
+        )
+        return
+    }
+    if (showQQLogin && currentSource == MusicSource.QQMusic) {
+        QQMusicLoginScreen(
+            onDismiss = { showQQLogin = false },
+            onLoggedIn = {
+                showQQLogin = false
+                loginRevision += 1
+            },
+        )
+        return
+    }
+    if (showKugouLogin && currentSource == MusicSource.Kugou) {
+        KugouLoginScreen(
+            onDismiss = { showKugouLogin = false },
+            onLoggedIn = {
+                showKugouLogin = false
+                loginRevision += 1
+            },
         )
         return
     }
@@ -336,16 +360,24 @@ fun ProviderSettingsHub(
                 )
             }
             MusicSource.QQMusic -> {
-                val session = QQMusicSessionStore.read(context)
-                ProviderSimpleCard("QQ音乐账号", if (session.isLoggedIn) "QQ ${session.uin}" else "未登录")
+                val session = remember(loginRevision, currentSource) { QQMusicSessionStore.read(context) }
+                ProviderSimpleCard(
+                    "QQ音乐账号",
+                    if (session.isLoggedIn) "QQ ${session.uin}" else "未登录 · 点击登录",
+                    onClick = if (session.isLoggedIn) null else ({ showQQLogin = true }),
+                )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放；其他 QQ音乐能力按 Capability 逐步显示")
+                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放；其余功能按 QQ音乐真实 Capability 接入")
             }
             MusicSource.Kugou -> {
-                val session = KugouSessionStore.read(context)
-                ProviderSimpleCard("酷狗音乐账号", if (session.isLoggedIn) "用户 ${session.userId}" else "未登录")
+                val session = remember(loginRevision, currentSource) { KugouSessionStore.read(context) }
+                ProviderSimpleCard(
+                    "酷狗音乐账号",
+                    if (session.isLoggedIn) "用户 ${session.userId}" else "未登录 · 点击扫码登录",
+                    onClick = if (session.isLoggedIn) null else ({ showKugouLogin = true }),
+                )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · KRC 逐字歌词 · 播放；其他酷狗能力按 Capability 逐步显示")
+                ProviderSimpleCard("当前能力", "搜索 · KRC 逐字歌词 · 播放；其余功能按酷狗真实 Capability 接入")
             }
         }
     }
