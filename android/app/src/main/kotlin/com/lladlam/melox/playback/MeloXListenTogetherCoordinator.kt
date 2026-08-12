@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -27,19 +26,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Application-lifetime Together coordinator. It owns its own MediaController so
- * Together keeps syncing after the song actions sheet (or the whole Activity)
- * is dismissed while MediaSessionService continues playback.
+ * Process-lifetime Listen Together coordinator.
+ *
+ * The coordinator owns a MediaController rather than borrowing a Compose screen's
+ * player reference, so a Together room keeps syncing after the actions sheet or
+ * Activity is dismissed while the MediaSessionService remains alive.
  */
 object MeloXListenTogetherCoordinator {
     enum class Phase { Idle, Connected, Reconnecting }
@@ -84,6 +85,7 @@ object MeloXListenTogetherCoordinator {
         private var controller: MediaController? = null
         private var room: MeloXListenTogetherRoom? = null
         private var cachedUserId: Long? = null
+        private var lastCookie: String? = null
         private var lastKnownSongId: Long? = null
         private var lastRemoteQueueSignature: String? = null
         private var lastRemoteCommandSignature: String? = null
@@ -99,11 +101,15 @@ object MeloXListenTogetherCoordinator {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (localEventsSuppressed()) return
                 val active = controller ?: return
+                // Media3 temporarily reports isPlaying=false while it is buffering
+                // with playWhenReady=true. Treating that transition as PAUSE makes
+                // every network stall pause the other listener as well.
+                if (!isPlaying && active.playWhenReady && active.playbackState == Player.STATE_BUFFERING) return
                 val songId = active.currentMediaItem?.mediaId?.toLongOrNull() ?: return
                 reportCommand(
                     if (isPlaying) MeloXListenTogetherCommandType.Play else MeloXListenTogetherCommandType.Pause,
                     targetSongId = songId,
-                    formerSongId = lastKnownSongId,
+                    formerSongId = lastKnownSongId ?: songId,
                 )
             }
 
@@ -123,7 +129,7 @@ object MeloXListenTogetherCoordinator {
                 if (reason != Player.DISCONTINUITY_REASON_SEEK || localEventsSuppressed()) return
                 val active = controller ?: return
                 val target = active.currentMediaItem?.mediaId?.toLongOrNull() ?: return
-                reportCommand(MeloXListenTogetherCommandType.Progress, target, lastKnownSongId)
+                reportCommand(MeloXListenTogetherCommandType.Progress, target, lastKnownSongId ?: target)
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -157,7 +163,17 @@ object MeloXListenTogetherCoordinator {
 
         private suspend fun monitorLoop() {
             while (scope.isActive) {
-                if (!NeteaseSessionStore.containsMusicU(cookieProvider())) {
+                val cookie = cookieProvider()
+                if (cookie != lastCookie) {
+                    // A MUSIC_U/account switch invalidates both the cached uid and
+                    // the room identity. Re-discover the room under the new account.
+                    lastCookie = cookie
+                    cachedUserId = null
+                    commandSequence.set(1)
+                    resetRoom()
+                }
+
+                if (!NeteaseSessionStore.containsMusicU(cookie)) {
                     resetRoom()
                     delay(IDLE_POLL_MS)
                     continue
@@ -170,20 +186,25 @@ object MeloXListenTogetherCoordinator {
                 }
 
                 val activeRoom = room
-                if (activeRoom != null) {
-                    runCatching { transport.playback(activeRoom.id) }
-                        .onSuccess { snapshot ->
-                            failures = 0
-                            mutableState.value = State(Phase.Connected, activeRoom)
-                            synchronizeRemote(activeRoom, snapshot)
-                        }
-                        .onFailure(::recordFailure)
+                if (activeRoom == null) {
+                    // Do not hit room-status once per second when the user is not
+                    // actually in a Together room.
+                    delay(IDLE_POLL_MS)
+                    continue
+                }
 
-                    heartbeatTick++
-                    if (heartbeatTick >= HEARTBEAT_EVERY_TICKS) {
-                        heartbeatTick = 0
-                        sendHeartbeat(activeRoom)
+                runCatching { transport.playback(activeRoom.id) }
+                    .onSuccess { snapshot ->
+                        failures = 0
+                        mutableState.value = State(Phase.Connected, activeRoom)
+                        synchronizeRemote(activeRoom, snapshot)
                     }
+                    .onFailure(::recordFailure)
+
+                heartbeatTick++
+                if (heartbeatTick >= HEARTBEAT_EVERY_TICKS) {
+                    heartbeatTick = 0
+                    sendHeartbeat(activeRoom)
                 }
                 delay(SYNC_INTERVAL_MS)
             }
@@ -220,11 +241,11 @@ object MeloXListenTogetherCoordinator {
         ) {
             val selfId = currentUserId()
             val isCreator = selfId != null && activeRoom.creatorId == selfId.toString()
-            val controller = controller ?: return
+            val active = controller ?: return
 
             if (firstSyncForRoom) {
                 firstSyncForRoom = false
-                if (isCreator && controller.mediaItemCount > 0) {
+                if (isCreator && active.mediaItemCount > 0) {
                     reportQueueNow(activeRoom)
                 } else {
                     applyRemoteSnapshot(snapshot, force = true)
@@ -247,7 +268,7 @@ object MeloXListenTogetherCoordinator {
                 snapshot.clientSequence,
                 snapshot.commandUserId.orEmpty(),
                 snapshot.targetSongId ?: -1L,
-                snapshot.progressMs / 250L,
+                snapshot.progressMs,
                 snapshot.isPlaying,
             ).joinToString(":")
             val commandFromSelf = selfId != null && snapshot.commandUserId == selfId.toString()
@@ -295,6 +316,8 @@ object MeloXListenTogetherCoordinator {
             val mode = snapshot.playMode?.uppercase() ?: return
             val shuffle = mode.contains("RANDOM") || mode.contains("SHUFFLE")
             MeloXPlaybackModePreferences.setShuffle(appContext, shuffle)
+            // The Together randomList is already a concrete playback order, so
+            // enabling Media3's own shuffle on top of it would randomize twice.
             active.shuffleModeEnabled = false
             active.repeatMode = when {
                 mode.contains("ONE") || mode.contains("SINGLE") -> Player.REPEAT_MODE_ONE
