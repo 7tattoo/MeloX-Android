@@ -104,8 +104,8 @@ internal fun ProviderSettingToggle(
 @Composable
 internal fun ProviderTrackRow(
     track: MusicTrack,
-    onClick: () -> Unit,
     showSource: Boolean = false,
+    onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -185,8 +185,8 @@ internal fun ProviderPlaylistCard(
 @Composable
 internal fun ProviderPlaylistRow(
     playlist: MusicPlaylistSummary,
-    onClick: () -> Unit,
     showSource: Boolean = false,
+    onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
