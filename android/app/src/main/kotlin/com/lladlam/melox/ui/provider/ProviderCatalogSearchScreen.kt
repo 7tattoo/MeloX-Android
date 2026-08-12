@@ -133,7 +133,7 @@ fun ProviderSearchScreen(source: MusicSource) {
                                 SearchPayload.Songs(result.tracks, result.failures)
                             } else {
                                 val capability = songSearch
-                                    ?: error("${source.displayName} 当前没有歌曲搜索能力")
+                                    ?: throw IllegalStateException("${source.displayName} 当前没有歌曲搜索能力")
                                 SearchPayload.Songs(
                                     tracks = capability.searchSongs(normalized, page = 1, pageSize = 50).items,
                                     failures = emptyList(),
@@ -143,7 +143,7 @@ fun ProviderSearchScreen(source: MusicSource) {
 
                         ProviderSearchKind.Playlists -> {
                             val capability = catalogSearch
-                                ?: error("${source.displayName} 当前没有歌单搜索能力")
+                                ?: throw IllegalStateException("${source.displayName} 当前没有歌单搜索能力")
                             SearchPayload.Playlists(
                                 capability.searchPlaylists(normalized, page = 1, pageSize = 40).items,
                             )
@@ -151,7 +151,7 @@ fun ProviderSearchScreen(source: MusicSource) {
 
                         ProviderSearchKind.Albums -> {
                             val capability = catalogSearch
-                                ?: error("${source.displayName} 当前没有专辑搜索能力")
+                                ?: throw IllegalStateException("${source.displayName} 当前没有专辑搜索能力")
                             SearchPayload.Albums(
                                 capability.searchAlbums(normalized, page = 1, pageSize = 40).items,
                             )
@@ -159,7 +159,7 @@ fun ProviderSearchScreen(source: MusicSource) {
 
                         ProviderSearchKind.Artists -> {
                             val capability = catalogSearch
-                                ?: error("${source.displayName} 当前没有歌手搜索能力")
+                                ?: throw IllegalStateException("${source.displayName} 当前没有歌手搜索能力")
                             SearchPayload.Artists(
                                 capability.searchArtists(normalized, page = 1, pageSize = 40).items,
                             )
@@ -475,7 +475,7 @@ private fun ProviderAlbumDetailScreen(
                 } else {
                     item { ProviderSimpleCard("暂无歌曲", "这个专辑当前没有返回歌曲") }
                 }
-                playbackError?.let { item { ProviderSimpleCard("播放失败", it) } }
+                playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
         }
     }
@@ -605,7 +605,7 @@ private fun ProviderArtistDetailScreen(
                 } else {
                     item { ProviderSimpleCard("暂无歌曲", "这个歌手当前没有返回歌曲") }
                 }
-                playbackError?.let { item { ProviderSimpleCard("播放失败", it) } }
+                playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
         }
     }
