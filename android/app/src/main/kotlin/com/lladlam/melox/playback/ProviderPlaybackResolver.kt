@@ -79,7 +79,13 @@ class ProviderPlaybackResolver(
             playback.resolvePlayback(track, quality)
         }
         val result = when (resolution) {
-            is PlaybackResolution.Playable -> Uri.parse(resolution.url)
+            is PlaybackResolution.Playable -> {
+                ProviderPlaybackQualityRuntime.recordActual(
+                    id,
+                    resolution.actualQuality ?: resolution.requestedQuality,
+                )
+                Uri.parse(resolution.url)
+            }
             is PlaybackResolution.Preview -> Uri.parse(resolution.url)
             PlaybackResolution.LoginRequired -> throw IOException("${provider.displayName} 需要登录后播放")
             PlaybackResolution.SubscriptionRequired -> throw IOException("${provider.displayName} 当前歌曲需要对应会员权益")
@@ -94,13 +100,14 @@ class ProviderPlaybackResolver(
     }
 
     private fun currentQuality(uri: Uri): AudioQualityTier {
-        // MusicQualityRuntime is updated by the quality selector before Media3 is
-        // re-prepared. Using it here makes a provider item re-resolve even though
-        // its stable melox://track identity does not change.
+        // The quality selector updates this runtime before Media3 prepare(). That
+        // allows a stable provider media identity to request a fresh VKey at the
+        // newly selected tier instead of reusing its initial query parameter.
         val runtime = MusicQualityRuntime.selected.toCommonTier()
-        val encoded = uri.getQueryParameter(QualityQuery)
-            ?.let { raw -> AudioQualityTier.entries.firstOrNull { it.name == raw } }
-        return if (MusicQualityRuntime.selected.apiLevel.isNotBlank()) runtime else encoded ?: AudioQualityTier.Standard
+        return runtime.takeIf { MusicQualityRuntime.selected.apiLevel.isNotBlank() }
+            ?: uri.getQueryParameter(QualityQuery)
+                ?.let { raw -> AudioQualityTier.entries.firstOrNull { it.name == raw } }
+            ?: AudioQualityTier.Standard
     }
 
     private fun parseSource(uri: Uri): MusicSource? {
