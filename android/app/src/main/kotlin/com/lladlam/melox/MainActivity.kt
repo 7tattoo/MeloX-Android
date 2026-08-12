@@ -1,8 +1,8 @@
 package com.lladlam.melox
 
-import android.content.Intent
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,9 +11,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.ui.MeloXApp
-import com.lladlam.melox.ui.theme.MeloXTheme
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
+import com.lladlam.melox.ui.theme.MeloXTheme
 
 class MainActivity : ComponentActivity() {
     private var openNowPlayingRequest by mutableIntStateOf(0)
@@ -25,6 +26,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         consumePlaybackIntent(intent)
         MeloXSettingsPreferences.initialize(this)
+        // Restore/monitor an existing NetEase Together session as soon as the app
+        // process starts, rather than waiting for the song actions sheet to open.
+        MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
 
         setContent {
             MeloXTheme {
