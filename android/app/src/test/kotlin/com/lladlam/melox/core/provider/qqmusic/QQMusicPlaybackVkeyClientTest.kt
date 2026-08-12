@@ -2,6 +2,7 @@ package com.lladlam.melox.core.provider.qqmusic
 
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QQMusicPlaybackVkeyClientTest {
@@ -46,5 +47,24 @@ class QQMusicPlaybackVkeyClientTest {
         val candidates = AudioQualityTier.Master.qqPlaybackCandidates()
         assertEquals("AI00", candidates.first().prefix)
         assertEquals(AudioQualityTier.Master, candidates.first().actualTier)
+    }
+
+    @Test
+    fun vkeyNoPermissionCodeIsReportedHonestly() {
+        val message = qqVkeyBusinessReason(104003)
+        assertTrue(message.contains("没有该音源的播放权限"))
+        assertTrue(message.contains("104003"))
+    }
+
+    @Test
+    fun noPermissionBeatsGenericVkeyFailureInFinalReason() {
+        val reason = linkedSetOf(104004, 104003).qqVkeyFinalReason().orEmpty()
+        assertTrue(reason.contains("104003"))
+    }
+
+    @Test
+    fun deviceRestrictionHasHighestPriority() {
+        val reason = linkedSetOf(104003, 104013).qqVkeyFinalReason().orEmpty()
+        assertTrue(reason.contains("104013"))
     }
 }
