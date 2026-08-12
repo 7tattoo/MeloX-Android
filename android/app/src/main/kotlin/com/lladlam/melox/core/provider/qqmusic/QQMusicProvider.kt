@@ -23,13 +23,6 @@ class QQMusicProvider(
         MusicCapability.Search,
         MusicCapability.Playback,
         MusicCapability.Lyrics,
-        MusicCapability.Library,
-        MusicCapability.Playlists,
-        MusicCapability.Albums,
-        MusicCapability.Artists,
-        MusicCapability.Comments,
-        MusicCapability.HomeRecommendations,
-        MusicCapability.Rankings,
     )
 
     private val api = QQMusicApiClient(
