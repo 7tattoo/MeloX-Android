@@ -18,6 +18,7 @@ object QQMusicQrcLyricsParser {
     private val wordTiming = Regex("\\((\\d+),(\\d+)\\)")
     private val lyricContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
     private const val AnnotationToleranceMs = 1_500L
+    private const val OffsetConsistencyMs = 1_500L
 
     fun decryptHex(value: String): String {
         val normalized = value.trim()
@@ -62,11 +63,25 @@ object QQMusicQrcLyricsParser {
             .ifEmpty { NeteaseLyricParser.parseLrc(extractLyricText(translation)) }
         val romanized = parseQrcLines(extractLyricText(romanization))
             .ifEmpty { NeteaseLyricParser.parseLrc(extractLyricText(romanization)) }
+        val translationOffset = estimateGlobalOffset(primaryLines, translated)
+        val romanizationOffset = estimateGlobalOffset(primaryLines, romanized)
 
         return LyricsDocument(
             primaryLines.mapIndexed { index, line ->
-                val translationLine = alignedAnnotation(line, index, primaryLines.size, translated)
-                val romanizationLine = alignedAnnotation(line, index, primaryLines.size, romanized)
+                val translationLine = alignedAnnotation(
+                    target = line,
+                    index = index,
+                    primarySize = primaryLines.size,
+                    candidates = translated,
+                    globalOffsetMs = translationOffset,
+                )
+                val romanizationLine = alignedAnnotation(
+                    target = line,
+                    index = index,
+                    primarySize = primaryLines.size,
+                    candidates = romanized,
+                    globalOffsetMs = romanizationOffset,
+                )
                 line.copy(
                     translation = annotationText(line, translationLine),
                     romanization = annotationText(line, romanizationLine),
@@ -151,12 +166,36 @@ object QQMusicQrcLyricsParser {
         .replace("&gt;", ">")
         .replace("&amp;", "&")
 
+    private fun estimateGlobalOffset(
+        primary: List<LyricLine>,
+        candidates: List<LyricLine>,
+    ): Long? {
+        if (primary.isEmpty() || candidates.isEmpty() || kotlin.math.abs(primary.size - candidates.size) > 2) return null
+        val count = minOf(primary.size, candidates.size, 6)
+        if (count <= 0) return null
+        val offsets = (0 until count)
+            .map { index -> candidates[index].timeMs - primary[index].timeMs }
+            .sorted()
+        val median = offsets[offsets.size / 2]
+        return median.takeIf { center ->
+            offsets.all { offset -> kotlin.math.abs(offset - center) <= OffsetConsistencyMs }
+        }
+    }
+
     private fun alignedAnnotation(
         target: LyricLine,
         index: Int,
         primarySize: Int,
         candidates: List<LyricLine>,
+        globalOffsetMs: Long?,
     ): LyricLine? {
+        if (globalOffsetMs != null) {
+            val expectedTime = target.timeMs + globalOffsetMs
+            val shifted = candidates.minByOrNull { kotlin.math.abs(it.timeMs - expectedTime) }
+            if (shifted != null && kotlin.math.abs(shifted.timeMs - expectedTime) <= AnnotationToleranceMs) {
+                return shifted
+            }
+        }
         nearest(target, candidates)?.let { return it }
         if (candidates.isEmpty() || kotlin.math.abs(candidates.size - primarySize) > 2) return null
         return candidates.getOrNull(index)
