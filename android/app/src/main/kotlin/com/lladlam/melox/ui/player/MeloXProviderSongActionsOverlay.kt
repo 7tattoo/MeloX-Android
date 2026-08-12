@@ -24,7 +24,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,25 +45,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.music.model.MusicArtistRef
+import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.provider.FavoriteCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class ProviderSongActionPage {
     Main,
     Sleep,
+    Playlists,
 }
 
 /**
- * Actions that are valid for non-NetEase provider tracks. Remote writes appear
- * only when that provider exposes an explicit capability backed by a real
- * authenticated platform API.
+ * Actions valid for non-NetEase provider tracks. Remote writes only appear when
+ * the active provider exposes an explicit capability backed by a real platform
+ * API. QQ uses FavoriteCapability; Kugou uses PlaylistWriteCapability.
  */
 @Composable
 internal fun MeloXProviderSongActionsOverlay(
@@ -77,25 +84,28 @@ internal fun MeloXProviderSongActionsOverlay(
         MeloXMusicProviders.create(context).require(identity.source)
     }
     val favoriteCapability = provider as? FavoriteCapability
+    val playlistWriteCapability = provider as? PlaylistWriteCapability
     val accountManager = remember { ProviderAccountManager(context) }
     val providerLoggedIn = remember(identity.source, visible) {
         accountManager.state(identity.source).loggedIn
     }
-    val favoriteTrack = remember(identity, state.title, state.artist) {
+    val actionTrack = remember(identity, state.title, state.artist, state.album, state.durationMs) {
         MusicTrack(
             id = identity,
             title = state.title.ifBlank { "未知歌曲" },
             artists = listOf(
-                MusicArtistRef(
-                    name = state.artist.ifBlank { "未知歌手" },
-                ),
+                MusicArtistRef(name = state.artist.ifBlank { "未知歌手" }),
             ),
+            durationMs = state.durationMs.takeIf { it > 0L },
         )
     }
 
     var page by remember(identity, visible) { mutableStateOf(ProviderSongActionPage.Main) }
     var favoriteKnownState by remember(identity) { mutableStateOf<Boolean?>(null) }
     var favoriteWorking by remember(identity) { mutableStateOf(false) }
+    var writablePlaylists by remember(identity) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
+    var playlistsLoading by remember(identity) { mutableStateOf(false) }
+    var playlistWriteWorking by remember(identity) { mutableStateOf(false) }
     var actionStatus by remember(identity) { mutableStateOf<String?>(null) }
     var actionError by remember(identity) { mutableStateOf<String?>(null) }
 
@@ -149,7 +159,10 @@ internal fun MeloXProviderSongActionsOverlay(
                     label = "provider-song-action-page",
                 ) { target ->
                     Column(
-                        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         ProviderActionHeader(
@@ -157,6 +170,7 @@ internal fun MeloXProviderSongActionsOverlay(
                             subtitle = when (target) {
                                 ProviderSongActionPage.Main -> "${identity.source.displayName} · 歌曲操作"
                                 ProviderSongActionPage.Sleep -> "定时关闭"
+                                ProviderSongActionPage.Playlists -> "选择目标歌单"
                             },
                         )
 
@@ -179,7 +193,7 @@ internal fun MeloXProviderSongActionsOverlay(
                                         actionError = null
                                         scope.launch {
                                             runCatching {
-                                                favoriteCapability.setFavorite(favoriteTrack, targetFavorite)
+                                                favoriteCapability.setFavorite(actionTrack, targetFavorite)
                                             }.onSuccess {
                                                 favoriteKnownState = targetFavorite
                                                 actionStatus = if (targetFavorite) {
@@ -191,6 +205,33 @@ internal fun MeloXProviderSongActionsOverlay(
                                                 actionError = failure.message ?: "我喜欢操作失败"
                                             }
                                             favoriteWorking = false
+                                        }
+                                    }
+                                }
+
+                                if (playlistWriteCapability != null) {
+                                    ProviderActionItem(
+                                        title = if (providerLoggedIn) "添加到歌单" else "登录 ${identity.source.displayName} 后可添加到歌单",
+                                        symbol = "＋",
+                                        enabled = providerLoggedIn && !playlistsLoading,
+                                    ) {
+                                        page = ProviderSongActionPage.Playlists
+                                        playlistsLoading = true
+                                        actionStatus = null
+                                        actionError = null
+                                        scope.launch {
+                                            runCatching {
+                                                withContext(Dispatchers.IO) {
+                                                    playlistWriteCapability.writablePlaylists(page = 1, pageSize = 50).items
+                                                }
+                                            }.onSuccess { playlists ->
+                                                writablePlaylists = playlists
+                                                if (playlists.isEmpty()) actionError = "没有返回可写入的用户歌单"
+                                            }.onFailure { failure ->
+                                                writablePlaylists = emptyList()
+                                                actionError = failure.message ?: "无法加载可写歌单"
+                                            }
+                                            playlistsLoading = false
                                         }
                                     }
                                 }
@@ -217,22 +258,7 @@ internal fun MeloXProviderSongActionsOverlay(
                                     }
                                 }
 
-                                actionStatus?.let { message ->
-                                    Text(
-                                        message,
-                                        color = Color.White.copy(alpha = 0.66f),
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                    )
-                                }
-                                actionError?.let { message ->
-                                    Text(
-                                        message,
-                                        color = Color(0xFFFF8A80),
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                    )
-                                }
+                                ProviderActionStatus(actionStatus, actionError)
                             }
 
                             ProviderSongActionPage.Sleep -> {
@@ -250,11 +276,66 @@ internal fun MeloXProviderSongActionsOverlay(
                                 }
                                 ProviderActionItem("返回", "‹") { page = ProviderSongActionPage.Main }
                             }
+
+                            ProviderSongActionPage.Playlists -> {
+                                when {
+                                    playlistsLoading -> ProviderActionItem("正在加载可写歌单…", "…", enabled = false) {}
+                                    writablePlaylists.isEmpty() -> ProviderActionItem("没有可写歌单", "—", enabled = false) {}
+                                    else -> writablePlaylists.forEach { playlist ->
+                                        ProviderActionItem(
+                                            title = playlist.title,
+                                            symbol = "▣",
+                                            enabled = !playlistWriteWorking,
+                                        ) {
+                                            val capability = playlistWriteCapability ?: return@ProviderActionItem
+                                            playlistWriteWorking = true
+                                            actionError = null
+                                            actionStatus = null
+                                            scope.launch {
+                                                runCatching {
+                                                    capability.addTrackToPlaylist(actionTrack, playlist)
+                                                }.onSuccess {
+                                                    actionStatus = "已添加到歌单「${playlist.title}」"
+                                                    page = ProviderSongActionPage.Main
+                                                }.onFailure { failure ->
+                                                    actionError = failure.message ?: "添加到歌单失败"
+                                                }
+                                                playlistWriteWorking = false
+                                            }
+                                        }
+                                    }
+                                }
+                                ProviderActionStatus(actionStatus, actionError)
+                                ProviderActionItem("返回", "‹") { page = ProviderSongActionPage.Main }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProviderActionStatus(
+    status: String?,
+    error: String?,
+) {
+    status?.let { message ->
+        Text(
+            message,
+            color = Color.White.copy(alpha = 0.66f),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+    error?.let { message ->
+        Text(
+            message,
+            color = Color(0xFFFF8A80),
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+        )
     }
 }
 
