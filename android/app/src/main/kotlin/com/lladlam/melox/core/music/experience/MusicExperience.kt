@@ -28,25 +28,31 @@ enum class HomeSectionKind {
 }
 
 /**
- * Product/navigation description for one music service. The Compose shell keeps
- * MeloX visual language, while the available content can differ by provider.
+ * Content/capability description for one music service.
+ *
+ * Root presentation is intentionally canonical MeloX presentation. Providers may
+ * expose different content/capabilities, but must not redefine root navigation,
+ * animation or visual language. This keeps future MeloX iOS -> Android UI ports
+ * provider-agnostic: migrate the canonical renderer once and every compatible
+ * provider inherits it automatically.
  */
 data class MusicExperience(
     val source: MusicSource,
-    val tabs: List<ExperienceTab>,
+    val tabs: List<ExperienceTab> = CanonicalMeloXTabs,
     val homeSections: List<HomeSectionKind>,
     val providerNativeCapabilities: Set<MusicCapability> = emptySet(),
+)
+
+val CanonicalMeloXTabs: List<ExperienceTab> = listOf(
+    ExperienceTab(ExperienceTabId.Home, "首页"),
+    ExperienceTab(ExperienceTabId.Explore, "发现"),
+    ExperienceTab(ExperienceTabId.Library, "音乐库"),
+    ExperienceTab(ExperienceTabId.Settings, "设置"),
 )
 
 object MusicExperiences {
     val netease = MusicExperience(
         source = MusicSource.Netease,
-        tabs = listOf(
-            ExperienceTab(ExperienceTabId.Home, "首页"),
-            ExperienceTab(ExperienceTabId.Explore, "发现"),
-            ExperienceTab(ExperienceTabId.Library, "音乐库"),
-            ExperienceTab(ExperienceTabId.Settings, "设置"),
-        ),
         homeSections = listOf(
             HomeSectionKind.QuickActions,
             HomeSectionKind.Recommendations,
@@ -67,12 +73,6 @@ object MusicExperiences {
 
     val qqMusic = MusicExperience(
         source = MusicSource.QQMusic,
-        tabs = listOf(
-            ExperienceTab(ExperienceTabId.Home, "首页"),
-            ExperienceTab(ExperienceTabId.Explore, "发现"),
-            ExperienceTab(ExperienceTabId.Library, "我的"),
-            ExperienceTab(ExperienceTabId.Settings, "设置"),
-        ),
         homeSections = listOf(
             HomeSectionKind.Recommendations,
             HomeSectionKind.Playlists,
@@ -84,12 +84,6 @@ object MusicExperiences {
 
     val kugou = MusicExperience(
         source = MusicSource.Kugou,
-        tabs = listOf(
-            ExperienceTab(ExperienceTabId.Home, "首页"),
-            ExperienceTab(ExperienceTabId.Explore, "乐库"),
-            ExperienceTab(ExperienceTabId.Library, "我的"),
-            ExperienceTab(ExperienceTabId.Settings, "设置"),
-        ),
         homeSections = listOf(
             HomeSectionKind.Recommendations,
             HomeSectionKind.Playlists,
