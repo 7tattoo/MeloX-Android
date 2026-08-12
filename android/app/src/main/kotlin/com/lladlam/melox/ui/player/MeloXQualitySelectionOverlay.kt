@@ -45,12 +45,17 @@ import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.audio.SongAudioAvailability
 import com.lladlam.melox.core.download.MeloXDownloadStore
+import com.lladlam.melox.core.music.model.AudioQualityTier
+import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.playback.PlaybackTrackIdentity
+import com.lladlam.melox.playback.ProviderPlaybackQualityRuntime
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Quality chooser. A downloaded track is physically one encoded file, so its
- * local quality is locked to the quality recorded at download time. */
+/** Quality chooser. A downloaded NetEase track is physically one encoded file,
+ * so its local quality is locked to the quality recorded at download time. */
 @Composable
 internal fun MeloXQualitySelectionOverlay(
     state: MeloXPlaybackUiState,
@@ -65,25 +70,43 @@ internal fun MeloXQualitySelectionOverlay(
             cookieProvider = { NeteaseSessionStore.readCookie(context) },
         )
     }
-    val songId = state.mediaId?.toLongOrNull()
+    val identity = remember(state.mediaId) { state.mediaId?.let(PlaybackTrackIdentity::decode) }
+    val source = identity?.source ?: MusicSource.Netease
+    val songId = identity
+        ?.takeIf { it.source == MusicSource.Netease }
+        ?.value
+        ?.toLongOrNull()
     val downloadedQuality = songId?.let(downloads::downloadedQuality)
-    var selected by remember(context, visible, songId) {
+    var selected by remember(context, visible, state.mediaId) {
         mutableStateOf(downloadedQuality ?: MusicQualityPreferences.read(context))
     }
     var availability by remember(state.mediaId, visible) {
         mutableStateOf(SongAudioAvailability.Unknown)
     }
+    var providerActual by remember(state.mediaId, visible) {
+        mutableStateOf(ProviderPlaybackQualityRuntime.actualFor(identity))
+    }
     var loading by remember(state.mediaId, visible) { mutableStateOf(false) }
 
-    LaunchedEffect(visible, songId, downloadedQuality) {
-        if (!visible || songId == null) return@LaunchedEffect
+    LaunchedEffect(visible, source, songId, downloadedQuality) {
+        if (!visible) return@LaunchedEffect
+        selected = downloadedQuality ?: MusicQualityPreferences.read(context)
+        if (source != MusicSource.Netease) {
+            loading = false
+            availability = SongAudioAvailability.Unknown
+            while (visible) {
+                providerActual = ProviderPlaybackQualityRuntime.actualFor(identity)
+                delay(180L)
+            }
+            return@LaunchedEffect
+        }
+        if (songId == null) return@LaunchedEffect
         if (downloadedQuality != null) {
             selected = downloadedQuality
             loading = false
             availability = SongAudioAvailability.Unknown
             return@LaunchedEffect
         }
-        selected = MusicQualityPreferences.read(context)
         loading = true
         availability = runCatching { client.audioAvailability(songId) }
             .getOrDefault(SongAudioAvailability.Unknown)
@@ -143,10 +166,12 @@ internal fun MeloXQualitySelectionOverlay(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            if (downloadedQuality != null) {
-                                "已下载 · ${downloadedQuality.title}"
-                            } else {
-                                state.title.ifBlank { "正在播放" }
+                            when {
+                                downloadedQuality != null -> "已下载 · ${downloadedQuality.title}"
+                                source != MusicSource.Netease && providerActual != null ->
+                                    "${source.displayName} · 实际播放：${providerActual!!.displayTitle()}"
+                                source != MusicSource.Netease -> "${source.displayName} · ${state.title.ifBlank { "正在播放" }}"
+                                else -> state.title.ifBlank { "正在播放" }
                             },
                             color = Color.White.copy(alpha = 0.55f),
                             fontSize = 13.sp,
@@ -163,10 +188,12 @@ internal fun MeloXQualitySelectionOverlay(
                 }
 
                 MusicQuality.entries.forEach { quality ->
-                    val supported = if (downloadedQuality != null) {
-                        quality == downloadedQuality
-                    } else {
-                        availability.supports(quality.apiLevel) != false
+                    val supported = when {
+                        downloadedQuality != null -> quality == downloadedQuality
+                        source == MusicSource.Netease -> availability.supports(quality.apiLevel) != false
+                        source == MusicSource.QQMusic -> quality in QQSelectableQualities
+                        source == MusicSource.Kugou -> quality in KugouSelectableQualities
+                        else -> false
                     }
                     val isSelected = quality == selected
                     Row(
@@ -193,6 +220,7 @@ internal fun MeloXQualitySelectionOverlay(
                             .clickable(enabled = supported) {
                                 if (downloadedQuality == null) {
                                     selected = quality
+                                    providerActual = null
                                     scope.launch { PlaybackCommands.changeQuality(context, quality) }
                                 }
                                 onDismiss()
@@ -211,7 +239,11 @@ internal fun MeloXQualitySelectionOverlay(
                             Text("✓", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         } else if (!supported) {
                             Text(
-                                if (downloadedQuality != null) "未下载" else "不可用",
+                                when {
+                                    downloadedQuality != null -> "未下载"
+                                    source == MusicSource.Netease -> "不可用"
+                                    else -> "平台不提供"
+                                },
                                 color = Color.White.copy(alpha = 0.30f),
                                 fontSize = 12.sp,
                             )
@@ -222,4 +254,29 @@ internal fun MeloXQualitySelectionOverlay(
             }
         }
     }
+}
+
+private val QQSelectableQualities = setOf(
+    MusicQuality.Standard,
+    MusicQuality.High,
+    MusicQuality.Lossless,
+    MusicQuality.HighDefinitionSurround,
+    MusicQuality.ImmersiveSurround,
+    MusicQuality.UltraClearMaster,
+)
+
+private val KugouSelectableQualities = setOf(
+    MusicQuality.Standard,
+    MusicQuality.High,
+    MusicQuality.Lossless,
+    MusicQuality.HiResolution,
+)
+
+private fun AudioQualityTier.displayTitle(): String = when (this) {
+    AudioQualityTier.Standard -> "标准"
+    AudioQualityTier.High -> "高品质"
+    AudioQualityTier.Lossless -> "无损"
+    AudioQualityTier.HiResolution -> "Hi-Res"
+    AudioQualityTier.Immersive -> "臻品/环绕"
+    AudioQualityTier.Master -> "臻品母带"
 }
