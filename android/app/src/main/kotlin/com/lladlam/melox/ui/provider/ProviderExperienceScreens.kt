@@ -43,6 +43,7 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.music.model.MusicAccountSummary
 import com.lladlam.melox.core.music.model.MusicHomeFeed
+import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
@@ -50,6 +51,7 @@ import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
+import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
@@ -107,6 +109,16 @@ private fun ProviderDiscoveryFeedScreen(
     var loading by remember(source) { mutableStateOf(home != null) }
     var error by remember(source) { mutableStateOf<String?>(null) }
     var playbackError by remember(source) { mutableStateOf<String?>(null) }
+    var selectedPlaylist by remember(source) { mutableStateOf<MusicPlaylistSummary?>(null) }
+
+    selectedPlaylist?.let { playlist ->
+        ProviderPlaylistDetailScreen(
+            source = source,
+            playlist = playlist,
+            onBack = { selectedPlaylist = null },
+        )
+        return
+    }
 
     LaunchedEffect(source, home) {
         if (home == null) return@LaunchedEffect
@@ -154,9 +166,7 @@ private fun ProviderDiscoveryFeedScreen(
                 }
             }
         } else if (error != null) {
-            item {
-                ProviderSimpleCard("加载失败", error.orEmpty())
-            }
+            item { ProviderSimpleCard("加载失败", error.orEmpty()) }
         } else {
             val value = feed ?: MusicHomeFeed()
             if (value.recommendedPlaylists.isNotEmpty()) {
@@ -167,7 +177,7 @@ private fun ProviderDiscoveryFeedScreen(
                             value.recommendedPlaylists,
                             key = { "playlist:${it.id.source.storageValue}:${it.id.value}" },
                         ) { playlist ->
-                            ProviderPlaylistCard(playlist)
+                            ProviderPlaylistCard(playlist) { selectedPlaylist = playlist }
                         }
                     }
                 }
@@ -195,9 +205,7 @@ private fun ProviderDiscoveryFeedScreen(
                 items(
                     value.rankings,
                     key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
-                ) { ranking ->
-                    ProviderRankingCard(ranking)
-                }
+                ) { ranking -> ProviderRankingCard(ranking) }
             }
 
             if (
@@ -214,9 +222,7 @@ private fun ProviderDiscoveryFeedScreen(
             }
         }
 
-        playbackError?.let { message ->
-            item { ProviderSimpleCard("播放失败", message) }
-        }
+        playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
     }
 }
 
@@ -229,6 +235,16 @@ fun ProviderLibraryScreen(source: MusicSource) {
     var playlists by remember(source) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
     var loading by remember(source) { mutableStateOf(library != null) }
     var error by remember(source) { mutableStateOf<String?>(null) }
+    var selectedPlaylist by remember(source) { mutableStateOf<MusicPlaylistSummary?>(null) }
+
+    selectedPlaylist?.let { playlist ->
+        ProviderPlaylistDetailScreen(
+            source = source,
+            playlist = playlist,
+            onBack = { selectedPlaylist = null },
+        )
+        return
+    }
 
     LaunchedEffect(source, library) {
         if (library == null) return@LaunchedEffect
@@ -277,10 +293,7 @@ fun ProviderLibraryScreen(source: MusicSource) {
             }
             error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
             account == null -> item {
-                ProviderSimpleCard(
-                    "尚未登录",
-                    "请先在设置中登录 ${source.displayName} 账号",
-                )
+                ProviderSimpleCard("尚未登录", "请先在设置中登录 ${source.displayName} 账号")
             }
             else -> {
                 item { ProviderAccountCard(account!!) }
@@ -290,16 +303,154 @@ fun ProviderLibraryScreen(source: MusicSource) {
                         playlists,
                         key = { "library:${it.id.source.storageValue}:${it.id.value}" },
                     ) { playlist ->
-                        ProviderLibraryPlaylistRow(playlist)
+                        ProviderLibraryPlaylistRow(playlist) { selectedPlaylist = playlist }
                     }
                 } else {
+                    item { ProviderSimpleCard("我的歌单", "当前账号没有返回可展示的歌单") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderPlaylistDetailScreen(
+    source: MusicSource,
+    playlist: MusicPlaylistSummary,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val provider = remember(source) { MeloXMusicProviders.create(context).require(source) }
+    val capability = provider as? PlaylistCapability
+    var detail by remember(playlist.id) { mutableStateOf<MusicPlaylistDetail?>(null) }
+    var loading by remember(playlist.id) { mutableStateOf(capability != null) }
+    var error by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var playbackError by remember(playlist.id) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(playlist.id, capability) {
+        if (capability == null) return@LaunchedEffect
+        loading = true
+        error = null
+        runCatching {
+            withContext(Dispatchers.IO) {
+                capability.playlistDetail(playlist, page = 1, pageSize = 150)
+            }
+        }.onSuccess { detail = it }
+            .onFailure { error = it.message ?: "歌单加载失败" }
+        loading = false
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 20.dp,
+            top = 42.dp,
+            end = 20.dp,
+            bottom = MeloXBottomContentClearance,
+        ),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Text(
+                "‹ 返回",
+                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        when {
+            capability == null -> item {
+                ProviderSimpleCard("暂不可用", "${source.displayName} 尚未实现歌单详情 Capability")
+            }
+            loading -> item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 52.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty(), onClick = onBack) }
+            detail != null -> {
+                val value = detail!!
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        AsyncImage(
+                            model = value.summary.artworkUrl,
+                            contentDescription = null,
+                            modifier = Modifier.size(118.dp).clip(RoundedCornerShape(22.dp)),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                value.summary.title,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            value.summary.creatorName?.takeIf(String::isNotBlank)?.let {
+                                Spacer(Modifier.height(5.dp))
+                                Text(
+                                    it,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                )
+                            }
+                            val count = value.total ?: value.tracks.size.toLong()
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "$count 首歌曲",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f),
+                            )
+                        }
+                    }
+                }
+                value.summary.description?.takeIf(String::isNotBlank)?.let { description ->
                     item {
-                        ProviderSimpleCard(
-                            "我的歌单",
-                            "当前账号没有返回可展示的歌单",
+                        Text(
+                            description,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         )
                     }
                 }
+                if (value.tracks.isNotEmpty()) {
+                    item {
+                        ProviderSimpleCard(
+                            "播放全部",
+                            "从第一首开始播放 · ${value.tracks.size} 首已加载",
+                            onClick = {
+                                ProviderPlaybackCommands.playQueue(
+                                    context = context,
+                                    tracks = value.tracks,
+                                    selectedTrackId = value.tracks.first().id,
+                                    onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
+                                )
+                            },
+                        )
+                    }
+                    items(
+                        value.tracks,
+                        key = { "detail:${it.id.source.storageValue}:${it.id.value}" },
+                    ) { track ->
+                        ProviderTrackRow(track) {
+                            ProviderPlaybackCommands.playQueue(
+                                context = context,
+                                tracks = value.tracks,
+                                selectedTrackId = track.id,
+                                onFailure = { failure -> playbackError = failure.message ?: "播放失败" },
+                            )
+                        }
+                    }
+                } else {
+                    item { ProviderSimpleCard("暂无歌曲", "这个歌单当前没有返回可播放歌曲") }
+                }
+                playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
             }
         }
     }
@@ -355,12 +506,14 @@ fun ProviderSearchScreen(source: MusicSource) {
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable(enabled = query.isNotBlank() && !loading) {
-                    val capability = search ?: return@clickable
+                    val searchCapability = search ?: return@clickable
                     loading = true
                     error = null
                     scope.launch {
                         runCatching {
-                            withContext(Dispatchers.IO) { capability.searchSongs(query, page = 1, pageSize = 40).items }
+                            withContext(Dispatchers.IO) {
+                                searchCapability.searchSongs(query, page = 1, pageSize = 40).items
+                            }
                         }.onSuccess { results = it }
                             .onFailure { error = it.message ?: "搜索失败" }
                         loading = false
@@ -407,10 +560,7 @@ fun ProviderSettingsHub(
     var automaticFallback by remember { mutableStateOf(MusicProviderSelectionStore.automaticFallbackEnabled(context)) }
 
     if (showNeteaseSettings && currentSource == MusicSource.Netease) {
-        SettingsScreen(
-            session = neteaseSession,
-            onLogin = onNeteaseLogin,
-        )
+        SettingsScreen(session = neteaseSession, onLogin = onNeteaseLogin)
         return
     }
     if (showQQLogin && currentSource == MusicSource.QQMusic) {
@@ -507,8 +657,7 @@ fun ProviderSettingsHub(
             MusicSource.Netease -> {
                 ProviderSimpleCard(
                     "网易云音乐账号",
-                    neteaseSession.profile?.nickname
-                        ?: if (neteaseSession.isLoggedIn) "已登录" else "未登录",
+                    neteaseSession.profile?.nickname ?: if (neteaseSession.isLoggedIn) "已登录" else "未登录",
                     onClick = if (neteaseSession.isLoggedIn) null else onNeteaseLogin,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -526,7 +675,7 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showQQLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放 · 推荐 · 排行榜 · 我的歌单")
+                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放 · 推荐 · 排行榜 · 我的歌单 · 歌单详情")
             }
             MusicSource.Kugou -> {
                 val session = remember(loginRevision, currentSource) { KugouSessionStore.read(context) }
@@ -536,7 +685,7 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showKugouLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · KRC逐字歌词 · 播放 · 乐库推荐 · 排行榜 · 我的歌单")
+                ProviderSimpleCard("当前能力", "搜索 · KRC逐字歌词 · 播放 · 乐库推荐 · 排行榜 · 我的歌单 · 歌单详情")
             }
         }
     }
@@ -553,14 +702,19 @@ private fun ProviderSectionTitle(title: String) {
 }
 
 @Composable
-private fun ProviderPlaylistCard(playlist: MusicPlaylistSummary) {
-    Column(modifier = Modifier.width(126.dp)) {
+private fun ProviderPlaylistCard(
+    playlist: MusicPlaylistSummary,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(126.dp)
+            .clickable(onClick = onClick),
+    ) {
         AsyncImage(
             model = playlist.artworkUrl,
             contentDescription = null,
-            modifier = Modifier
-                .size(126.dp)
-                .clip(RoundedCornerShape(18.dp)),
+            modifier = Modifier.size(126.dp).clip(RoundedCornerShape(18.dp)),
         )
         Spacer(Modifier.height(7.dp))
         Text(
@@ -651,10 +805,14 @@ private fun ProviderAccountCard(account: MusicAccountSummary) {
 }
 
 @Composable
-private fun ProviderLibraryPlaylistRow(playlist: MusicPlaylistSummary) {
+private fun ProviderLibraryPlaylistRow(
+    playlist: MusicPlaylistSummary,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
