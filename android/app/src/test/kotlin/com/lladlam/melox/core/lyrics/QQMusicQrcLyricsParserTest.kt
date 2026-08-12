@@ -51,4 +51,16 @@ class QQMusicQrcLyricsParserTest {
         assertEquals("甲乙", document.lines.single().translation)
         assertEquals("a b", document.lines.single().romanization)
     }
+
+    @Test
+    fun plainLrcTranslationCanAlignByLineWhenTimestampsDrift() {
+        val document = QQMusicQrcLyricsParser.parseEncrypted(
+            qrcHex = "[1000,600]A(1000,300)B(1300,300)\n[3000,600]C(3000,300)D(3300,300)",
+            translationHex = "[00:03.00]甲乙\n[00:05.00]丙丁",
+        )
+        assertEquals(2, document.lines.size)
+        assertEquals("甲乙", document.lines[0].translation)
+        assertEquals("丙丁", document.lines[1].translation)
+        assertTrue(document.lines.all { it.syllables.isNotEmpty() })
+    }
 }
