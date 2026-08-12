@@ -58,6 +58,7 @@ class NeteaseMusicOperationsClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val syntheticDeviceId = randomHex(26).uppercase()
+    private val authenticatedWeapi = NeteaseAuthenticatedWeapi(cookieProvider, httpClient)
 
     suspend fun setSongLiked(songId: Long, liked: Boolean) = withContext(Dispatchers.IO) {
         ensureLoggedIn()
@@ -196,28 +197,62 @@ class NeteaseMusicOperationsClient(
 
     suspend fun listenTogetherRoomStatus(): MeloXListenTogetherRoom? = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val response = eapi("/api/listen/together/status/get", JSONObject(), true)
-        parseListenTogetherRoom(response.optJSONObject("data")?.optJSONObject("roomInfo"))
+        val response = try {
+            authenticatedWeapi.post("/api/listen/together/status/get")
+        } catch (error: IOException) {
+            // Upstream MeloX only falls back when WEAPI returns an empty body.
+            // Preserve that behavior instead of masking real authentication/server errors.
+            if (!error.message.orEmpty().contains("空响应")) throw error
+            eapi("/api/listen/together/status/get", JSONObject(), true)
+        }
+        val data = response.optJSONObject("data") ?: return@withContext null
+        val roomInfo = data.optJSONObject("roomInfo")
+        val inRoom = if (data.has("inRoom")) data.optBoolean("inRoom", false) else roomInfo != null
+        if (!inRoom) return@withContext null
+        parseListenTogetherRoom(roomInfo)
     }
 
     suspend fun joinListenTogetherRoom(roomId: String, inviterId: String): MeloXListenTogetherRoom = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val check = eapi(
+
+        // A stale local UI can ask to join a room the current NetEase account is
+        // already in. The server then correctly reports joinable=false. Restore
+        // that existing session instead of turning it into a misleading join error.
+        listenTogetherRoomStatus()?.takeIf { it.id == roomId }?.let { return@withContext it }
+
+        val checkResponse = eapi(
             "/api/listen/together/room/check",
             JSONObject().put("roomId", roomId),
             true,
-        ).optJSONObject("data")
+        )
+        val check = checkResponse.optJSONObject("data")
         if (check?.optBoolean("canJoin", check.optBoolean("joinable", true)) == false) {
-            throw IOException(check.optString("message").ifBlank { "该一起听房间当前无法加入" })
+            val status = check.optString("status").trim()
+            val type = check.optString("type").trim()
+            val serverMessage = checkResponse.optString("message")
+                .ifBlank { checkResponse.optString("msg") }
+                .trim()
+            val reason = when {
+                status.equals("FULL", true) -> "一起听房间人数已满"
+                status.equals("END", true) || status.equals("ENDED", true) || status.equals("CLOSED", true) ->
+                    "一起听房间已结束"
+                serverMessage.isNotBlank() -> serverMessage
+                status.isNotBlank() && type.isNotBlank() -> "该一起听房间当前无法加入（status=$status，type=$type）"
+                status.isNotBlank() -> "该一起听房间当前无法加入（status=$status）"
+                type.isNotBlank() -> "该一起听房间当前无法加入（type=$type）"
+                else -> "该一起听房间当前无法加入"
+            }
+            throw IOException(reason)
         }
+
         val response = eapi(
             "/api/listen/together/play/invitation/accept",
             JSONObject().put("refer", "inbox_invite").put("roomId", roomId).put("inviterId", inviterId),
             true,
         )
         parseListenTogetherRoom(response.optJSONObject("data")?.optJSONObject("roomInfo"))
-            ?: listenTogetherRoomStatus()
-            ?: throw IOException("加入成功，但未能读取房间信息")
+            ?: listenTogetherRoomStatus()?.takeIf { it.id == roomId }
+            ?: throw IOException("加入成功，但未能读取目标房间信息")
     }
 
     suspend fun listenTogetherPlayback(roomId: String): MeloXListenTogetherPlayback = withContext(Dispatchers.IO) {
