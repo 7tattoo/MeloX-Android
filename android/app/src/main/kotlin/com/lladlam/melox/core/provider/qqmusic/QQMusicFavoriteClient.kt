@@ -12,6 +12,10 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal const val QQ_LIKED_DIRECTORY_ID = 201
+internal fun qqFavoriteWriteMethod(favorite: Boolean): String =
+    if (favorite) "AddSonglist" else "DelSonglist"
+
 /** Authenticated QQ Music "我喜欢" writer. */
 class QQMusicFavoriteClient(
     private val sessionProvider: () -> QQMusicSession,
@@ -32,7 +36,7 @@ class QQMusicFavoriteClient(
         val data = postMusicu(
             session = session,
             module = "music.musicasset.PlaylistDetailWrite",
-            method = if (favorite) "AddSonglist" else "DelSonglist",
+            method = qqFavoriteWriteMethod(favorite),
             param = param,
         )
         val retCode = findInt(data, "retCode", "retcode", "code") ?: 0
@@ -58,7 +62,7 @@ class QQMusicFavoriteClient(
     }
 
     internal fun buildWriteParam(song: SongWriteRef): JSONObject = JSONObject()
-        .put("dirId", LikedDirectoryId)
+        .put("dirId", QQ_LIKED_DIRECTORY_ID)
         .put("tid", 0)
         .put("bFmtUtf8", true)
         .put(
@@ -198,7 +202,6 @@ class QQMusicFavoriteClient(
     }
 
     private companion object {
-        const val LikedDirectoryId = 201
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
         const val DesktopUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
