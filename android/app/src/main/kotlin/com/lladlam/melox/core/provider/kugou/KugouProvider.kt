@@ -3,6 +3,10 @@ package com.lladlam.melox.core.provider.kugou
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicAccountSummary
+import com.lladlam.melox.core.music.model.MusicAlbumDetail
+import com.lladlam.melox.core.music.model.MusicAlbumSummary
+import com.lladlam.melox.core.music.model.MusicArtistDetail
+import com.lladlam.melox.core.music.model.MusicArtistSummary
 import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
 import com.lladlam.melox.core.music.model.MusicPlaylistDetail
@@ -11,6 +15,9 @@ import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
+import com.lladlam.melox.core.music.provider.AlbumCapability
+import com.lladlam.melox.core.music.provider.ArtistCapability
+import com.lladlam.melox.core.music.provider.CatalogSearchCapability
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.LyricsCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
@@ -27,12 +34,15 @@ class KugouProvider(
     httpClient: OkHttpClient = OkHttpClient(),
 ) : MusicProvider,
     SearchCapability,
+    CatalogSearchCapability,
     LyricsCapability,
     PlaybackCapability,
     HomeFeedCapability,
     UserLibraryCapability,
     PlaylistCapability,
-    RankingCapability {
+    RankingCapability,
+    AlbumCapability,
+    ArtistCapability {
     override val source: MusicSource = MusicSource.Kugou
     override val displayName: String = source.displayName
     override val capabilities: Set<MusicCapability> = setOf(
@@ -41,6 +51,8 @@ class KugouProvider(
         MusicCapability.Lyrics,
         MusicCapability.Library,
         MusicCapability.Playlists,
+        MusicCapability.Albums,
+        MusicCapability.Artists,
         MusicCapability.HomeRecommendations,
         MusicCapability.Rankings,
     )
@@ -61,9 +73,31 @@ class KugouProvider(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
+    private val catalog = KugouCatalogClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
 
     override suspend fun searchSongs(query: String, page: Int, pageSize: Int): MusicPage<MusicTrack> =
         api.searchSongs(query, page, pageSize)
+
+    override suspend fun searchPlaylists(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): MusicPage<MusicPlaylistSummary> = catalog.searchPlaylists(query, page, pageSize)
+
+    override suspend fun searchAlbums(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): MusicPage<MusicAlbumSummary> = catalog.searchAlbums(query, page, pageSize)
+
+    override suspend fun searchArtists(
+        query: String,
+        page: Int,
+        pageSize: Int,
+    ): MusicPage<MusicArtistSummary> = catalog.searchArtists(query, page, pageSize)
 
     override suspend fun lyrics(track: MusicTrack): LyricsDocument = api.lyrics(track)
 
@@ -94,4 +128,16 @@ class KugouProvider(
         page: Int,
         pageSize: Int,
     ): MusicPage<MusicTrack> = rankings.tracks(ranking, page, pageSize)
+
+    override suspend fun albumDetail(
+        album: MusicAlbumSummary,
+        page: Int,
+        pageSize: Int,
+    ): MusicAlbumDetail = catalog.albumDetail(album, page, pageSize)
+
+    override suspend fun artistDetail(
+        artist: MusicArtistSummary,
+        page: Int,
+        pageSize: Int,
+    ): MusicArtistDetail = catalog.artistDetail(artist, page, pageSize)
 }
