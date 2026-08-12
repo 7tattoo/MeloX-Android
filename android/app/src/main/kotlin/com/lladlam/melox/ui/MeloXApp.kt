@@ -384,6 +384,7 @@ fun MeloXApp(
             CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
                 MeloXBottomChrome(
                     selectedTab = selectedTab,
+                    source = selectedSource,
                     onSelect = { tab ->
                         tabBarMinimized = false
                         selectedTab = tab
@@ -583,6 +584,7 @@ private fun MeloXSectionShell(
 @Composable
 private fun MeloXBottomChrome(
     selectedTab: AppTab,
+    source: MusicSource,
     onSelect: (AppTab) -> Unit,
     hasMedia: Boolean,
     minimized: Boolean,
@@ -724,7 +726,7 @@ private fun MeloXBottomChrome(
                     ) {
                         primaryTabs.forEach { (tab, glyph) ->
                             RootTabButton(
-                                tab = tab,
+                                title = tab.titleFor(source),
                                 glyph = glyph,
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
@@ -784,7 +786,7 @@ private fun MeloXBottomChrome(
                     ) {
                         primaryTabs.forEach { (tab, glyph) ->
                             RootTabButton(
-                                tab = tab,
+                                title = tab.titleFor(source),
                                 glyph = glyph,
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
@@ -862,7 +864,7 @@ private fun bottomGlassFallbackColor(): Color =
 
 @Composable
 private fun RowScope.RootTabButton(
-    tab: AppTab,
+    title: String,
     glyph: RootGlyph,
     selected: Boolean,
     labelAlpha: Float,
@@ -887,7 +889,7 @@ private fun RowScope.RootTabButton(
     ) {
         RootGlyphIcon(glyph = glyph, modifier = Modifier.size(24.dp), color = foreground)
         Text(
-            text = tab.title,
+            text = title,
             modifier = Modifier.graphicsLayer { alpha = labelAlpha },
             fontSize = 9.sp,
             lineHeight = 11.sp,
@@ -898,6 +900,14 @@ private fun RowScope.RootTabButton(
 }
 
 private enum class RootGlyph { Home, Explore, Library, Settings, Search }
+
+private fun AppTab.titleFor(source: MusicSource): String = when (this) {
+    AppTab.Home -> "首页"
+    AppTab.Explore -> if (source == MusicSource.Kugou) "乐库" else "发现"
+    AppTab.Library -> if (source == MusicSource.Netease) "音乐库" else "我的"
+    AppTab.Settings -> "设置"
+    AppTab.Search -> "搜索"
+}
 
 private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Home -> RootGlyph.Home
