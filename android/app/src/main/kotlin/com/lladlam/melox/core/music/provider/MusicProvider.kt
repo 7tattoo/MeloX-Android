@@ -2,7 +2,10 @@ package com.lladlam.melox.core.music.provider
 
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.AudioQualityTier
+import com.lladlam.melox.core.music.model.MusicAccountSummary
+import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
+import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
@@ -59,7 +62,26 @@ interface PlaybackCapability {
     ): PlaybackResolution
 }
 
-/** Small registry used by repositories and the future provider-aware UI layer. */
+/** Home semantic feed. Providers return only the sections they actually expose. */
+interface HomeFeedCapability {
+    suspend fun homeFeed(
+        playlistLimit: Int = 12,
+        newSongLimit: Int = 12,
+        rankingLimit: Int = 8,
+    ): MusicHomeFeed
+}
+
+/** Logged-in account/library data. Credentials remain private to each provider. */
+interface UserLibraryCapability {
+    suspend fun accountSummary(): MusicAccountSummary?
+
+    suspend fun userPlaylists(
+        page: Int = 1,
+        pageSize: Int = 30,
+    ): MusicPage<MusicPlaylistSummary>
+}
+
+/** Small registry used by repositories and the provider-aware UI layer. */
 class MusicProviderRegistry(
     providers: Iterable<MusicProvider>,
 ) {
