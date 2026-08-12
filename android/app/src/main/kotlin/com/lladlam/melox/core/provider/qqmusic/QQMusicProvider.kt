@@ -49,6 +49,10 @@ class QQMusicProvider(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
+    private val richLyrics = QQMusicRichLyricsClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
     private val playlists = QQMusicPlaylistClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
@@ -61,7 +65,9 @@ class QQMusicProvider(
     override suspend fun searchSongs(query: String, page: Int, pageSize: Int): MusicPage<MusicTrack> =
         api.searchSongs(query, page, pageSize)
 
-    override suspend fun lyrics(track: MusicTrack): LyricsDocument = api.lyrics(track)
+    override suspend fun lyrics(track: MusicTrack): LyricsDocument =
+        runCatching { richLyrics.lyrics(track) }
+            .getOrElse { api.lyrics(track) }
 
     override suspend fun resolvePlayback(
         track: MusicTrack,
