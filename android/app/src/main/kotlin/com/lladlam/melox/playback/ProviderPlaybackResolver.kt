@@ -124,6 +124,9 @@ class ProviderPlaybackResolver(
         private const val KugouAlbumAudioIdQuery = "kgAlbumAudioId"
         private const val KugouAlbumIdQuery = "kgAlbumId"
 
+        fun isProviderTrackUri(uri: Uri): Boolean =
+            uri.scheme == MeloXScheme && uri.host == ProviderTrackHost
+
         fun uriForTrack(
             track: MusicTrack,
             quality: AudioQualityTier,
