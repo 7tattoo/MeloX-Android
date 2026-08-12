@@ -21,8 +21,25 @@ class QQMusicRichLyricsClient(
         require(track.id.source == MusicSource.QQMusic)
         val metadata = track.providerMetadata as? ProviderTrackMetadata.QQMusic
         val songMid = metadata?.songMid?.takeIf(String::isNotBlank) ?: track.id.value
-        val songId = metadata?.numericSongId ?: 0L
+        val songId = metadata?.numericSongId?.takeIf { it > 0L }
         val session = sessionProvider()
+
+        // Keep this request shape in lock-step with PlayLyricInfo/GetPlayLyricInfo.
+        // The service accepts *either* songId or songMid. Sending songID=0 together
+        // with the old songMID spelling makes some tracks resolve as an empty QRC.
+        val lyricParam = JSONObject()
+            .put("crypt", 1)
+            .put("lrc_t", 0)
+            .put("qrc", 1)
+            .put("qrc_t", 0)
+            .put("trans", 1)
+            .put("trans_t", 0)
+            .put("roma", 1)
+            .put("roma_t", 0)
+            .put("needSingingAnnotations", false)
+            .put("type", 1)
+        if (songId != null) lyricParam.put("songId", songId) else lyricParam.put("songMid", songMid)
+
         val payload = JSONObject()
             .put(
                 "comm",
@@ -40,24 +57,9 @@ class QQMusicRichLyricsClient(
                 JSONObject()
                     .put("module", "music.musichallSong.PlayLyricInfo")
                     .put("method", "GetPlayLyricInfo")
-                    .put(
-                        "param",
-                        JSONObject()
-                            .put("songID", songId)
-                            .put("songMID", songMid)
-                            .put("qrc", 1)
-                            .put("qrc_t", 0)
-                            .put("trans", 1)
-                            .put("trans_t", 0)
-                            .put("roma", 1)
-                            .put("roma_t", 0)
-                            .put("lrc_t", 0)
-                            .put("crypt", 1)
-                            .put("type", 0)
-                            .put("ct", 11)
-                            .put("cv", 13_020_508),
-                    ),
+                    .put("param", lyricParam),
             )
+
         val request = Request.Builder()
             .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
             .header("User-Agent", "QQMusic 13020508(android 15)")
@@ -65,6 +67,7 @@ class QQMusicRichLyricsClient(
             .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
             .post(payload.toString().toRequestBody(JsonMediaType))
             .build()
+
         httpClient.newCall(request).execute().use { response ->
             val body = response.body.string()
             if (!response.isSuccessful) throw IOException("QQ音乐逐字歌词请求失败：HTTP ${response.code}")
