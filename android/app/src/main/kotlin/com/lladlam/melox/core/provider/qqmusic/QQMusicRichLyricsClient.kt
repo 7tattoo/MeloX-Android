@@ -6,6 +6,8 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.ProviderTrackMetadata
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,7 +19,7 @@ class QQMusicRichLyricsClient(
     private val sessionProvider: () -> QQMusicSession,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
-    suspend fun lyrics(track: MusicTrack): LyricsDocument {
+    suspend fun lyrics(track: MusicTrack): LyricsDocument = withContext(Dispatchers.IO) {
         require(track.id.source == MusicSource.QQMusic)
         val metadata = track.providerMetadata as? ProviderTrackMetadata.QQMusic
         val songMid = metadata?.songMid?.takeIf(String::isNotBlank) ?: track.id.value
@@ -94,7 +96,7 @@ class QQMusicRichLyricsClient(
             if (parsed.lines.isEmpty() || parsed.lines.none { it.syllables.isNotEmpty() }) {
                 throw IOException("QQ音乐 QRC 解码后没有有效逐字时间轴")
             }
-            return parsed
+            parsed
         }
     }
 
