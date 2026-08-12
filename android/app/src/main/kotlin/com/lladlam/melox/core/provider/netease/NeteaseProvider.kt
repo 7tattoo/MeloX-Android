@@ -74,7 +74,10 @@ class NeteaseProvider(
         // delegated to NeteaseUniversalSearchClient when UI starts requesting it.
         if (page > 1) return MusicPage(emptyList(), page, pageSize.coerceAtLeast(1), null, false)
         val size = pageSize.coerceIn(1, 50)
-        val songs = searchClient.searchSongs(query, size).map { song ->
+        // The original NetEase SearchScreen enriches missing artwork after search.
+        // Unified search must do the same before mapping into provider-neutral tracks,
+        // otherwise the Compose row receives a blank artwork URL.
+        val songs = searchClient.ensureArtwork(searchClient.searchSongs(query, size)).map { song ->
             MusicTrack(
                 id = MusicResourceId(MusicSource.Netease, song.id.toString()),
                 title = song.name,
