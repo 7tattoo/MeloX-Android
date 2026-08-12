@@ -8,6 +8,7 @@ import com.lladlam.melox.core.music.model.ProviderTrackMetadata
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,8 +27,38 @@ class QQMusicRichLyricsClient(
         val songId = metadata?.numericSongId?.takeIf { it > 0L }
         val session = sessionProvider()
 
-        // PlayLyricInfo accepts either songId or songMid. Supplying the old
-        // songMID spelling together with songID=0 can resolve to an empty QRC.
+        // Rich lyrics must not depend on QQ Android's device Session/QIMEI setup.
+        // Our login state is a web cookie, so use the web musicu profile here.
+        val playLyric = runCatching {
+            requestPlayLyricInfo(songMid, songId, session)
+        }.getOrNull()
+
+        if (playLyric != null &&
+            playLyric.lines.any { it.syllables.isNotEmpty() } &&
+            playLyric.lines.any { !it.translation.isNullOrBlank() }
+        ) {
+            return@withContext playLyric
+        }
+
+        // QQ also exposes the PC lyric_download path used by Lyricify. It can
+        // return encrypted QRC while translation is already plain LRC, so the
+        // shared parser deliberately accepts either encrypted or decoded fields.
+        val downloaded = runCatching {
+            requestDownloadedLyrics(songMid, songId, session)
+        }.getOrNull()
+
+        when {
+            downloaded != null && downloaded.lines.any { it.syllables.isNotEmpty() } -> downloaded
+            playLyric != null && playLyric.lines.any { it.syllables.isNotEmpty() } -> playLyric
+            else -> throw IOException("QQ音乐没有返回可用的逐字歌词")
+        }
+    }
+
+    private fun requestPlayLyricInfo(
+        songMid: String,
+        songId: Long?,
+        session: QQMusicSession,
+    ): LyricsDocument {
         val lyricParam = JSONObject()
             .put("crypt", 1)
             .put("lrc_t", 0)
@@ -41,17 +72,20 @@ class QQMusicRichLyricsClient(
             .put("type", 1)
         if (songId != null) lyricParam.put("songId", songId) else lyricParam.put("songMid", songMid)
 
-        // Match the current Android profile used by QQMusicApi rather than the
-        // stale client version that was originally copied into the Android port.
+        val gtk = hash33(session.musicKey)
         val comm = JSONObject()
-            .put("ct", 11)
-            .put("cv", 14_090_008)
-            .put("v", 14_090_008)
-            .put("chid", "10003505")
-            .put("qq", session.uin.ifBlank { "0" })
-            .put("authst", session.musicKey)
-            .put("tmeAppID", "qqmusic")
+            .put("ct", 24)
+            .put("cv", 4_747_474)
+            .put("platform", "yqq.json")
+            .put("chid", "0")
+            .put("uin", session.uin.toLongOrNull() ?: 0L)
+            .put("g_tk", gtk)
+            .put("g_tk_new_20200303", gtk)
             .put("format", "json")
+            .put("inCharset", "utf-8")
+            .put("outCharset", "utf-8")
+            .put("notice", 0)
+            .put("need_new_code", 1)
 
         val payload = JSONObject()
             .put("comm", comm)
@@ -65,7 +99,8 @@ class QQMusicRichLyricsClient(
 
         val request = Request.Builder()
             .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
-            .header("User-Agent", "QQMusic 14090008(android 15)")
+            .header("User-Agent", DesktopUserAgent)
+            .header("Referer", "https://y.qq.com/")
             .header("Accept", "application/json, text/plain, */*")
             .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
             .post(payload.toString().toRequestBody(JsonMediaType))
@@ -86,21 +121,120 @@ class QQMusicRichLyricsClient(
                 )
             }
             val data = req.optJSONObject("data") ?: JSONObject()
-            val qrc = data.optString("lyric")
-            if (qrc.isBlank()) throw IOException("QQ音乐没有返回 QRC")
+            val lyric = data.optString("lyric")
+            if (lyric.isBlank()) throw IOException("QQ音乐没有返回 QRC")
             val parsed = QQMusicQrcLyricsParser.parseEncrypted(
-                qrcHex = qrc,
+                qrcHex = lyric,
                 translationHex = data.optString("trans"),
                 romanizationHex = data.optString("roma"),
             )
-            if (parsed.lines.isEmpty() || parsed.lines.none { it.syllables.isNotEmpty() }) {
+            if (parsed.lines.none { it.syllables.isNotEmpty() }) {
                 throw IOException("QQ音乐 QRC 解码后没有有效逐字时间轴")
             }
-            parsed
+            return parsed
         }
+    }
+
+    private fun requestDownloadedLyrics(
+        songMid: String,
+        knownSongId: Long?,
+        session: QQMusicSession,
+    ): LyricsDocument {
+        val songId = knownSongId ?: resolveNumericSongId(songMid, session)
+            ?: throw IOException("QQ音乐无法解析歌曲数字 ID")
+        val body = FormBody.Builder()
+            .add("version", "15")
+            .add("miniversion", "82")
+            .add("lrctype", "4")
+            .add("musicid", songId.toString())
+            .build()
+        val request = Request.Builder()
+            .url("https://c.y.qq.com/qqmusic/fcgi-bin/lyric_download.fcg")
+            .header("User-Agent", DesktopUserAgent)
+            .header("Referer", "https://c.y.qq.com/")
+            .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
+            .post(body)
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("QQ音乐歌词下载失败：HTTP ${response.code}")
+            val xml = response.body.string()
+                .replace("<!--", "")
+                .replace("-->", "")
+            val primary = extractXmlText(xml, "content")
+            val translation = extractXmlText(xml, "contentts")
+            val romanization = extractXmlText(xml, "contentroma")
+            if (primary.isBlank()) throw IOException("QQ音乐歌词下载没有返回原文")
+            val parsed = QQMusicQrcLyricsParser.parseEncrypted(
+                qrcHex = primary,
+                translationHex = translation,
+                romanizationHex = romanization,
+            )
+            if (parsed.lines.none { it.syllables.isNotEmpty() }) {
+                throw IOException("QQ音乐下载歌词没有有效逐字时间轴")
+            }
+            return parsed
+        }
+    }
+
+    private fun resolveNumericSongId(songMid: String, session: QQMusicSession): Long? {
+        val url = okhttp3.HttpUrl.Builder()
+            .scheme("https")
+            .host("c.y.qq.com")
+            .addPathSegments("v8/fcg-bin/fcg_play_single_song.fcg")
+            .addQueryParameter("songmid", songMid)
+            .addQueryParameter("tpl", "yqq_song_detail")
+            .addQueryParameter("format", "json")
+            .addQueryParameter("g_tk", "5381")
+            .addQueryParameter("loginUin", session.uin.ifBlank { "0" })
+            .addQueryParameter("hostUin", "0")
+            .addQueryParameter("outCharset", "utf8")
+            .addQueryParameter("notice", "0")
+            .addQueryParameter("platform", "yqq")
+            .addQueryParameter("needNewCode", "0")
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", DesktopUserAgent)
+            .header("Referer", "https://y.qq.com/")
+            .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
+            .get()
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+            val root = runCatching { JSONObject(response.body.string()) }.getOrNull() ?: return null
+            val data = root.optJSONArray("data") ?: return null
+            val song = data.optJSONObject(0) ?: return null
+            return song.optLong("songid", 0L).takeIf { it > 0L }
+                ?: song.optLong("id", 0L).takeIf { it > 0L }
+        }
+    }
+
+    private fun extractXmlText(xml: String, tag: String): String {
+        val pattern = Regex(
+            "<$tag(?:\\s[^>]*)?>(.*?)</$tag>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+        )
+        return pattern.find(xml)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+            .trim()
+            .removePrefix("<![CDATA[")
+            .removeSuffix("]]>")
+            .trim()
+    }
+
+    private fun hash33(value: String): Int {
+        var hash = 5381L
+        value.forEach { char -> hash += (hash shl 5) + char.code }
+        return (hash and 0x7fffffffL).toInt()
     }
 
     private companion object {
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
+        const val DesktopUserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }
