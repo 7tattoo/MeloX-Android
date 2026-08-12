@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -42,216 +41,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.music.model.MusicAccountSummary
-import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
-import com.lladlam.melox.core.music.model.MusicRankingSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
-import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
+import com.lladlam.melox.ui.discovery.MeloXExploreScreen
+import com.lladlam.melox.ui.discovery.MeloXHomeScreen
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Provider-backed discovery/library screens reuse MeloX's root presentation.
- * Provider differences stay in the returned content, not in a second navigation
- * vocabulary or a separate provider-only visual language.
+ * Temporary compatibility entry points while MeloXApp still imports provider names.
+ * Home and Explore no longer own UI here: they render the already-migrated MeloX
+ * screens and only change the backing music source.
  */
 @Composable
-fun ProviderHomeScreen(source: MusicSource) {
-    ProviderDiscoveryFeedScreen(
-        source = source,
-        title = "首页",
-        subtitle = when (source) {
-            MusicSource.QQMusic -> "QQ音乐推荐"
-            MusicSource.Kugou -> "酷狗音乐推荐"
-            MusicSource.Netease -> "推荐"
-        },
-    )
-}
+fun ProviderHomeScreen(source: MusicSource) = MeloXHomeScreen(source)
 
 @Composable
-fun ProviderExploreScreen(source: MusicSource) {
-    ProviderDiscoveryFeedScreen(
-        source = source,
-        title = "发现",
-        subtitle = when (source) {
-            MusicSource.QQMusic -> "QQ音乐 · 推荐歌单 · 新歌 · 排行榜"
-            MusicSource.Kugou -> "酷狗音乐 · 推荐歌单 · 新歌 · 排行榜"
-            MusicSource.Netease -> "发现"
-        },
-    )
-}
-
-@Composable
-private fun ProviderDiscoveryFeedScreen(
-    source: MusicSource,
-    title: String,
-    subtitle: String,
-) {
-    val context = LocalContext.current
-    val provider = remember(source) { MeloXMusicProviders.create(context).require(source) }
-    val home = provider as? HomeFeedCapability
-    var feed by remember(source) { mutableStateOf<MusicHomeFeed?>(null) }
-    var loading by remember(source) { mutableStateOf(home != null) }
-    var error by remember(source) { mutableStateOf<String?>(null) }
-    var playbackError by remember(source) { mutableStateOf<String?>(null) }
-    var selectedPlaylist by remember(source) { mutableStateOf<MusicPlaylistSummary?>(null) }
-    var selectedRanking by remember(source) { mutableStateOf<MusicRankingSummary?>(null) }
-
-    selectedPlaylist?.let { playlist ->
-        ProviderPlaylistDetailScreen(
-            source = playlist.id.source,
-            playlist = playlist,
-            onBack = { selectedPlaylist = null },
-        )
-        return
-    }
-    selectedRanking?.let { ranking ->
-        ProviderRankingDetailScreen(
-            source = ranking.id.source,
-            ranking = ranking,
-            onBack = { selectedRanking = null },
-        )
-        return
-    }
-
-    LaunchedEffect(source, home) {
-        if (home == null) return@LaunchedEffect
-        loading = true
-        error = null
-        runCatching {
-            withContext(Dispatchers.IO) {
-                home.homeFeed(
-                    playlistLimit = 12,
-                    newSongLimit = 16,
-                    rankingLimit = 10,
-                )
-            }
-        }.onSuccess { feed = it }
-            .onFailure { error = it.message ?: "无法加载 ${source.displayName} 内容" }
-        loading = false
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            top = 70.dp,
-            end = 20.dp,
-            bottom = MeloXBottomContentClearance,
-        ),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
-    ) {
-        item {
-            Text(
-                title,
-                fontSize = 40.sp,
-                lineHeight = 46.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                subtitle,
-                modifier = Modifier.padding(top = 2.dp),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f),
-            )
-        }
-
-        when {
-            home == null -> item {
-                ProviderSimpleCard("暂不可用", "当前音乐服务没有提供首页 Feed 能力")
-            }
-            loading -> item {
-                Box(Modifier.fillMaxWidth().padding(vertical = 38.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            }
-            error != null -> item { ProviderSimpleCard("加载失败", error.orEmpty()) }
-            else -> {
-                val value = feed ?: MusicHomeFeed()
-
-                if (value.recommendedPlaylists.isNotEmpty()) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            ProviderSectionTitle("推荐歌单")
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                items(
-                                    value.recommendedPlaylists,
-                                    key = { "playlist:${it.id.source.storageValue}:${it.id.value}" },
-                                ) { playlist ->
-                                    ProviderPlaylistCard(playlist) { selectedPlaylist = playlist }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (value.newSongs.isNotEmpty()) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            ProviderSectionTitle("最新歌曲")
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                items(
-                                    value.newSongs,
-                                    key = { "newsong:${it.id.source.storageValue}:${it.id.value}" },
-                                ) { track ->
-                                    ProviderSongCard(track) {
-                                        ProviderPlaybackCommands.playQueue(
-                                            context = context,
-                                            tracks = value.newSongs,
-                                            selectedTrackId = track.id,
-                                            onFailure = { failure ->
-                                                playbackError = failure.message ?: "播放失败"
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (value.rankings.isNotEmpty()) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            ProviderSectionTitle("排行榜")
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                items(
-                                    value.rankings,
-                                    key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
-                                ) { ranking ->
-                                    ProviderRankingCard(ranking) { selectedRanking = ranking }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (
-                    value.recommendedPlaylists.isEmpty() &&
-                    value.newSongs.isEmpty() &&
-                    value.rankings.isEmpty()
-                ) {
-                    item {
-                        ProviderSimpleCard(
-                            "暂无内容",
-                            "${source.displayName} 当前没有返回可展示的推荐内容",
-                        )
-                    }
-                }
-            }
-        }
-
-        playbackError?.let { message -> item { ProviderSimpleCard("播放失败", message) } }
-    }
-}
+fun ProviderExploreScreen(source: MusicSource) = MeloXExploreScreen(source)
 
 @Composable
 fun ProviderLibraryScreen(source: MusicSource) {
@@ -305,12 +119,7 @@ fun ProviderLibraryScreen(source: MusicSource) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text(
-                "音乐库",
-                fontSize = 40.sp,
-                lineHeight = 46.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Text("音乐库", fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Bold)
             Text(
                 source.displayName,
                 modifier = Modifier.padding(top = 2.dp),
@@ -383,14 +192,10 @@ internal fun ProviderPlaylistDetailScreen(
     val tracks = value?.tracks.orEmpty()
     val filteredTracks = remember(tracks, trackQuery) {
         val normalized = trackQuery.trim().lowercase()
-        if (normalized.isBlank()) {
-            tracks
-        } else {
-            tracks.filter { track ->
-                track.title.lowercase().contains(normalized) ||
-                    track.artistText.lowercase().contains(normalized) ||
-                    track.album?.name?.lowercase()?.contains(normalized) == true
-            }
+        if (normalized.isBlank()) tracks else tracks.filter { track ->
+            track.title.lowercase().contains(normalized) ||
+                track.artistText.lowercase().contains(normalized) ||
+                track.album?.name?.lowercase()?.contains(normalized) == true
         }
     }
 
@@ -404,17 +209,10 @@ internal fun ProviderPlaylistDetailScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
-            PlaylistDetailHeader(
-                title = value?.summary?.title ?: playlist.title,
-                onBack = onBack,
-            )
-        }
+        item { PlaylistDetailHeader(title = value?.summary?.title ?: playlist.title, onBack = onBack) }
 
         when {
-            capability == null -> item {
-                ProviderSimpleCard("暂不可用", "${source.displayName} 尚未实现歌单详情能力")
-            }
+            capability == null -> item { ProviderSimpleCard("暂不可用", "${source.displayName} 尚未实现歌单详情能力") }
             loading -> item {
                 Box(Modifier.fillMaxWidth().padding(vertical = 52.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -525,10 +323,7 @@ internal fun ProviderPlaylistDetailScreen(
                             value = trackQuery,
                             onValueChange = { trackQuery = it },
                             singleLine = true,
-                            textStyle = TextStyle(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 16.sp,
-                            ),
+                            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .meloXLiquidButton(
@@ -583,23 +378,15 @@ internal fun ProviderPlaylistDetailScreen(
 }
 
 @Composable
-private fun PlaylistDetailHeader(
-    title: String,
-    onBack: () -> Unit,
-) {
+private fun PlaylistDetailHeader(title: String, onBack: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(58.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(44.dp)
-                .meloXLiquidButton(shape = CircleShape)
-                .clickable(onClick = onBack),
+            modifier = Modifier.size(44.dp).meloXLiquidButton(shape = CircleShape).clickable(onClick = onBack),
             contentAlignment = Alignment.Center,
-        ) {
-            Text("‹", fontSize = 30.sp, lineHeight = 30.sp)
-        }
+        ) { Text("‹", fontSize = 30.sp, lineHeight = 30.sp) }
         Spacer(Modifier.size(12.dp))
         Text(
             title,
@@ -614,11 +401,7 @@ private fun PlaylistDetailHeader(
 }
 
 @Composable
-private fun PlaylistDetailAction(
-    title: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
+private fun PlaylistDetailAction(title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier = modifier
             .meloXLiquidButton(
@@ -634,16 +417,9 @@ private fun PlaylistDetailAction(
 }
 
 @Composable
-private fun PlaylistTrackRow(
-    index: Int,
-    track: MusicTrack,
-    onClick: () -> Unit,
-) {
+private fun PlaylistTrackRow(index: Int, track: MusicTrack, onClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().height(58.dp).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
