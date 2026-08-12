@@ -1,5 +1,6 @@
 package com.lladlam.melox.ui.provider
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -110,12 +111,21 @@ private fun ProviderDiscoveryFeedScreen(
     var error by remember(source) { mutableStateOf<String?>(null) }
     var playbackError by remember(source) { mutableStateOf<String?>(null) }
     var selectedPlaylist by remember(source) { mutableStateOf<MusicPlaylistSummary?>(null) }
+    var selectedRanking by remember(source) { mutableStateOf<MusicRankingSummary?>(null) }
 
     selectedPlaylist?.let { playlist ->
         ProviderPlaylistDetailScreen(
             source = source,
             playlist = playlist,
             onBack = { selectedPlaylist = null },
+        )
+        return
+    }
+    selectedRanking?.let { ranking ->
+        ProviderRankingDetailScreen(
+            source = source,
+            ranking = ranking,
+            onBack = { selectedRanking = null },
         )
         return
     }
@@ -205,7 +215,9 @@ private fun ProviderDiscoveryFeedScreen(
                 items(
                     value.rankings,
                     key = { "ranking:${it.id.source.storageValue}:${it.id.value}" },
-                ) { ranking -> ProviderRankingCard(ranking) }
+                ) { ranking ->
+                    ProviderRankingCard(ranking) { selectedRanking = ranking }
+                }
             }
 
             if (
@@ -319,6 +331,7 @@ private fun ProviderPlaylistDetailScreen(
     playlist: MusicPlaylistSummary,
     onBack: () -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     val context = LocalContext.current
     val provider = remember(source) { MeloXMusicProviders.create(context).require(source) }
     val capability = provider as? PlaylistCapability
@@ -675,7 +688,7 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showQQLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放 · 推荐 · 排行榜 · 我的歌单 · 歌单详情")
+                ProviderSimpleCard("当前能力", "搜索 · 歌词 · 播放 · 推荐 · 排行榜 · 我的歌单 · 歌单详情 · 排行榜详情")
             }
             MusicSource.Kugou -> {
                 val session = remember(loginRevision, currentSource) { KugouSessionStore.read(context) }
@@ -685,7 +698,7 @@ fun ProviderSettingsHub(
                     onClick = if (session.isLoggedIn) null else ({ showKugouLogin = true }),
                 )
                 Spacer(Modifier.height(10.dp))
-                ProviderSimpleCard("当前能力", "搜索 · KRC逐字歌词 · 播放 · 乐库推荐 · 排行榜 · 我的歌单 · 歌单详情")
+                ProviderSimpleCard("当前能力", "搜索 · KRC逐字歌词 · 播放 · 乐库推荐 · 排行榜 · 我的歌单 · 歌单详情 · 排行榜详情")
             }
         }
     }
@@ -740,7 +753,10 @@ private fun ProviderPlaylistCard(
 }
 
 @Composable
-private fun ProviderRankingCard(ranking: MusicRankingSummary) {
+private fun ProviderRankingCard(
+    ranking: MusicRankingSummary,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -748,6 +764,7 @@ private fun ProviderRankingCard(ranking: MusicRankingSummary) {
                 shape = RoundedCornerShape(22.dp),
                 surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.04f),
             )
+            .clickable(onClick = onClick)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
