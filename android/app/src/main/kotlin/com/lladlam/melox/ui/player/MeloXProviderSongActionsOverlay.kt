@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,10 +42,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lladlam.melox.core.music.model.MusicArtistRef
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.music.model.MusicTrack
+import com.lladlam.melox.core.music.provider.FavoriteCapability
+import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import kotlinx.coroutines.launch
 
 private enum class ProviderSongActionPage {
     Main,
@@ -52,10 +59,9 @@ private enum class ProviderSongActionPage {
 }
 
 /**
- * Actions that are valid for non-NetEase provider tracks. Provider-only remote
- * writes (favourite, comments, cloud playlists, etc.) are intentionally absent
- * until that provider has a real write capability instead of calling NetEase
- * endpoints with a QQ/Kugou identifier.
+ * Actions that are valid for non-NetEase provider tracks. Remote writes appear
+ * only when that provider exposes an explicit capability backed by a real
+ * authenticated platform API.
  */
 @Composable
 internal fun MeloXProviderSongActionsOverlay(
@@ -66,7 +72,32 @@ internal fun MeloXProviderSongActionsOverlay(
     onNavigateSearch: ((String, MeloXSearchKind) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val provider = remember(identity.source) {
+        MeloXMusicProviders.create(context).require(identity.source)
+    }
+    val favoriteCapability = provider as? FavoriteCapability
+    val accountManager = remember { ProviderAccountManager(context) }
+    val providerLoggedIn = remember(identity.source, visible) {
+        accountManager.state(identity.source).loggedIn
+    }
+    val favoriteTrack = remember(identity, state.title, state.artist) {
+        MusicTrack(
+            id = identity,
+            title = state.title.ifBlank { "未知歌曲" },
+            artists = listOf(
+                MusicArtistRef(
+                    name = state.artist.ifBlank { "未知歌手" },
+                ),
+            ),
+        )
+    }
+
     var page by remember(identity, visible) { mutableStateOf(ProviderSongActionPage.Main) }
+    var favoriteKnownState by remember(identity) { mutableStateOf<Boolean?>(null) }
+    var favoriteWorking by remember(identity) { mutableStateOf(false) }
+    var actionStatus by remember(identity) { mutableStateOf<String?>(null) }
+    var actionError by remember(identity) { mutableStateOf<String?>(null) }
 
     BackHandler(enabled = visible) {
         if (page == ProviderSongActionPage.Main) onDismiss() else page = ProviderSongActionPage.Main
@@ -131,6 +162,39 @@ internal fun MeloXProviderSongActionsOverlay(
 
                         when (target) {
                             ProviderSongActionPage.Main -> {
+                                if (favoriteCapability != null) {
+                                    ProviderActionItem(
+                                        title = when {
+                                            !providerLoggedIn -> "登录 ${identity.source.displayName} 后可使用我喜欢"
+                                            favoriteWorking -> "正在更新我喜欢…"
+                                            favoriteKnownState == true -> "从我喜欢移除"
+                                            else -> "添加到我喜欢"
+                                        },
+                                        symbol = if (favoriteKnownState == true) "♥" else "♡",
+                                        enabled = providerLoggedIn && !favoriteWorking,
+                                    ) {
+                                        val targetFavorite = favoriteKnownState != true
+                                        favoriteWorking = true
+                                        actionStatus = null
+                                        actionError = null
+                                        scope.launch {
+                                            runCatching {
+                                                favoriteCapability.setFavorite(favoriteTrack, targetFavorite)
+                                            }.onSuccess {
+                                                favoriteKnownState = targetFavorite
+                                                actionStatus = if (targetFavorite) {
+                                                    "已添加到 ${identity.source.displayName} 我喜欢"
+                                                } else {
+                                                    "已从 ${identity.source.displayName} 我喜欢移除"
+                                                }
+                                            }.onFailure { failure ->
+                                                actionError = failure.message ?: "我喜欢操作失败"
+                                            }
+                                            favoriteWorking = false
+                                        }
+                                    }
+                                }
+
                                 ProviderActionItem("定时关闭", "◷") { page = ProviderSongActionPage.Sleep }
                                 ProviderActionItem("添加到播放队列", "+") {
                                     state.addCurrentToQueue()
@@ -151,6 +215,23 @@ internal fun MeloXProviderSongActionsOverlay(
                                         onDismiss()
                                         onNavigateSearch(state.artist.substringBefore(" / "), MeloXSearchKind.Artists)
                                     }
+                                }
+
+                                actionStatus?.let { message ->
+                                    Text(
+                                        message,
+                                        color = Color.White.copy(alpha = 0.66f),
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    )
+                                }
+                                actionError?.let { message ->
+                                    Text(
+                                        message,
+                                        color = Color(0xFFFF8A80),
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    )
                                 }
                             }
 
@@ -222,25 +303,27 @@ private fun ProviderActionHeader(
 private fun ProviderActionItem(
     title: String,
     symbol: String,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val alpha = if (enabled) 1f else 0.38f
         Text(
             symbol,
-            color = Color.White.copy(alpha = 0.82f),
+            color = Color.White.copy(alpha = 0.82f * alpha),
             fontSize = 20.sp,
             modifier = Modifier.size(34.dp),
         )
         Text(
             title,
-            color = Color.White.copy(alpha = 0.94f),
+            color = Color.White.copy(alpha = 0.94f * alpha),
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
