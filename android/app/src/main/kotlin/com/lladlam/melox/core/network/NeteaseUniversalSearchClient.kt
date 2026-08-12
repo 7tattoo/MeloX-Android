@@ -23,7 +23,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 enum class MeloXSearchKind(val apiType: Int, val title: String) {
-    Songs(1, "歌曲"), Albums(10, "专辑"), Artists(100, "歌手"), Playlists(1000, "歌单"), Podcasts(1009, "播客")
+    Songs(1, "歌曲"), Albums(10, "专辑"), Artists(100, "歌手"), Playlists(1000, "歌单"), Podcasts(1009, "播客"), Users(1002, "用户")
 }
 
 data class MeloXSearchMediaItem(
@@ -121,12 +121,13 @@ class NeteaseUniversalSearchClient(
             MeloXSearchKind.Artists -> result.optJSONArray("artists")
             MeloXSearchKind.Playlists -> result.optJSONArray("playlists")
             MeloXSearchKind.Podcasts -> result.optJSONArray("djRadios") ?: result.optJSONArray("radios")
+            MeloXSearchKind.Users -> result.optJSONArray("userprofiles") ?: result.optJSONArray("userProfiles")
             else -> null
         } ?: JSONArray()
         buildList {
             for (i in 0 until values.length()) {
                 val value = values.optJSONObject(i) ?: continue
-                val id = value.optLong("id", -1L)
+                val id = if (kind == MeloXSearchKind.Users) value.optLong("userId", -1L) else value.optLong("id", -1L)
                 if (id <= 0L) continue
                 when (kind) {
                     MeloXSearchKind.Albums -> add(MeloXSearchMediaItem(
@@ -152,13 +153,8 @@ class NeteaseUniversalSearchClient(
                         secure(value.optString("coverImgUrl").takeIf(String::isNotBlank) ?: value.optString("picUrl").takeIf(String::isNotBlank)),
                         value.optInt("trackCount", 0),
                     ))
-                    MeloXSearchKind.Podcasts -> add(MeloXSearchMediaItem(
-                        id, kind,
-                        value.optString("name").ifBlank { "未命名播客" },
-                        value.optJSONObject("dj")?.optString("nickname").orEmpty(),
-                        secure(value.optString("picUrl").takeIf(String::isNotBlank)),
-                        value.optInt("programCount", 0),
-                    ))
+                    MeloXSearchKind.Podcasts -> add(MeloXSearchMediaItem(id, kind, value.optString("name").ifBlank { "未命名播客" }, value.optJSONObject("dj")?.optString("nickname").orEmpty(), secure(value.optString("picUrl").takeIf(String::isNotBlank)), value.optInt("programCount", 0)))
+                    MeloXSearchKind.Users -> add(MeloXSearchMediaItem(value.optLong("userId", id), kind, value.optString("nickname").ifBlank { "网易云用户" }, value.optString("signature"), secure(value.optString("avatarUrl").takeIf(String::isNotBlank))))
                     else -> Unit
                 }
             }
@@ -407,6 +403,7 @@ class NeteaseUniversalSearchClient(
         val values = when (item.kind) {
             MeloXSearchKind.Albums -> eapi("/api/v1/album/${item.id}", JSONObject()).optJSONArray("songs")
             MeloXSearchKind.Artists -> eapi("/api/v1/artist/${item.id}", JSONObject()).optJSONArray("hotSongs")
+            MeloXSearchKind.Users -> JSONArray()
             MeloXSearchKind.Podcasts -> {
                 val response = eapi(
                     "/api/dj/program/byradio",

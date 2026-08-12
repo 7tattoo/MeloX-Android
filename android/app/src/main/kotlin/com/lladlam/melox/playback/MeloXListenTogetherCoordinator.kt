@@ -62,10 +62,9 @@ object MeloXListenTogetherCoordinator {
         }
     }
 
-    fun state(context: Context): StateFlow<State> {
-        ensureStarted(context)
-        return runtime!!.state
-    }
+    fun state(context: Context): StateFlow<State> { ensureStarted(context); return runtime!!.state }
+    fun adoptRoom(context: Context, room: MeloXListenTogetherRoom) { ensureStarted(context); runtime!!.adoptRoom(room) }
+    fun clearRoom(context: Context) { ensureStarted(context); runtime!!.clearRoom() }
 
     private class Runtime(private val appContext: Context) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -138,10 +137,9 @@ object MeloXListenTogetherCoordinator {
             }
         }
 
-        init {
-            connectController()
-            scope.launch { monitorLoop() }
-        }
+        init { connectController(); scope.launch { monitorLoop() } }
+        fun adoptRoom(latest: MeloXListenTogetherRoom) { room = latest; failures = 0; firstSyncForRoom = true; lastRemoteQueueSignature = null; lastRemoteCommandSignature = null; playlistVersion = 1; heartbeatTick = HEARTBEAT_EVERY_TICKS; statusTick = 0; mutableState.value = State(Phase.Connected, latest) }
+        fun clearRoom() = resetRoom()
 
         private fun connectController() {
             val token = SessionToken(appContext, ComponentName(appContext, MeloXPlaybackService::class.java))

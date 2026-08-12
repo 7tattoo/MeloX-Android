@@ -62,6 +62,8 @@ import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.account.MeloXAccountActivity
+import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -207,7 +209,13 @@ fun SearchScreen() {
                 kind == MeloXSearchKind.Songs -> SearchSongResults(songs) { song ->
                     PlaybackCommands.playQueue(context, songs, song.id)
                 }
-                else -> SearchMediaResults(media) { selectedMedia = it }
+                else -> SearchMediaResults(media) { item ->
+                    when (item.kind) {
+                        MeloXSearchKind.Albums, MeloXSearchKind.Artists, MeloXSearchKind.Podcasts -> MeloXCollectionDetailActivity.launch(context, item)
+                        MeloXSearchKind.Users -> MeloXAccountActivity.launch(context, item.id)
+                        else -> selectedMedia = item
+                    }
+                }
             }
         }
     }
@@ -337,7 +345,7 @@ private fun SearchMediaResults(values: List<MeloXSearchMediaItem>, onOpen: (Melo
     LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
         items(values, key = { "${it.kind}-${it.id}" }) { item ->
             Row(Modifier.fillMaxWidth().clickable { onOpen(item) }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(item.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(54.dp).clip(if (item.kind == MeloXSearchKind.Artists) CircleShape else RoundedCornerShape(8.dp)))
+                AsyncImage(item.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(54.dp).clip(if (item.kind == MeloXSearchKind.Artists || item.kind == MeloXSearchKind.Users) CircleShape else RoundedCornerShape(8.dp)))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 17.sp)

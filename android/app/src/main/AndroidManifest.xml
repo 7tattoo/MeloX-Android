@@ -26,6 +26,10 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ui.account.MeloXAccountActivity" android:exported="false" />
+        <activity android:name=".ui.collection.MeloXCollectionDetailActivity" android:exported="false" />
+        <activity android:name=".ui.player.MeloXListenTogetherInviteActivity" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

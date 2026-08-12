@@ -34,6 +34,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ private enum class SongActionPage {
     AddToPlaylist,
     Comments,
     CommentReplies,
+    ShareContacts,
     ListeningRank,
     Wiki,
     ListenTogether,
@@ -109,13 +111,17 @@ fun MeloXSongActionsOverlay(
     var message by remember(song.id, visible) { mutableStateOf<String?>(null) }
     var liked by remember(song.id, visible) { mutableStateOf<Boolean?>(null) }
     var writablePlaylists by remember(song.id, visible) { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
+    var hotComments by remember(song.id, visible) { mutableStateOf<List<MeloXMusicComment>>(emptyList()) }
     var comments by remember(song.id, visible) { mutableStateOf<List<MeloXMusicComment>>(emptyList()) }
+    var commentsPage by remember(song.id, visible) { mutableStateOf<com.lladlam.melox.core.network.MeloXCommentsPage?>(null) }
     var selectedComment by remember(song.id, visible) { mutableStateOf<MeloXMusicComment?>(null) }
     var repliesPage by remember(song.id, visible) { mutableStateOf<MeloXCommentRepliesPage?>(null) }
+    var shareContacts by remember(song.id, visible) { mutableStateOf<List<com.lladlam.melox.core.network.MeloXMessageContact>>(emptyList()) }
     var playRecordPeriod by remember(song.id, visible) { mutableStateOf(MeloXUserPlayRecordPeriod.Week) }
     var playRecords by remember(song.id, visible) { mutableStateOf<List<MeloXUserPlayRecord>>(emptyList()) }
     var wiki by remember(song.id, visible) { mutableStateOf<List<MeloXWikiSection>>(emptyList()) }
-    var listenRoom by remember(visible) { mutableStateOf<MeloXListenTogetherRoom?>(null) }
+    val togetherState by MeloXListenTogetherCoordinator.state(app).collectAsState()
+    val listenRoom = togetherState.room
     var invitationText by remember(visible) { mutableStateOf("") }
 
     LaunchedEffect(visible, song.id) {
@@ -126,11 +132,7 @@ fun MeloXSongActionsOverlay(
             liked = song.id in ids
         }
     }
-    LaunchedEffect(visible, playbackState != null) {
-        if (!visible) return@LaunchedEffect
-        if (playbackState != null) MeloXListenTogetherCoordinator.ensureStarted(app)
-        runCatching { ops.listenTogetherRoomStatus() }.onSuccess { listenRoom = it }
-    }
+    LaunchedEffect(visible, playbackState != null) { if (!visible) return@LaunchedEffect; if (playbackState != null) MeloXListenTogetherCoordinator.ensureStarted(app) }
 
     suspend fun loadOwnedPlaylists() {
         busy = true
@@ -144,14 +146,8 @@ fun MeloXSongActionsOverlay(
         busy = false
     }
 
-    suspend fun loadComments() {
-        busy = true
-        message = null
-        runCatching { ops.songComments(song.id) }
-            .onSuccess { comments = it }
-            .onFailure { message = it.message ?: "评论加载失败" }
-        busy = false
-    }
+    suspend fun loadComments(append: Boolean = false) { busy = true; message = null; val current = commentsPage; val offset = if (append) current?.nextOffset ?: comments.size else 0; val before = if (append) current?.beforeTime ?: 0L else 0L; runCatching { social.songComments(song.id, offset, before) }.onSuccess { loaded -> if (append) comments = (comments + loaded.comments).distinctBy(MeloXMusicComment::id) else { hotComments = loaded.hotComments; comments = loaded.comments }; commentsPage = loaded.copy(comments = comments, nextOffset = comments.size) }.onFailure { message = it.message ?: "评论加载失败" }; busy = false }
+    suspend fun loadShareContacts() { busy = true; message = null; runCatching { val profile = account.accountProfile(); ops.messageContacts(profile.userId) }.onSuccess { shareContacts = it }.onFailure { message = it.message ?: "联系人加载失败" }; busy = false }
 
     suspend fun loadReplies(parent: MeloXMusicComment, append: Boolean) {
         busy = true
@@ -259,6 +255,7 @@ fun MeloXSongActionsOverlay(
                                 SongActionPage.AddToPlaylist -> "添加到歌单"
                                 SongActionPage.Comments -> "评论"
                                 SongActionPage.CommentReplies -> "评论回复"
+                                SongActionPage.ShareContacts -> "发送给网易云好友"
                                 SongActionPage.ListeningRank -> "我的听歌排行"
                                 SongActionPage.Wiki -> "歌曲百科"
                                 SongActionPage.ListenTogether -> "一起听"
@@ -320,11 +317,10 @@ fun MeloXSongActionsOverlay(
                                         busy = false
                                     }
                                 }
-                                ActionItem("分享", "↗") { shareSong(context, song); onDismiss() }
-                                ActionItem("查看评论", "◌") {
-                                    page = SongActionPage.Comments
-                                    scope.launch { loadComments() }
-                                }
+                                ActionItem("系统分享", "↗") { shareSong(context, song); onDismiss() }
+                                ActionItem("发送给网易云好友", "✉") { page = SongActionPage.ShareContacts; scope.launch { loadShareContacts() } }
+                                ActionItem("分享到网易云动态", "◎") { if (!busy) { busy = true; scope.launch { runCatching { social.shareSongToTimeline(song.id) }.onSuccess { message = "已分享到网易云动态" }.onFailure { message = it.message ?: "动态分享失败" }; busy = false } } }
+                                ActionItem("查看评论", "◌") { page = SongActionPage.Comments; scope.launch { loadComments(false) } }
                                 ActionItem("我的听歌排行", "#") {
                                     page = SongActionPage.ListeningRank
                                     scope.launch { loadPlayRecords(MeloXUserPlayRecordPeriod.Week) }
@@ -394,32 +390,21 @@ fun MeloXSongActionsOverlay(
                             }
 
                             SongActionPage.Comments -> {
-                                if (busy) LoadingRow("正在读取评论")
+                                if (busy && comments.isEmpty()) LoadingRow("正在读取评论")
+                                if (hotComments.isNotEmpty()) Text("热门评论", color = Color.White.copy(alpha = .55f), fontSize = 12.sp)
                                 LazyColumn(Modifier.fillMaxWidth().height(360.dp)) {
-                                    items(comments, key = { it.id }) { comment ->
-                                        Column(
-                                            Modifier.fillMaxWidth().clickable {
-                                                selectedComment = comment
-                                                repliesPage = null
-                                                page = SongActionPage.CommentReplies
-                                                scope.launch { loadReplies(comment, append = false) }
-                                            }.padding(vertical = 9.dp),
-                                        ) {
-                                            Text(comment.user, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                            Text(comment.content, color = Color.White.copy(alpha = .9f), fontSize = 14.sp, modifier = Modifier.padding(top = 3.dp))
-                                            Text(
-                                                listOf(comment.timeText.takeIf(String::isNotBlank), "♡ ${comment.likedCount}", "查看回复 ›")
-                                                    .filterNotNull().joinToString(" · "),
-                                                color = Color.White.copy(alpha = .42f),
-                                                fontSize = 11.sp,
-                                                modifier = Modifier.padding(top = 4.dp),
-                                            )
-                                        }
-                                    }
+                                    items(hotComments, key = { "hot-${it.id}" }) { c -> Column(Modifier.fillMaxWidth().clickable { selectedComment = c; repliesPage = null; page = SongActionPage.CommentReplies; scope.launch { loadReplies(c, false) } }.padding(vertical = 9.dp)) { CommentRow(c) } }
+                                    if (comments.isNotEmpty()) item { Text("最新评论 · ${commentsPage?.totalCount ?: comments.size}", color = Color.White.copy(alpha = .55f), fontSize = 12.sp) }
+                                    items(comments, key = { "latest-${it.id}" }) { c -> Column(Modifier.fillMaxWidth().clickable { selectedComment = c; repliesPage = null; page = SongActionPage.CommentReplies; scope.launch { loadReplies(c, false) } }.padding(vertical = 9.dp)) { CommentRow(c) } }
                                 }
+                                if (commentsPage?.hasMore == true) ActionItem("加载更多评论", "+") { if (!busy) scope.launch { loadComments(true) } }
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
                             }
-
+                            SongActionPage.ShareContacts -> {
+                                if (busy && shareContacts.isEmpty()) LoadingRow("正在读取联系人")
+                                LazyColumn(Modifier.fillMaxWidth().height(350.dp)) { items(shareContacts, key = { "share-${it.id}" }) { contact -> Row(Modifier.fillMaxWidth().clickable(enabled = !busy) { busy = true; scope.launch { runCatching { social.sendSongToUser(song.id, contact.id) }.onSuccess { message = "已发送给 ${contact.name}"; page = SongActionPage.Main }.onFailure { message = it.message ?: "发送失败" }; busy = false } }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { AsyncImage(contact.avatarUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp)); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(contact.name, color = Color.White); if (contact.signature.isNotBlank()) Text(contact.signature, color = Color.White.copy(alpha = .45f), fontSize = 11.sp, maxLines = 1) } } } }
+                                ActionItem("返回", "‹") { page = SongActionPage.Main }
+                            }
                             SongActionPage.CommentReplies -> {
                                 val parent = selectedComment
                                 val replies = repliesPage
@@ -534,10 +519,7 @@ fun MeloXSongActionsOverlay(
                                                     val ids = queue.map(SearchSong::id).filter { it > 0L }.ifEmpty { listOf(song.id) }
                                                     ops.reportListenTogetherPlaylist(created.id, profile.userId, ids, 1)
                                                     created
-                                                }.onSuccess {
-                                                    listenRoom = it
-                                                    MeloXListenTogetherCoordinator.ensureStarted(app)
-                                                }.onFailure { message = it.message ?: "创建房间失败" }
+                                                }.onSuccess { MeloXListenTogetherCoordinator.adoptRoom(app, it) }.onFailure { message = it.message ?: "创建房间失败" }
                                                 busy = false
                                             }
                                         }
@@ -568,10 +550,7 @@ fun MeloXSongActionsOverlay(
                                             message = null
                                             scope.launch {
                                                 runCatching { ops.joinListenTogetherRoom(parsed.first, parsed.second) }
-                                                    .onSuccess {
-                                                        listenRoom = it
-                                                        MeloXListenTogetherCoordinator.ensureStarted(app)
-                                                    }
+                                                    .onSuccess { MeloXListenTogetherCoordinator.adoptRoom(app, it) }
                                                     .onFailure { message = it.message ?: "加入房间失败" }
                                                 busy = false
                                             }
@@ -588,7 +567,7 @@ fun MeloXSongActionsOverlay(
                                         Text("• ${member.name}", color = Color.White.copy(alpha = .58f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
                                     }
                                     Text(
-                                        "后台自动同步已启用 · 1 秒状态同步 · 5 秒心跳",
+                                        when (togetherState.phase) { MeloXListenTogetherCoordinator.Phase.Reconnecting -> "正在重新连接 · ${togetherState.consecutiveFailures} 次失败"; MeloXListenTogetherCoordinator.Phase.Connected -> "后台自动同步已启用 · 1 秒状态同步 · 5 秒心跳"; MeloXListenTogetherCoordinator.Phase.Idle -> "正在恢复房间状态" },
                                         color = Color.White.copy(alpha = .5f),
                                         fontSize = 11.sp,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -599,7 +578,7 @@ fun MeloXSongActionsOverlay(
                                             busy = true
                                             scope.launch {
                                                 runCatching { ops.endListenTogetherRoom(room.id) }
-                                                    .onSuccess { listenRoom = null }
+                                                    .onSuccess { MeloXListenTogetherCoordinator.clearRoom(app) }
                                                     .onFailure { message = it.message ?: "结束房间失败" }
                                                 busy = false
                                             }

@@ -22,55 +22,55 @@ class NeteaseLibraryClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val syntheticDeviceId: String = randomHex(26).uppercase()
+    private val authenticatedWeapi = com.lladlam.melox.core.network.NeteaseAuthenticatedWeapi(cookieProvider, httpClient)
 
     suspend fun snapshot(userId: Long): NeteaseLibrarySnapshot = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val playlists = userPlaylistsBlocking(userId)
+        val allPlaylists = userPlaylistsBlocking(userId)
+        val likedPlaylistId = allPlaylists.firstOrNull()?.id
+        val playlists = if (allPlaylists.isEmpty()) emptyList() else allPlaylists.drop(1)
         val likedIds = likedSongIdsBlocking(userId)
-        val liked = songDetailsBlocking(likedIds.take(100))
+        val likedById = likedIds.chunked(100).flatMap(::songDetailsBlocking).associateBy(SearchSong::id)
+        val liked = likedIds.mapNotNull(likedById::get)
         val recent = recentSongsBlocking(100)
-        NeteaseLibrarySnapshot(
-            playlists = playlists,
-            likedSongs = liked,
-            recentSongs = recent,
-        )
+        NeteaseLibrarySnapshot(playlists = playlists, likedSongs = liked, recentSongs = recent, likedPlaylistId = likedPlaylistId)
     }
 
     suspend fun playlistDetail(playlistId: Long): NeteasePlaylistDetail =
         withContext(Dispatchers.IO) { playlistDetailBlocking(playlistId) }
 
-    suspend fun homeContent(limit: Int = 12, area: String = "全部"): NeteaseHomeContent = withContext(Dispatchers.IO) {
+    suspend fun homeContent(
+        limit: Int = 12, area: String = "全部", userId: Long? = null,
+        currentSongId: Long? = null, podcastsEnabled: Boolean = true,
+    ): NeteaseHomeContent = withContext(Dispatchers.IO) {
         val authenticated = NeteaseSessionStore.containsMusicU(cookieProvider())
-        val playlistsResponse = eapi(
-            uri = "/api/personalized/playlist",
-            data = JSONObject().put("limit", limit).put("total", true).put("n", 1_000),
-            authenticated = authenticated,
-        )
-        val songsResponse = eapi(
-            uri = "/api/personalized/newsong",
-            data = JSONObject().put("type", "recommend").put("limit", limit).put(
-                "areaId",
-                when (area) {
-                    "华语" -> 7
-                    "日本" -> 8
-                    "韩国" -> 16
-                    "欧美" -> 96
-                    else -> 0
-                },
-            ),
-            authenticated = authenticated,
-        )
+        if (authenticated) runCatching { eapi("/api/homepage/block/page", JSONObject().put("refresh", false), true) }
+        val playlistsResponse = eapi("/api/personalized/playlist", JSONObject().put("limit", limit).put("total", true).put("n", 1_000), authenticated)
+        val songData = JSONObject().put("type", "recommend").put("limit", limit).put("areaId", areaId(area))
+        val songsResponse = if (authenticated) try { authenticatedWeapi.post("/api/personalized/newsong", songData) } catch (error: IOException) {
+            if (!error.message.orEmpty().contains("空响应")) throw error
+            eapi("/api/personalized/newsong", songData, true)
+        } else eapi("/api/personalized/newsong", songData, false)
         val songItems = songsResponse.optJSONArray("result") ?: JSONArray()
-        val songs = buildList {
-            for (index in 0 until songItems.length()) {
-                val item = songItems.optJSONObject(index) ?: continue
-                parseSong(item.optJSONObject("song") ?: item)?.let(::add)
-            }
-        }
-        NeteaseHomeContent(
-            playlists = parsePlaylists(playlistsResponse.optJSONArray("result") ?: JSONArray()),
-            newSongs = songs,
-        )
+        val songs = buildList { for (index in 0 until songItems.length()) { val item = songItems.optJSONObject(index) ?: continue; parseSong(item.optJSONObject("song") ?: item)?.let(::add) } }
+        val accountPlaylists = if (authenticated && userId != null) runCatching { userPlaylistsBlocking(userId).drop(1) }.getOrDefault(emptyList()) else emptyList()
+        val radar = accountPlaylists.filter { it.name.contains("雷达") }.take(limit)
+        val personal = accountPlaylists.filter { it.creatorUserId == userId }.take(limit)
+        val regional = runCatching { topSongs(area, limit) }.getOrDefault(emptyList())
+        val roaming = if (authenticated) runCatching { personalFm(explore = true, limit = limit) }.getOrDefault(emptyList()) else emptyList()
+        val similar = currentSongId?.let { runCatching { similarSongsBlocking(it, limit) }.getOrDefault(emptyList()) }.orEmpty()
+        val podcasts = if (podcastsEnabled) runCatching {
+            val result = eapi("/api/program/recommend/v1", JSONObject().put("limit", limit.coerceIn(1, 50)).put("offset", 0), authenticated)
+            val values = result.optJSONArray("programs") ?: JSONArray()
+            buildList {
+                for (index in 0 until values.length()) {
+                    val program = values.optJSONObject(index) ?: continue; val pid = program.optLong("id", -1L); if (pid <= 0L) continue
+                    val radio = program.optJSONObject("radio")
+                    add(NeteaseHomePodcast(radio?.optLong("id", 0L)?.takeIf { it > 0L } ?: pid, radio?.optString("name").orEmpty().ifBlank { program.optString("name").ifBlank { "播客" } }, secureUrl(program.optString("coverUrl").takeIf(String::isNotBlank) ?: radio?.optString("picUrl").orEmpty()).takeIf(String::isNotBlank)))
+                }
+            }.distinctBy(NeteaseHomePodcast::id).take(limit)
+        }.getOrDefault(emptyList()) else emptyList()
+        NeteaseHomeContent(parsePlaylists(playlistsResponse.optJSONArray("result") ?: JSONArray()), songs, radar, personal, regional, roaming, similar, podcasts)
     }
 
     suspend fun explorePlaylists(category: String, limit: Int = 50): List<NeteasePlaylistSummary> =
@@ -156,18 +156,27 @@ class NeteaseLibraryClient(
 
     fun similarSongsBlocking(songId: Long, limit: Int = 50): List<SearchSong> {
         if (songId <= 0L) return emptyList()
-        // Upstream uses /api/v1/discovery/simiSong. The direct EAPI transport is
-        // accepted by the same interface host and keeps Android on one client.
-        val response = eapi(
-            uri = "/api/v1/discovery/simiSong",
-            data = JSONObject().put("songid", songId).put("limit", limit.coerceIn(1, 50)),
-            authenticated = NeteaseSessionStore.containsMusicU(cookieProvider()),
-        )
+        val data = JSONObject().put("songid", songId).put("limit", limit.coerceIn(1, 50)).put("offset", 0)
+        val loggedIn = NeteaseSessionStore.containsMusicU(cookieProvider())
+        val response = if (loggedIn) try { authenticatedWeapi.post("/api/v1/discovery/simiSong", data) } catch (error: IOException) {
+            if (!error.message.orEmpty().contains("空响应")) throw error
+            eapi("/api/v1/discovery/simiSong", data, true)
+        } else eapi("/api/v1/discovery/simiSong", data, false)
         val songs = response.optJSONArray("songs") ?: JSONArray()
-        return buildList {
-            for (index in 0 until songs.length()) parseSong(songs.optJSONObject(index))?.let(::add)
-        }
+        return buildList { for (index in 0 until songs.length()) parseSong(songs.optJSONObject(index))?.let(::add) }
     }
+
+    suspend fun topSongs(area: String, limit: Int = 12): List<SearchSong> = withContext(Dispatchers.IO) {
+        val data = JSONObject().put("areaId", areaId(area)).put("total", true)
+        val response = if (NeteaseSessionStore.containsMusicU(cookieProvider())) try { authenticatedWeapi.post("/api/v1/discovery/new/songs", data) } catch (error: IOException) {
+            if (!error.message.orEmpty().contains("空响应")) throw error
+            eapi("/api/v1/discovery/new/songs", data, true)
+        } else eapi("/api/v1/discovery/new/songs", data, false)
+        val values = response.optJSONArray("data") ?: JSONArray()
+        buildList { for (index in 0 until minOf(values.length(), limit.coerceIn(1, 100))) parseSong(values.optJSONObject(index))?.let(::add) }
+    }
+
+    private fun areaId(area: String): Int = when (area) { "华语", "中国" -> 7; "日本", "日语" -> 8; "韩国", "韩语" -> 16; "欧美" -> 96; else -> 0 }
 
     fun userPlaylistsBlocking(userId: Long, limit: Int = 2_000): List<NeteasePlaylistSummary> {
         ensureLoggedIn()

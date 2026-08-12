@@ -12,6 +12,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
+import com.lladlam.melox.core.network.parseNeteaseListenTogetherInvitation
+import com.lladlam.melox.ui.player.MeloXListenTogetherInviteActivity
 import com.lladlam.melox.ui.MeloXApp
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.ui.theme.MeloXTheme
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
         val text = manager.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
         if (text.isNotBlank() && text != lastClipboardText) {
             lastClipboardText = text
+            val together = parseNeteaseListenTogetherInvitation(text)
+            if (together != null) { MeloXListenTogetherInviteActivity.launch(this, together.roomId, together.inviterId); return }
             clipboardLinkRequest = text
         }
     }

@@ -30,22 +30,20 @@ class NeteaseLibraryCache(context: Context) {
         writeJson(File(directory, "playlist_$playlistId.json"), encodePlaylistDetail(detail))
     }
 
-    suspend fun loadHomeContent(): NeteaseHomeContent? = readJson(
-        File(directory, "home.json"),
-    ) { value ->
+    suspend fun loadHomeContent(cacheKey: String): NeteaseHomeContent? = readJson(File(directory, "home_${safeCacheKey(cacheKey)}.json")) { value ->
         NeteaseHomeContent(
-            playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()),
-            newSongs = decodeSongs(value.optJSONArray("newSongs") ?: JSONArray()),
+            playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()), newSongs = decodeSongs(value.optJSONArray("newSongs") ?: JSONArray()),
+            radarPlaylists = decodePlaylists(value.optJSONArray("radarPlaylists") ?: JSONArray()), personalPlaylists = decodePlaylists(value.optJSONArray("personalPlaylists") ?: JSONArray()),
+            regionalSongs = decodeSongs(value.optJSONArray("regionalSongs") ?: JSONArray()), roamingSongs = decodeSongs(value.optJSONArray("roamingSongs") ?: JSONArray()),
+            similarSongs = decodeSongs(value.optJSONArray("similarSongs") ?: JSONArray()), podcasts = decodeHomePodcasts(value.optJSONArray("podcasts") ?: JSONArray()),
         )
     }
-
-    suspend fun saveHomeContent(content: NeteaseHomeContent) {
-        writeJson(
-            File(directory, "home.json"),
-            JSONObject()
-                .put("playlists", encodePlaylists(content.playlists))
-                .put("newSongs", encodeSongs(content.newSongs)),
-        )
+    suspend fun saveHomeContent(cacheKey: String, content: NeteaseHomeContent) {
+        writeJson(File(directory, "home_${safeCacheKey(cacheKey)}.json"), JSONObject()
+            .put("playlists", encodePlaylists(content.playlists)).put("newSongs", encodeSongs(content.newSongs))
+            .put("radarPlaylists", encodePlaylists(content.radarPlaylists)).put("personalPlaylists", encodePlaylists(content.personalPlaylists))
+            .put("regionalSongs", encodeSongs(content.regionalSongs)).put("roamingSongs", encodeSongs(content.roamingSongs))
+            .put("similarSongs", encodeSongs(content.similarSongs)).put("podcasts", encodeHomePodcasts(content.podcasts)))
     }
 
     suspend fun loadExplore(category: String): List<NeteasePlaylistSummary>? = readJson(
@@ -80,7 +78,7 @@ class NeteaseLibraryCache(context: Context) {
     companion object {
         private val refreshedLibraries = mutableSetOf<Long>()
         private val refreshedPlaylists = mutableSetOf<Long>()
-        private var refreshedHome = false
+        private val refreshedHomes = mutableSetOf<String>()
         private val refreshedExplore = mutableSetOf<String>()
 
         /** Returns true only for the first automatic refresh in this app process. */
@@ -94,27 +92,15 @@ class NeteaseLibraryCache(context: Context) {
             refreshedPlaylists.add(playlistId)
 
         @Synchronized
-        fun beginHomeColdStartRefresh(): Boolean {
-            if (refreshedHome) return false
-            refreshedHome = true
-            return true
-        }
+        fun beginHomeColdStartRefresh(cacheKey: String): Boolean = refreshedHomes.add(cacheKey)
 
         @Synchronized
         fun beginExploreColdStartRefresh(category: String): Boolean = refreshedExplore.add(category)
     }
 }
 
-private fun encodeSnapshot(value: NeteaseLibrarySnapshot) = JSONObject()
-    .put("playlists", encodePlaylists(value.playlists))
-    .put("likedSongs", encodeSongs(value.likedSongs))
-    .put("recentSongs", encodeSongs(value.recentSongs))
-
-private fun decodeSnapshot(value: JSONObject) = NeteaseLibrarySnapshot(
-    playlists = decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()),
-    likedSongs = decodeSongs(value.optJSONArray("likedSongs") ?: JSONArray()),
-    recentSongs = decodeSongs(value.optJSONArray("recentSongs") ?: JSONArray()),
-)
+private fun encodeSnapshot(value: NeteaseLibrarySnapshot) = JSONObject().put("playlists", encodePlaylists(value.playlists)).put("likedSongs", encodeSongs(value.likedSongs)).put("recentSongs", encodeSongs(value.recentSongs)).put("likedPlaylistId", value.likedPlaylistId)
+private fun decodeSnapshot(value: JSONObject) = NeteaseLibrarySnapshot(decodePlaylists(value.optJSONArray("playlists") ?: JSONArray()), decodeSongs(value.optJSONArray("likedSongs") ?: JSONArray()), decodeSongs(value.optJSONArray("recentSongs") ?: JSONArray()), value.optLong("likedPlaylistId", -1L).takeIf { it > 0L })
 
 private fun encodePlaylistDetail(value: NeteasePlaylistDetail) = JSONObject()
     .put("summary", encodePlaylist(value.summary))
@@ -189,5 +175,7 @@ private fun decodeSongs(values: JSONArray) = buildList {
     }
 }
 
-private fun JSONObject.optNullableString(name: String): String? =
-    if (isNull(name)) null else optString(name).takeIf(String::isNotBlank)
+private fun encodeHomePodcasts(values: List<NeteaseHomePodcast>) = JSONArray().apply { values.forEach { put(JSONObject().put("id", it.id).put("name", it.name).put("artworkUrl", it.artworkUrl)) } }
+private fun decodeHomePodcasts(values: JSONArray) = buildList { for (index in 0 until values.length()) { val value = values.optJSONObject(index) ?: continue; val id = value.optLong("id", -1L); if (id > 0L) add(NeteaseHomePodcast(id, value.optString("name").ifBlank { "播客" }, value.optNullableString("artworkUrl"))) } }
+private fun safeCacheKey(value: String): String = value.hashCode().toUInt().toString(16)
+private fun JSONObject.optNullableString(name: String): String? = if (isNull(name)) null else optString(name).takeIf(String::isNotBlank)

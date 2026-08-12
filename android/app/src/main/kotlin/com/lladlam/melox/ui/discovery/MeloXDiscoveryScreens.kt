@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.account.NeteaseAccountProfile
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseHomeContent
 import com.lladlam.melox.core.library.NeteaseLibraryCache
@@ -55,6 +56,8 @@ import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.account.MeloXAccountActivity
+import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
 import kotlinx.coroutines.launch
 
 private val Accent = Color(0xFFFF3147)
@@ -72,6 +75,7 @@ fun MeloXHomeScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var selectedPlaylist by remember { mutableStateOf<NeteasePlaylistSummary?>(null) }
     var activeAction by remember { mutableStateOf<String?>(null) }
+    val homeCacheKey = "${session.cookie.hashCode()}_${MeloXSettingsRuntime.musicArea}_${MeloXSettingsRuntime.podcastsEnabled}"
 
     selectedPlaylist?.let { playlist ->
         DiscoveryPlaylistDetail(playlist = playlist, onBack = { selectedPlaylist = null })
@@ -82,17 +86,13 @@ fun MeloXHomeScreen() {
         if (refreshing) return
         scope.launch {
             refreshing = true
-            runCatching { client.homeContent(area = MeloXSettingsRuntime.musicArea) }
-                .onSuccess { content = it; cache.saveHomeContent(it); error = null }
+            runCatching { if (session.isLoggedIn && session.profile == null) session.refreshProfile(force = true); client.homeContent(area = MeloXSettingsRuntime.musicArea, userId = session.profile?.userId, currentSongId = PlaybackCommands.currentSongId(), podcastsEnabled = MeloXSettingsRuntime.podcastsEnabled) }
+                .onSuccess { content = it; cache.saveHomeContent(homeCacheKey, it); error = null }
                 .onFailure { error = it.message ?: "首页加载失败" }
             refreshing = false
         }
     }
-    LaunchedEffect(Unit) {
-        content = cache.loadHomeContent()
-        if (session.isLoggedIn) session.refreshProfile()
-        if (NeteaseLibraryCache.beginHomeColdStartRefresh()) refresh()
-    }
+    LaunchedEffect(homeCacheKey) { content = cache.loadHomeContent(homeCacheKey); if (session.isLoggedIn) session.refreshProfile(); if (NeteaseLibraryCache.beginHomeColdStartRefresh(homeCacheKey)) refresh() }
 
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = ::refresh, modifier = Modifier.fillMaxSize()) {
         val value = content
@@ -105,6 +105,7 @@ fun MeloXHomeScreen() {
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 item { LargeTitle("首页") }
+                session.profile?.let { profile -> item { HomeAccountCard(profile) { MeloXAccountActivity.launch(context, profile.userId) } } }
                 MeloXSettingsRuntime.homeSectionOrder.forEach { section ->
                     when (section) {
                         "QuickActions" -> if (MeloXSettingsRuntime.homeQuickActionsEnabled) item {
@@ -116,14 +117,15 @@ fun MeloXHomeScreen() {
                                             "每日推荐" -> client.dailyRecommendedSongs()
                                             "热歌榜" -> client.hotSongs()
                                             "私人漫游" -> client.personalFm(explore = true)
+                                            "私人雷达" -> { val uid = session.profile?.userId ?: throw IllegalStateException("请先登录网易云音乐"); val s = client.snapshot(uid); val radar = s.playlists.firstOrNull { it.name.contains("雷达") } ?: throw IllegalStateException("当前账号没有可用的私人雷达"); client.playlistDetail(radar.id).songs }
                                             "相似歌曲" -> PlaybackCommands.currentSongId()?.let { client.similarSongsBlocking(it) }
                                                 ?: throw IllegalStateException("请先播放一首歌曲")
                                             "心动模式" -> {
                                                 val userId = session.profile?.userId ?: throw IllegalStateException("请先登录网易云音乐")
                                                 val snapshot = client.snapshot(userId)
                                                 val seed = snapshot.likedSongs.randomOrNull() ?: throw IllegalStateException("收藏歌曲为空")
-                                                val playlist = snapshot.playlists.firstOrNull() ?: throw IllegalStateException("没有可用歌单")
-                                                client.intelligenceModeSongs(seed.id, playlist.id)
+                                                val playlistId = snapshot.likedPlaylistId ?: throw IllegalStateException("没有找到“我喜欢的音乐”歌单")
+                                                client.intelligenceModeSongs(seed.id, playlistId)
                                             }
                                             else -> emptyList()
                                         }
@@ -147,11 +149,19 @@ fun MeloXHomeScreen() {
                         }
                     }
                 }
+                if (value.radarPlaylists.isNotEmpty()) { item { SectionTitle("私人雷达", "你的雷达歌单") }; item { PlaylistRow(value.radarPlaylists) { selectedPlaylist = it } } }
+                if (value.personalPlaylists.isNotEmpty()) { item { SectionTitle("我的歌单", "为你保留") }; item { PlaylistRow(value.personalPlaylists) { selectedPlaylist = it } } }
+                if (value.regionalSongs.isNotEmpty()) { item { SectionTitle("${MeloXSettingsRuntime.musicArea}最近热门", "地区推荐") }; items(value.regionalSongs, key = { "region-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.regionalSongs, song.id) } } }
+                if (value.roamingSongs.isNotEmpty()) { item { SectionTitle("私人漫游", "探索更多") }; items(value.roamingSongs, key = { "roaming-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.roamingSongs, song.id) } } }
+                if (value.similarSongs.isNotEmpty()) { item { SectionTitle("相似歌曲", "根据当前播放") }; items(value.similarSongs, key = { "similar-${it.id}" }) { song -> SongRow(song) { PlaybackCommands.playQueue(context, value.similarSongs, song.id) } } }
+                if (value.podcasts.isNotEmpty() && MeloXSettingsRuntime.podcastsEnabled) { item { SectionTitle("播客推荐", "继续发现") }; item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) { items(value.podcasts, key = { "podcast-${it.id}" }) { podcast -> Column(Modifier.width(150.dp).clickable { MeloXCollectionDetailActivity.launchPodcast(context, podcast.id) }) { AsyncImage(podcast.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(150.dp).clip(RoundedCornerShape(14.dp))); Text(podcast.name, Modifier.padding(top = 6.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold) } } } } }
                 error?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) } }
             }
         }
     }
 }
+
+@Composable private fun HomeAccountCard(profile: NeteaseAccountProfile, onClick: () -> Unit) { Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.onBackground.copy(alpha = .055f)).clickable(onClick = onClick).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { AsyncImage(profile.avatarUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(54.dp).clip(RoundedCornerShape(27.dp))); Column(Modifier.weight(1f).padding(start = 12.dp)) { Text(profile.nickname, fontWeight = FontWeight.Bold, fontSize = 17.sp); Text(profile.signature ?: "查看主页、听歌排行与歌单", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }; Text("›", fontSize = 24.sp) } }
 
 @Composable
 private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
@@ -160,6 +170,7 @@ private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
         Triple("热歌榜", "全站热门", Color(0xFFFF7A28)),
         Triple("心动模式", "为你心动", Color(0xFFEF4F9A)),
         Triple("私人漫游", "探索模式", Color(0xFF4285F4)),
+        Triple("私人雷达", "你的雷达歌单", Color(0xFF7B61FF)),
         Triple("相似歌曲", "从当前歌曲出发", Color(0xFF17A589)),
     )
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -324,7 +324,7 @@ fun LibraryScreen(
                                 },
                                 onHeartMode = {
                                     val seed = data.likedSongs.randomOrNull()
-                                    val playlistId = data.playlists.firstOrNull()?.id
+                                    val playlistId = data.likedPlaylistId
                                     if (seed != null && playlistId != null) scope.launch {
                                         runCatching { client.intelligenceModeSongs(seed.id, playlistId) }
                                             .onSuccess { songs -> songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id, heartMode = true) } }

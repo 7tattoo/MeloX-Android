@@ -57,6 +57,9 @@ class MeloXPlaybackService : MediaSessionService() {
     private lateinit var playbackResolver: NeteasePlaybackResolver
     private lateinit var autoMixAnalyzer: MeloXAutoMixAudioAnalyzer
     private lateinit var equalizerController: MeloXEqualizerController
+    private lateinit var playbackHistoryReporter: MeloXPlaybackHistoryReporter
+    private var historySongId: Long? = null
+    private var historyPositionMs = 0L
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
     private var recommendationJob: Job? = null
@@ -111,6 +114,8 @@ class MeloXPlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) {
             val active = player ?: return
             if (playbackState == Player.STATE_ENDED) {
+                historySongId?.let { playbackHistoryReporter.recordDuration(it, elapsedMs = historyPositionMs, durationMs = active.duration.takeIf { value -> value != C.TIME_UNSET && value > 0L }, completed = true) }
+                historySongId = null; historyPositionMs = 0L
                 if (!MeloXNetworkAvailability.isOnline(this@MeloXPlaybackService)) {
                     if (!skipToNextDownloaded(active)) active.pause()
                     return
@@ -123,7 +128,9 @@ class MeloXPlaybackService : MediaSessionService() {
             recommendationSeed = null
             autoMixRetrySourceId = null
             autoMixRetryAfterRealtimeMs = 0L
-            val transitionedId = mediaItem?.mediaId?.toLongOrNull()
+            val transitionedId = mediaItem?.mediaId?.toLongOrNull(); val previousHistoryId = historySongId
+            if (previousHistoryId != null && previousHistoryId != transitionedId) playbackHistoryReporter.recordDuration(previousHistoryId, elapsedMs = historyPositionMs)
+            if (transitionedId != null && transitionedId != previousHistoryId) { historySongId = transitionedId; historyPositionMs = 0L; playbackHistoryReporter.recordStart(transitionedId) }
             reactiveAnalysisJob?.cancel()
             reactiveAnalysisJob = null
             reactiveAnalysisMediaId = null
@@ -160,6 +167,7 @@ class MeloXPlaybackService : MediaSessionService() {
         override fun run() {
             val active = player
             if (active != null) {
+                active.currentMediaItem?.mediaId?.toLongOrNull()?.let { current -> if (current == historySongId) historyPositionMs = active.currentPosition.coerceAtLeast(0L) }
                 runCatching {
                     applyLocalArtworkMetadata(active)
                     PlaybackCommands.prioritizeManualQueue(active)
@@ -241,6 +249,7 @@ class MeloXPlaybackService : MediaSessionService() {
             )
         downloadStore = MeloXDownloadStore.get(this)
         equalizerController = MeloXEqualizerController(this)
+        playbackHistoryReporter = MeloXPlaybackHistoryReporter(this)
         val cookieProvider = { NeteaseSessionStore.readCookie(this@MeloXPlaybackService) }
         playbackResolver = NeteasePlaybackResolver(
             cookieProvider = cookieProvider,
@@ -847,6 +856,7 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        historySongId?.let { playbackHistoryReporter.recordDuration(it, elapsedMs = historyPositionMs) }; historySongId = null; playbackHistoryReporter.close()
         handler.removeCallbacks(modeMonitor)
         recommendationJob?.cancel()
         systemLyricsJob?.cancel()

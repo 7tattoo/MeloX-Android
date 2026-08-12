@@ -16,12 +16,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class MeloXMusicComment(
-    val id: Long,
-    val user: String,
-    val avatarUrl: String?,
-    val content: String,
-    val likedCount: Long,
-    val timeText: String,
+    val id: Long, val user: String, val avatarUrl: String?, val content: String,
+    val likedCount: Long, val timeText: String, val replyCount: Int = 0,
 )
 
 data class MeloXWikiSection(val title: String, val lines: List<String>)
@@ -95,33 +91,10 @@ class NeteaseMusicOperationsClient(
     }
 
     suspend fun songComments(songId: Long, limit: Int = 100): List<MeloXMusicComment> = withContext(Dispatchers.IO) {
-        val result = eapi(
-            "/api/v1/resource/comments/R_SO_4_$songId",
-            JSONObject().put("rid", songId).put("limit", limit.coerceIn(1, 100)).put("offset", 0).put("beforeTime", 0),
-            NeteaseSessionStore.containsMusicU(cookieProvider()),
-        )
-        val hot = result.optJSONArray("hotComments") ?: JSONArray()
-        val normal = result.optJSONArray("comments") ?: JSONArray()
-        val seen = mutableSetOf<Long>()
-        buildList {
-            fun addArray(values: JSONArray) {
-                for (i in 0 until values.length()) {
-                    val c = values.optJSONObject(i) ?: continue
-                    val id = c.optLong("commentId", -1L)
-                    if (id <= 0L || !seen.add(id)) continue
-                    val user = c.optJSONObject("user")
-                    add(MeloXMusicComment(
-                        id = id,
-                        user = user?.optString("nickname").orEmpty().ifBlank { "网易云用户" },
-                        avatarUrl = secure(user?.optString("avatarUrl")?.takeIf(String::isNotBlank)),
-                        content = c.optString("content").ifBlank { "…" },
-                        likedCount = c.optLong("likedCount", 0L),
-                        timeText = c.optString("timeStr").ifBlank { "" },
-                    ))
-                }
-            }
-            addArray(hot); addArray(normal)
-        }
+        val path = "/api/v1/resource/comments/R_SO_4_$songId"; val data = JSONObject().put("rid", songId).put("limit", limit.coerceIn(1, 100)).put("offset", 0).put("beforeTime", 0)
+        val loggedIn = NeteaseSessionStore.containsMusicU(cookieProvider()); val result = if (loggedIn) try { authenticatedWeapi.post(path, data) } catch (error: IOException) { if (!error.message.orEmpty().contains("空响应")) throw error; eapi(path, data, true) } else eapi(path, data, false)
+        val hot = result.optJSONArray("hotComments") ?: JSONArray(); val normal = result.optJSONArray("comments") ?: JSONArray(); val seen = mutableSetOf<Long>()
+        buildList { fun addArray(values: JSONArray) { for (i in 0 until values.length()) { val c = values.optJSONObject(i) ?: continue; val id = c.optLong("commentId", -1L); if (id <= 0L || !seen.add(id)) continue; val user = c.optJSONObject("user"); add(MeloXMusicComment(id, user?.optString("nickname").orEmpty().ifBlank { "网易云用户" }, secure(user?.optString("avatarUrl")?.takeIf(String::isNotBlank)), c.optString("content").ifBlank { "…" }, c.optLong("likedCount", 0L), c.optString("timeStr"), c.optInt("replyCount", c.optJSONArray("beReplied")?.length() ?: 0))) } }; addArray(hot); addArray(normal) }
     }
 
     suspend fun songWiki(songId: Long): List<MeloXWikiSection> = withContext(Dispatchers.IO) {
@@ -337,21 +310,13 @@ class NeteaseMusicOperationsClient(
 
     suspend fun messageContacts(userId: Long, limit: Int = 200): List<MeloXMessageContact> = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val response = eapi(
-            "/api/user/getfollows/$userId",
-            JSONObject().put("offset", 0).put("limit", limit.coerceIn(1, 1_000)).put("order", true),
-            true,
-        )
+        val path = "/api/user/getfollows/$userId"; val data = JSONObject().put("offset", 0).put("limit", limit.coerceIn(1, 1_000)).put("order", true); val response = socialRead(path, data)
         parseMessageContacts(response.optJSONArray("follow"))
     }
 
     suspend fun privateMessageConversations(limit: Int = 50): List<MeloXMessageContact> = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val response = eapi(
-            "/api/msg/private/users",
-            JSONObject().put("offset", 0).put("limit", limit.coerceIn(1, 100)).put("total", "true"),
-            true,
-        )
+        val response = socialRead("/api/msg/private/users", JSONObject().put("offset", 0).put("limit", limit.coerceIn(1, 100)).put("total", "true"))
         val messages = response.optJSONArray("msgs") ?: JSONArray()
         buildList {
             for (index in 0 until messages.length()) {
@@ -366,11 +331,7 @@ class NeteaseMusicOperationsClient(
 
     suspend fun privateMessageHistory(userId: Long, limit: Int = 100): List<MeloXPrivateMessage> = withContext(Dispatchers.IO) {
         ensureLoggedIn()
-        val response = eapi(
-            "/api/msg/private/history",
-            JSONObject().put("userId", userId).put("limit", limit.coerceIn(1, 200)).put("time", -1).put("total", "true"),
-            true,
-        )
+        val response = socialRead("/api/msg/private/history", JSONObject().put("userId", userId).put("limit", limit.coerceIn(1, 200)).put("time", -1).put("total", "true"))
         val messages = response.optJSONArray("msgs") ?: JSONArray()
         buildList {
             for (index in 0 until messages.length()) {
@@ -404,6 +365,8 @@ class NeteaseMusicOperationsClient(
         )
         Unit
     }
+
+    private fun socialRead(path: String, data: JSONObject): JSONObject = try { authenticatedWeapi.post(path, data) } catch (error: IOException) { if (!error.message.orEmpty().contains("空响应")) throw error; eapi(path, data, true) }
 
     private fun parseMessageContacts(values: JSONArray?): List<MeloXMessageContact> = buildList {
         val source = values ?: JSONArray()
