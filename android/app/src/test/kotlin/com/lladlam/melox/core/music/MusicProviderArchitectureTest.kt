@@ -1,5 +1,6 @@
 package com.lladlam.melox.core.music
 
+import com.lladlam.melox.core.music.experience.CanonicalMeloXTabs
 import com.lladlam.melox.core.music.experience.ExperienceTabId
 import com.lladlam.melox.core.music.experience.MusicExperiences
 import com.lladlam.melox.core.music.model.MusicResourceId
@@ -26,15 +27,24 @@ class MusicProviderArchitectureTest {
     }
 
     @Test
-    fun neteaseExperienceKeepsIosStyleLibraryWhileOtherProvidersCanDiffer() {
-        val neteaseLibrary = MusicExperiences.netease.tabs.single { it.id == ExperienceTabId.Library }
-        val qqLibrary = MusicExperiences.qqMusic.tabs.single { it.id == ExperienceTabId.Library }
-        val kugouExplore = MusicExperiences.kugou.tabs.single { it.id == ExperienceTabId.Explore }
+    fun everyProviderUsesCanonicalMeloXRootPresentation() {
+        val experiences = listOf(
+            MusicExperiences.netease,
+            MusicExperiences.qqMusic,
+            MusicExperiences.kugou,
+        )
 
-        assertEquals("音乐库", neteaseLibrary.title)
-        assertEquals("我的", qqLibrary.title)
-        assertEquals("乐库", kugouExplore.title)
+        experiences.forEach { experience ->
+            assertEquals(CanonicalMeloXTabs, experience.tabs)
+            assertEquals("首页", experience.tabs.single { it.id == ExperienceTabId.Home }.title)
+            assertEquals("发现", experience.tabs.single { it.id == ExperienceTabId.Explore }.title)
+            assertEquals("音乐库", experience.tabs.single { it.id == ExperienceTabId.Library }.title)
+        }
+
+        // Product capabilities are still allowed to differ. Only presentation is
+        // canonical, so future iOS UI migrations do not require provider forks.
         assertTrue(MusicExperiences.netease.providerNativeCapabilities.isNotEmpty())
+        assertNotEquals(MusicExperiences.netease.homeSections, MusicExperiences.kugou.homeSections)
     }
 
     @Test
