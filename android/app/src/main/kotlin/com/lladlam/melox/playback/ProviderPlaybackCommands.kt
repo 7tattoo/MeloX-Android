@@ -50,6 +50,10 @@ object ProviderPlaybackCommands {
             {
                 runCatching {
                     val controller = future.get()
+                    // One controller ownership path for both legacy MeloX UI actions
+                    // and provider-backed queues. Existing UI can add/play-next
+                    // without knowing which service owns the track.
+                    PlaybackCommands.adoptController(controller)
                     controller.shuffleModeEnabled = false
                     controller.setMediaItems(items, startIndex, startPositionMs)
                     controller.prepare()
