@@ -5,7 +5,9 @@ import com.lladlam.melox.core.music.model.MusicSource
 
 /**
  * Provider selection is local-only. Cross-provider aggregation is deliberately
- * opt-in and defaults to disabled.
+ * opt-in and defaults to disabled. Even after the global experiment switch is
+ * enabled, the source whitelist defaults to the current provider only; MeloX
+ * never silently fans a request out to every installed provider.
  */
 object MusicProviderSelectionStore {
     private const val PreferencesName = "melox_music_providers"
@@ -34,11 +36,16 @@ object MusicProviderSelectionStore {
             .getBoolean(KeyUnifiedEnabled, false)
 
     fun setUnifiedEnabled(context: Context, enabled: Boolean) {
-        context.applicationContext
+        val preferences = context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KeyUnifiedEnabled, enabled)
-            .apply()
+        val editor = preferences.edit().putBoolean(KeyUnifiedEnabled, enabled)
+        if (enabled && !preferences.contains(KeyUnifiedSources)) {
+            editor.putStringSet(
+                KeyUnifiedSources,
+                setOf(selectedSource(context).storageValue),
+            )
+        }
+        editor.apply()
     }
 
     fun automaticFallbackEnabled(context: Context): Boolean =
@@ -55,11 +62,13 @@ object MusicProviderSelectionStore {
     }
 
     fun unifiedSources(context: Context): Set<MusicSource> {
-        val raw = context.applicationContext
+        val preferences = context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
-            .getStringSet(KeyUnifiedSources, emptySet())
-            .orEmpty()
-        return raw.mapTo(linkedSetOf(), MusicSource::fromStorageValue)
+        val raw = preferences.getStringSet(KeyUnifiedSources, null)
+        if (raw == null) return linkedSetOf(selectedSource(context))
+        return raw.mapNotNullTo(linkedSetOf()) { value ->
+            MusicSource.entries.firstOrNull { it.storageValue == value }
+        }
     }
 
     fun setUnifiedSources(context: Context, sources: Set<MusicSource>) {
