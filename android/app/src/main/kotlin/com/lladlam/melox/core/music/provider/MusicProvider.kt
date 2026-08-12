@@ -22,6 +22,7 @@ enum class MusicCapability {
     Lyrics,
     Library,
     Playlists,
+    PlaylistWrite,
     Albums,
     Artists,
     Favorites,
@@ -99,6 +100,23 @@ interface FavoriteCapability {
     suspend fun setFavorite(
         track: MusicTrack,
         favorite: Boolean,
+    )
+}
+
+/**
+ * Optional playlist mutation surface. A provider returns only playlists for
+ * which it has a reliable provider-native writable id; display/global ids must
+ * never be guessed for writes.
+ */
+interface PlaylistWriteCapability {
+    suspend fun writablePlaylists(
+        page: Int = 1,
+        pageSize: Int = 50,
+    ): MusicPage<MusicPlaylistSummary>
+
+    suspend fun addTrackToPlaylist(
+        track: MusicTrack,
+        playlist: MusicPlaylistSummary,
     )
 }
 
