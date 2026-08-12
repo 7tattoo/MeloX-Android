@@ -226,7 +226,20 @@ class NeteaseMusicOperationsClient(
             true,
         )
         val check = checkResponse.optJSONObject("data")
-        if (check?.optBoolean("canJoin", check.optBoolean("joinable", true)) == false) {
+            ?: throw IOException(
+                checkResponse.optString("message")
+                    .ifBlank { checkResponse.optString("msg") }
+                    .ifBlank { "网易云没有返回一起听房间状态" },
+            )
+        // Upstream MeloX models the official response field as `joinable`.
+        // Only fall back to the older guessed `canJoin` spelling when the
+        // canonical field is absent.
+        val joinable = if (check.has("joinable")) {
+            check.optBoolean("joinable", false)
+        } else {
+            check.optBoolean("canJoin", false)
+        }
+        if (!joinable) {
             val status = check.optString("status").trim()
             val type = check.optString("type").trim()
             val serverMessage = checkResponse.optString("message")
