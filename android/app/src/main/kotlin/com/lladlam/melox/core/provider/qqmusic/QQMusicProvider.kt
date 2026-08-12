@@ -5,6 +5,7 @@ import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicAccountSummary
 import com.lladlam.melox.core.music.model.MusicHomeFeed
 import com.lladlam.melox.core.music.model.MusicPage
+import com.lladlam.melox.core.music.model.MusicPlaylistDetail
 import com.lladlam.melox.core.music.model.MusicPlaylistSummary
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
@@ -14,6 +15,7 @@ import com.lladlam.melox.core.music.provider.LyricsCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
 import com.lladlam.melox.core.music.provider.MusicProvider
 import com.lladlam.melox.core.music.provider.PlaybackCapability
+import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.SearchCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import okhttp3.OkHttpClient
@@ -26,7 +28,8 @@ class QQMusicProvider(
     LyricsCapability,
     PlaybackCapability,
     HomeFeedCapability,
-    UserLibraryCapability {
+    UserLibraryCapability,
+    PlaylistCapability {
     override val source: MusicSource = MusicSource.QQMusic
     override val displayName: String = source.displayName
     override val capabilities: Set<MusicCapability> = setOf(
@@ -40,6 +43,10 @@ class QQMusicProvider(
     )
 
     private val api = QQMusicApiClient(
+        sessionProvider = sessionProvider,
+        httpClient = httpClient,
+    )
+    private val playlists = QQMusicPlaylistClient(
         sessionProvider = sessionProvider,
         httpClient = httpClient,
     )
@@ -64,4 +71,10 @@ class QQMusicProvider(
 
     override suspend fun userPlaylists(page: Int, pageSize: Int): MusicPage<MusicPlaylistSummary> =
         api.userPlaylists(page, pageSize)
+
+    override suspend fun playlistDetail(
+        playlist: MusicPlaylistSummary,
+        page: Int,
+        pageSize: Int,
+    ): MusicPlaylistDetail = playlists.detail(playlist, page, pageSize)
 }
