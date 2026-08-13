@@ -11,8 +11,8 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0-Dev"
+        versionCode = 4
+        versionName = "0.3.1-Dev"
     }
 
     buildFeatures {
@@ -65,6 +65,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.4")
+
+    // External lyric integrations.
+    implementation("io.github.proify.lyricon:provider:0.1.70")
+    // HyperOS Focus / Super Island notification payload builder.
+    implementation("com.xzakota.hyper.notification:focus-api:1.4")
 
     testImplementation("junit:junit:4.13.2")
 
