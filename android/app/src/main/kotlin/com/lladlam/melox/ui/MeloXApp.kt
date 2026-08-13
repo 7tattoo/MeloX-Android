@@ -79,6 +79,8 @@ import androidx.compose.ui.zIndex
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.BuildConfig
+import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
@@ -94,9 +96,13 @@ import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
+import com.lladlam.melox.ui.provider.ProviderExploreScreen
+import com.lladlam.melox.ui.provider.ProviderHomeScreen
+import com.lladlam.melox.ui.provider.ProviderLibraryScreen
+import com.lladlam.melox.ui.provider.ProviderSearchScreen
+import com.lladlam.melox.ui.provider.ProviderSettingsHub
 import com.lladlam.melox.ui.search.SearchScreen
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
-import com.lladlam.melox.ui.settings.SettingsScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.core.network.MeloXSearchKind
@@ -106,6 +112,7 @@ import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.update.MeloXRelease
 import com.lladlam.melox.core.update.MeloXUpdateClient
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.playback.ProviderPlaybackRuntime
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -129,6 +136,9 @@ fun MeloXApp(
     onClipboardLinkConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current.applicationContext
+    var selectedSource by remember {
+        mutableStateOf(MusicProviderSelectionStore.selectedSource(context))
+    }
     val initialTab = runCatching {
         AppTab.valueOf(
             if (MeloXSettingsRuntime.rememberLastTab) {
@@ -154,7 +164,13 @@ fun MeloXApp(
         label = "melox-player-transition",
     )
     val playerScope = rememberCoroutineScope()
-    val clipboardTarget = remember(clipboardLinkRequest) { clipboardLinkRequest?.let(NeteaseClipboardLink::parse) }
+    val clipboardTarget = remember(clipboardLinkRequest, selectedSource) {
+        if (selectedSource == MusicSource.Netease) {
+            clipboardLinkRequest?.let(NeteaseClipboardLink::parse)
+        } else {
+            null
+        }
+    }
     val openPlayer: () -> Unit = {
         if (playbackState.hasMedia) {
             playerScope.launch {
@@ -191,6 +207,7 @@ fun MeloXApp(
     val bottomChromeBackdrop = rememberLayerBackdrop()
 
     LaunchedEffect(Unit) {
+        ProviderPlaybackRuntime.initialize(context)
         if (MeloXSettingsPreferences.boolean(context, "update_auto_check", true)) {
             val now = System.currentTimeMillis()
             val last = MeloXSettingsPreferences.string(context, "update_last_check_ms", "0").toLongOrNull() ?: 0L
@@ -241,7 +258,7 @@ fun MeloXApp(
         }
     }
 
-    LaunchedEffect(clipboardLinkRequest, clipboardTarget) {
+    LaunchedEffect(clipboardLinkRequest, clipboardTarget, selectedSource) {
         if (clipboardLinkRequest != null && clipboardTarget == null) onClipboardLinkConsumed()
     }
 
@@ -258,12 +275,13 @@ fun MeloXApp(
     }
 
     LaunchedEffect(
+        selectedSource,
         neteaseSession.cookie,
         onboardingPage,
         MeloXSettingsRuntime.startsHeartModeOnLaunch,
         playbackState.hasMedia,
     ) {
-        if (heartModeLaunchAttempted || onboardingPage >= 0 || playbackState.hasMedia ||
+        if (selectedSource != MusicSource.Netease || heartModeLaunchAttempted || onboardingPage >= 0 || playbackState.hasMedia ||
             !MeloXSettingsRuntime.startsHeartModeOnLaunch || !neteaseSession.isLoggedIn
         ) return@LaunchedEffect
         heartModeLaunchAttempted = true
@@ -317,10 +335,6 @@ fun MeloXApp(
                     .fillMaxSize()
                     .nestedScroll(tabBarMinimizeConnection)
                     .layerBackdrop(bottomChromeBackdrop)
-                    // Library action sheets deliberately stay in the same Compose
-                    // window so Liquid Glass can sample the collection behind them.
-                    // Raise the whole screen while one is open; BottomChrome must
-                    // never paint over the modal scrim/sheet.
                     .zIndex(if (libraryModalVisible && selectedTab == AppTab.Library && !fullPlayerVisible) 15f else 0f),
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 containerColor = MaterialTheme.colorScheme.background,
@@ -331,21 +345,35 @@ fun MeloXApp(
                         .padding(innerPadding),
                 ) {
                     when (selectedTab) {
-                        AppTab.Search -> SearchScreen()
-                        AppTab.Home -> MeloXHomeScreen()
-                        AppTab.Explore -> MeloXExploreScreen()
-                        AppTab.Library -> LibraryScreen(
-                            session = neteaseSession,
-                            playlistBackEnabled = !fullPlayerVisible && !libraryModalVisible,
-                            onModalVisibilityChanged = { libraryModalVisible = it },
-                            onLogin = {
-                                loginReturnTab = AppTab.Library
-                                showNeteaseLogin = true
+                        AppTab.Search -> if (selectedSource == MusicSource.Netease) SearchScreen() else ProviderSearchScreen(selectedSource)
+                        AppTab.Home -> if (selectedSource == MusicSource.Netease) MeloXHomeScreen() else ProviderHomeScreen(selectedSource)
+                        AppTab.Explore -> if (selectedSource == MusicSource.Netease) MeloXExploreScreen() else ProviderExploreScreen(selectedSource)
+                        AppTab.Library -> if (selectedSource == MusicSource.Netease) {
+                            LibraryScreen(
+                                session = neteaseSession,
+                                playlistBackEnabled = !fullPlayerVisible && !libraryModalVisible,
+                                onModalVisibilityChanged = { libraryModalVisible = it },
+                                onLogin = {
+                                    loginReturnTab = AppTab.Library
+                                    showNeteaseLogin = true
+                                },
+                            )
+                        } else {
+                            ProviderLibraryScreen(selectedSource)
+                        }
+                        AppTab.Settings -> ProviderSettingsHub(
+                            currentSource = selectedSource,
+                            onSourceSelected = { source ->
+                                selectedSource = source
+                                MusicProviderSelectionStore.setSelectedSource(context, source)
+                                tabBarMinimized = false
+                                libraryModalVisible = false
+                                heartModeLaunchAttempted = false
+                                // Provider switching changes only the backing data source.
+                                // Stay on the current Settings route and preserve all MeloX settings UI/state.
                             },
-                        )
-                        AppTab.Settings -> SettingsScreen(
-                            session = neteaseSession,
-                            onLogin = {
+                            neteaseSession = neteaseSession,
+                            onNeteaseLogin = {
                                 loginReturnTab = AppTab.Settings
                                 showNeteaseLogin = true
                             },
@@ -357,6 +385,7 @@ fun MeloXApp(
             CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
                 MeloXBottomChrome(
                     selectedTab = selectedTab,
+                    source = selectedSource,
                     onSelect = { tab ->
                         tabBarMinimized = false
                         selectedTab = tab
@@ -388,8 +417,6 @@ fun MeloXApp(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        // Explicit z-order is important here: this transparent hit-test
-                        // shield must sit above Scaffold/BottomChrome but below NowPlaying.
                         .zIndex(10f)
                         .pointerInput(fullPlayerVisible) {
                             awaitPointerEventScope {
@@ -414,7 +441,9 @@ fun MeloXApp(
                     state = playbackState,
                     onDismiss = closePlayer,
                     onNavigateSearch = { query, kind ->
-                        MeloXSearchLaunchBus.post(query, kind)
+                        if (selectedSource == MusicSource.Netease) {
+                            MeloXSearchLaunchBus.post(query, kind)
+                        }
                         selectedTab = AppTab.Search
                         closePlayer()
                     },
@@ -475,13 +504,13 @@ fun MeloXApp(
         if (onboardingPage >= 0) {
             AlertDialog(
                 onDismissRequest = {},
-                title = { Text(if (onboardingPage == 0) "欢迎使用 MeloX" else "连接网易云音乐") },
+                title = { Text(if (onboardingPage == 0) "欢迎使用 MeloX" else "连接音乐服务") },
                 text = {
                     Text(
                         if (onboardingPage == 0) {
-                            "用原生方式发现、播放和收藏网易云音乐。MeloX 是非官方第三方客户端，与网易云音乐及其关联公司不存在隶属、合作或授权关系。"
+                            "用 MeloX 的原生 Android 体验发现和播放音乐。MeloX 是非官方开源项目，与所支持的音乐平台及其关联公司不存在隶属、合作或授权关系。"
                         } else {
-                            "登录后可以同步收藏歌曲、歌单和播放历史，并使用每日推荐等账号功能。登录不是开始使用 MeloX 的必要条件，Cookie 只保存在本机。"
+                            "默认使用网易云音乐；你可以稍后在设置中切换 QQ音乐或酷狗音乐。各平台登录态只保存在本机。"
                         },
                     )
                 },
@@ -556,6 +585,7 @@ private fun MeloXSectionShell(
 @Composable
 private fun MeloXBottomChrome(
     selectedTab: AppTab,
+    source: MusicSource,
     onSelect: (AppTab) -> Unit,
     hasMedia: Boolean,
     minimized: Boolean,
@@ -697,7 +727,7 @@ private fun MeloXBottomChrome(
                     ) {
                         primaryTabs.forEach { (tab, glyph) ->
                             RootTabButton(
-                                tab = tab,
+                                title = tab.titleFor(source),
                                 glyph = glyph,
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
@@ -757,7 +787,7 @@ private fun MeloXBottomChrome(
                     ) {
                         primaryTabs.forEach { (tab, glyph) ->
                             RootTabButton(
-                                tab = tab,
+                                title = tab.titleFor(source),
                                 glyph = glyph,
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
@@ -835,7 +865,7 @@ private fun bottomGlassFallbackColor(): Color =
 
 @Composable
 private fun RowScope.RootTabButton(
-    tab: AppTab,
+    title: String,
     glyph: RootGlyph,
     selected: Boolean,
     labelAlpha: Float,
@@ -860,7 +890,7 @@ private fun RowScope.RootTabButton(
     ) {
         RootGlyphIcon(glyph = glyph, modifier = Modifier.size(24.dp), color = foreground)
         Text(
-            text = tab.title,
+            text = title,
             modifier = Modifier.graphicsLayer { alpha = labelAlpha },
             fontSize = 9.sp,
             lineHeight = 11.sp,
@@ -871,6 +901,9 @@ private fun RowScope.RootTabButton(
 }
 
 private enum class RootGlyph { Home, Explore, Library, Settings, Search }
+
+@Suppress("UNUSED_PARAMETER")
+private fun AppTab.titleFor(source: MusicSource): String = title
 
 private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Home -> RootGlyph.Home

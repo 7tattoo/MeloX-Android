@@ -21,8 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.core.model.SearchSong
+import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
+import com.lladlam.melox.playback.PlaybackTrackIdentity
 
 @Composable
 fun MeloXNowPlayingActionsSheet(
@@ -32,37 +34,25 @@ fun MeloXNowPlayingActionsSheet(
     onNavigateSearch: ((String, MeloXSearchKind) -> Unit)? = null,
 ) {
     val context = LocalContext.current.applicationContext
-    LaunchedEffect(Unit) {
-        MeloXListenTogetherCoordinator.ensureStarted(context)
+    val identity = state.mediaId?.let(PlaybackTrackIdentity::decode)
+    val neteaseId = identity
+        ?.takeIf { it.source == MusicSource.Netease }
+        ?.value
+        ?.toLongOrNull()
+        ?.takeIf { it > 0L }
+
+    // Listen Together and the mature song-actions overlay are NetEase-only. Do
+    // not start or expose them for QQ/Kugou just because they share Now Playing.
+    LaunchedEffect(neteaseId) {
+        if (neteaseId != null) MeloXListenTogetherCoordinator.ensureStarted(context)
     }
     val togetherState by MeloXListenTogetherCoordinator.state(context).collectAsState()
     var openedFromTogetherBadge by remember { mutableStateOf(false) }
-    val effectiveVisible = visible || openedFromTogetherBadge
-
-    val id = state.mediaId?.toLongOrNull() ?: -1L
-    val song = SearchSong(
-        id = id,
-        name = state.title.ifBlank { "正在播放" },
-        artists = state.artist,
-        album = state.album,
-        artworkUrl = state.artworkUrl,
-        durationMs = state.durationMs,
-    )
-    val queue = state.queue.mapNotNull { entry ->
-        val entryId = entry.mediaId.toLongOrNull()?.takeIf { it > 0L } ?: return@mapNotNull null
-        SearchSong(
-            id = entryId,
-            name = entry.title.ifBlank { "未知歌曲" },
-            artists = entry.artist.ifBlank { "未知歌手" },
-            album = if (entryId == id) state.album else "",
-            artworkUrl = entry.artworkUrl,
-            durationMs = if (entryId == id) state.durationMs else 0L,
-        )
-    }
+    val effectiveVisible = visible || (neteaseId != null && openedFromTogetherBadge)
 
     Box(Modifier.fillMaxSize()) {
         val room = togetherState.room
-        if (room != null && !effectiveVisible) {
+        if (neteaseId != null && room != null && !effectiveVisible) {
             val status = when (togetherState.phase) {
                 MeloXListenTogetherCoordinator.Phase.Reconnecting -> "一起听 · 重连中"
                 else -> "一起听 · ${room.users.size.coerceAtLeast(1)} 人"
@@ -84,16 +74,48 @@ fun MeloXNowPlayingActionsSheet(
             }
         }
 
-        MeloXSongActionsOverlay(
-            song = song,
-            queue = queue,
-            visible = effectiveVisible && id > 0L,
-            onDismiss = {
-                if (openedFromTogetherBadge) openedFromTogetherBadge = false
-                if (visible) onDismiss()
-            },
-            playbackState = state,
-            onNavigateSearch = onNavigateSearch,
-        )
+        if (neteaseId != null) {
+            val song = SearchSong(
+                id = neteaseId,
+                name = state.title.ifBlank { "正在播放" },
+                artists = state.artist,
+                album = state.album,
+                artworkUrl = state.artworkUrl,
+                durationMs = state.durationMs,
+            )
+            val queue = state.queue.mapNotNull { entry ->
+                val entryIdentity = PlaybackTrackIdentity.decode(entry.mediaId) ?: return@mapNotNull null
+                if (entryIdentity.source != MusicSource.Netease) return@mapNotNull null
+                val entryId = entryIdentity.value.toLongOrNull()?.takeIf { it > 0L } ?: return@mapNotNull null
+                SearchSong(
+                    id = entryId,
+                    name = entry.title.ifBlank { "未知歌曲" },
+                    artists = entry.artist.ifBlank { "未知歌手" },
+                    album = if (entryId == neteaseId) state.album else "",
+                    artworkUrl = entry.artworkUrl,
+                    durationMs = if (entryId == neteaseId) state.durationMs else 0L,
+                )
+            }
+
+            MeloXSongActionsOverlay(
+                song = song,
+                queue = queue,
+                visible = effectiveVisible,
+                onDismiss = {
+                    if (openedFromTogetherBadge) openedFromTogetherBadge = false
+                    if (visible) onDismiss()
+                },
+                playbackState = state,
+                onNavigateSearch = onNavigateSearch,
+            )
+        } else if (identity != null) {
+            MeloXProviderSongActionsOverlay(
+                state = state,
+                identity = identity,
+                visible = visible,
+                onDismiss = onDismiss,
+                onNavigateSearch = onNavigateSearch,
+            )
+        }
     }
 }

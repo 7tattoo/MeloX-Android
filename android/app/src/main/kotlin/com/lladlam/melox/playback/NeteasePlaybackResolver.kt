@@ -28,6 +28,9 @@ class NeteasePlaybackResolver(
     private val resolvedUris = ConcurrentHashMap<ResolveKey, Uri>()
     private val qualityClient = NeteaseQualityClient(cookieProvider = cookieProvider)
 
+    @Volatile
+    private var providerDelegate: ProviderPlaybackResolver? = null
+
     /**
      * Resolves the same source used by ExoPlayer for offline analysis. Keeping
      * this path in the resolver guarantees that AutoMix never analyses a
@@ -51,6 +54,11 @@ class NeteasePlaybackResolver(
 
     override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
         val uri = dataSpec.uri
+        if (ProviderPlaybackResolver.isProviderTrackUri(uri)) {
+            val delegate = providerDelegate()
+                ?: throw IOException("MeloX provider playback runtime is not initialized")
+            return delegate.resolveDataSpec(dataSpec)
+        }
         if (uri.scheme != MELOX_SCHEME || uri.host != SONG_HOST) {
             return dataSpec
         }
@@ -71,6 +79,9 @@ class NeteasePlaybackResolver(
     }
 
     override fun resolveReportedUri(uri: Uri): Uri {
+        if (ProviderPlaybackResolver.isProviderTrackUri(uri)) {
+            return providerDelegate()?.resolveReportedUri(uri) ?: uri
+        }
         if (uri.scheme != MELOX_SCHEME || uri.host != SONG_HOST) return uri
         val songId = uri.lastPathSegment?.toLongOrNull() ?: return uri
         localSourceProvider(songId)?.let { return it }
@@ -78,6 +89,18 @@ class NeteasePlaybackResolver(
             ?: MusicQualityRuntime.selected
         val currentCookieHeader = cookieProvider()
         return resolvedUris[ResolveKey(songId, requestedQuality, currentCookieHeader)] ?: uri
+    }
+
+    private fun providerDelegate(): ProviderPlaybackResolver? {
+        providerDelegate?.let { return it }
+        val registry = ProviderPlaybackRuntime.registryOrNull() ?: return null
+        return synchronized(this) {
+            providerDelegate ?: ProviderPlaybackResolver(
+                neteaseResolver = this,
+                providers = registry,
+                authKeyProvider = ProviderPlaybackRuntime::authKey,
+            ).also { providerDelegate = it }
+        }
     }
 
     companion object {

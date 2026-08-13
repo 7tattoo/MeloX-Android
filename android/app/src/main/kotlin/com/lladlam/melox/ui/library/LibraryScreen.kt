@@ -88,6 +88,12 @@ import com.lladlam.melox.core.library.NeteaseLibrarySnapshot
 import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.model.SearchSong
+import com.lladlam.melox.core.music.model.MusicAccountSummary
+import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.music.provider.MeloXLegacyUiBridge
+import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.PlaylistCapability
+import com.lladlam.melox.core.music.provider.UserLibraryCapability
 import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
@@ -103,7 +109,9 @@ import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.cloud.MeloXCloudMusicScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class MeloXLibraryPage(val title: String) {
@@ -115,11 +123,17 @@ private enum class MeloXLibraryPage(val title: String) {
     Downloads("下载"),
 }
 
-private fun MeloXLibraryPage.isEnabled(): Boolean = when (this) {
-    MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled
-    MeloXLibraryPage.History -> MeloXSettingsRuntime.listeningHistoryEnabled
-    MeloXLibraryPage.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled
-    MeloXLibraryPage.Downloads -> MeloXSettingsRuntime.downloadsEnabled
+/**
+ * Presentation capability gate only. Provider-specific differences are kept out
+ * of the renderer: unsupported product sections are simply absent while the
+ * same MeloX transitions/backgrounds remain active.
+ */
+private fun MeloXLibraryPage.isEnabled(source: MusicSource): Boolean = when {
+    source != MusicSource.Netease -> this == MeloXLibraryPage.Playlists
+    this == MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled
+    this == MeloXLibraryPage.History -> MeloXSettingsRuntime.listeningHistoryEnabled
+    this == MeloXLibraryPage.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled
+    this == MeloXLibraryPage.Downloads -> MeloXSettingsRuntime.downloadsEnabled
     else -> true
 }
 
@@ -127,7 +141,8 @@ private fun MeloXLibraryPage.isEnabled(): Boolean = when (this) {
 @Composable
 fun LibraryScreen(
     session: NeteaseSessionStore,
-    onLogin: () -> Unit,
+    onLogin: (() -> Unit)?,
+    source: MusicSource = MusicSource.Netease,
     playlistBackEnabled: Boolean = true,
     onModalVisibilityChanged: (Boolean) -> Unit = {},
 ) {
@@ -139,69 +154,127 @@ fun LibraryScreen(
             cookieProvider = { NeteaseSessionStore.readCookie(appContext) },
         )
     }
+    val provider = remember(source, appContext) {
+        if (source == MusicSource.Netease) null else MeloXMusicProviders.create(appContext).require(source)
+    }
+    val providerLibrary = provider as? UserLibraryCapability
     val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
     val downloadStore = remember(appContext) { MeloXDownloadStore.get(appContext) }
-
-    val initialLibraryPage = remember {
-        val name = if (MeloXSettingsRuntime.rememberLibraryPage) {
-            MeloXSettingsPreferences.string(appContext, "library_last_page", MeloXSettingsRuntime.defaultLibraryPage)
-        } else MeloXSettingsRuntime.defaultLibraryPage
-        runCatching { MeloXLibraryPage.valueOf(name) }
-            .getOrDefault(MeloXLibraryPage.Songs)
-            .takeIf { it.isEnabled() }
-            ?: MeloXLibraryPage.Songs
+    val libraryPagePreferenceKey = if (source == MusicSource.Netease) {
+        "library_last_page"
+    } else {
+        "library_last_page_${source.storageValue}"
     }
-    var selectedPage by remember { mutableStateOf(initialLibraryPage) }
-    var selectedPlaylist by remember(session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
-    var snapshot by remember(session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
-    var loading by remember(session.cookie) { mutableStateOf(false) }
-    var errorMessage by remember(session.cookie) { mutableStateOf<String?>(null) }
+
+    val initialLibraryPage = remember(source) {
+        val fallback = if (source == MusicSource.Netease) MeloXLibraryPage.Songs else MeloXLibraryPage.Playlists
+        val name = if (MeloXSettingsRuntime.rememberLibraryPage) {
+            MeloXSettingsPreferences.string(appContext, libraryPagePreferenceKey, fallback.name)
+        } else fallback.name
+        runCatching { MeloXLibraryPage.valueOf(name) }
+            .getOrDefault(fallback)
+            .takeIf { it.isEnabled(source) }
+            ?: fallback
+    }
+    var selectedPage by remember(source) { mutableStateOf(initialLibraryPage) }
+    var selectedPlaylist by remember(source, session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
+    var snapshot by remember(source, session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
+    var providerAccount by remember(source) { mutableStateOf<MusicAccountSummary?>(null) }
+    var loading by remember(source, session.cookie) { mutableStateOf(source != MusicSource.Netease) }
+    var errorMessage by remember(source, session.cookie) { mutableStateOf<String?>(null) }
     val playlistListState = rememberLazyListState()
 
     suspend fun refreshLibrary() {
-        if (!session.isLoggedIn) return
-        if (session.profile == null) session.refreshProfile(force = true)
-        val userId = session.profile?.userId ?: return
         loading = true
         errorMessage = null
-        runCatching { client.snapshot(userId) }
-            .onSuccess {
-                snapshot = it
-                cache.saveSnapshot(userId, it)
+        if (source == MusicSource.Netease) {
+            if (!session.isLoggedIn) {
+                loading = false
+                return
             }
-            .onFailure { errorMessage = it.message ?: "音乐库加载失败" }
+            if (session.profile == null) session.refreshProfile(force = true)
+            val userId = session.profile?.userId
+            if (userId == null) {
+                loading = false
+                return
+            }
+            runCatching { client.snapshot(userId) }
+                .onSuccess {
+                    snapshot = it
+                    cache.saveSnapshot(userId, it)
+                }
+                .onFailure { errorMessage = it.message ?: "音乐库加载失败" }
+        } else {
+            val capability = providerLibrary
+            if (capability == null) {
+                providerAccount = null
+                snapshot = null
+                errorMessage = "${source.displayName} 当前没有提供个人音乐库能力"
+                loading = false
+                return
+            }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val account = capability.accountSummary()
+                    val playlists = if (account != null) {
+                        capability.userPlaylists(page = 1, pageSize = 100).items
+                    } else {
+                        emptyList()
+                    }
+                    account to playlists
+                }
+            }.onSuccess { (account, playlists) ->
+                providerAccount = account
+                snapshot = if (account == null) null else MeloXLegacyUiBridge.library(playlists)
+            }.onFailure { failure ->
+                providerAccount = null
+                snapshot = null
+                errorMessage = failure.message ?: "${source.displayName} 音乐库加载失败"
+            }
+        }
         loading = false
     }
 
-    LaunchedEffect(session.cookie, session.profile?.userId) {
-        val userId = session.profile?.userId ?: return@LaunchedEffect
-        cache.loadSnapshot(userId)?.let { snapshot = it }
-        if (NeteaseLibraryCache.beginLibraryColdStartRefresh(userId)) {
+    LaunchedEffect(source, session.cookie, session.profile?.userId) {
+        if (source == MusicSource.Netease) {
+            val userId = session.profile?.userId ?: return@LaunchedEffect
+            cache.loadSnapshot(userId)?.let { snapshot = it }
+            if (NeteaseLibraryCache.beginLibraryColdStartRefresh(userId)) {
+                refreshLibrary()
+            }
+        } else {
             refreshLibrary()
         }
     }
 
-    LaunchedEffect(selectedPage) {
+    LaunchedEffect(source, selectedPage) {
         if (MeloXSettingsRuntime.rememberLibraryPage) {
-            MeloXSettingsPreferences.setString(appContext, "library_last_page", selectedPage.name)
+            MeloXSettingsPreferences.setString(appContext, libraryPagePreferenceKey, selectedPage.name)
         }
     }
 
     LaunchedEffect(
+        source,
         MeloXSettingsRuntime.podcastsEnabled,
         MeloXSettingsRuntime.listeningHistoryEnabled,
         MeloXSettingsRuntime.cloudMusicEnabled,
         MeloXSettingsRuntime.downloadsEnabled,
     ) {
-        if (!selectedPage.isEnabled()) selectedPage = MeloXLibraryPage.Songs
+        if (!selectedPage.isEnabled(source)) {
+            selectedPage = if (source == MusicSource.Netease) MeloXLibraryPage.Songs else MeloXLibraryPage.Playlists
+        }
     }
 
     BackHandler(enabled = playlistBackEnabled && selectedPlaylist != null) {
         selectedPlaylist = null
     }
 
-    if (!session.isLoggedIn) {
-        MeloXLibraryLoginUnavailable(onLogin)
+    if (source == MusicSource.Netease && !session.isLoggedIn) {
+        MeloXLibraryLoginUnavailable(onLogin, source)
+        return
+    }
+    if (source != MusicSource.Netease && !loading && providerAccount == null && errorMessage == null) {
+        MeloXLibraryLoginUnavailable(onLogin, source)
         return
     }
 
@@ -269,6 +342,7 @@ fun LibraryScreen(
                     MeloXLibrarySegmentedPicker(
                         selected = selectedPage,
                         onSelected = { selectedPage = it },
+                        source = source,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 24.dp),
                     )
 
@@ -322,15 +396,17 @@ fun LibraryScreen(
                                         )
                                     }
                                 },
-                                onHeartMode = {
-                                    val seed = data.likedSongs.randomOrNull()
-                                    val playlistId = data.likedPlaylistId
-                                    if (seed != null && playlistId != null) scope.launch {
-                                        runCatching { client.intelligenceModeSongs(seed.id, playlistId) }
-                                            .onSuccess { songs -> songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id, heartMode = true) } }
-                                            .onFailure { errorMessage = it.message ?: "无法启动心动模式" }
+                                onHeartMode = if (source == MusicSource.Netease) {
+                                    {
+                                        val seed = data.likedSongs.randomOrNull()
+                                        val playlistId = data.likedPlaylistId
+                                        if (seed != null && playlistId != null) scope.launch {
+                                            runCatching { client.intelligenceModeSongs(seed.id, playlistId) }
+                                                .onSuccess { songs -> songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id, heartMode = true) } }
+                                                .onFailure { errorMessage = it.message ?: "无法启动心动模式" }
+                                        }
                                     }
-                                },
+                                } else null,
                             )
 
                             MeloXLibraryPage.Playlists -> MeloXLibraryPlaylistsPage(
@@ -703,7 +779,10 @@ private fun formatDownloadSpeed(bytesPerSecond: Long): String = when {
 }
 
 @Composable
-private fun MeloXLibraryLoginUnavailable(onLogin: () -> Unit) {
+private fun MeloXLibraryLoginUnavailable(
+    onLogin: (() -> Unit)?,
+    source: MusicSource,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -727,29 +806,35 @@ private fun MeloXLibraryLoginUnavailable(onLogin: () -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("需要登录", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "登录后可读取收藏歌曲、歌单和播放记录。",
+                    if (source == MusicSource.Netease) {
+                        "登录后可读取收藏歌曲、歌单和播放记录。"
+                    } else {
+                        "请先在设置中登录 ${source.displayName}，登录后可读取该平台提供的音乐库内容。"
+                    },
                     modifier = Modifier.padding(top = 8.dp),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.50f),
                     textAlign = TextAlign.Center,
                 )
-                Surface(
-                    modifier = Modifier
-                        .padding(top = 18.dp)
-                        .meloXLiquidButton(
-                            shape = RoundedCornerShape(18.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                            surfaceColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f),
+                if (onLogin != null) {
+                    Surface(
+                        modifier = Modifier
+                            .padding(top = 18.dp)
+                            .meloXLiquidButton(
+                                shape = RoundedCornerShape(18.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                                surfaceColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f),
+                            )
+                            .clickable(onClick = onLogin),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Text(
+                            if (source == MusicSource.Netease) "登录网易云音乐" else "前往登录 ${source.displayName}",
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.SemiBold,
                         )
-                        .clickable(onClick = onLogin),
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                ) {
-                    Text(
-                        "登录网易云音乐",
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    }
                 }
             }
         }
@@ -760,9 +845,10 @@ private fun MeloXLibraryLoginUnavailable(onLogin: () -> Unit) {
 private fun MeloXLibrarySegmentedPicker(
     selected: MeloXLibraryPage,
     onSelected: (MeloXLibraryPage) -> Unit,
+    source: MusicSource,
     modifier: Modifier = Modifier,
 ) {
-    val pages = MeloXLibraryPage.entries.filter { it.isEnabled() }
+    val pages = MeloXLibraryPage.entries.filter { it.isEnabled(source) }
     val panelShape = RoundedCornerShape(16.dp)
     val lensShape = RoundedCornerShape(15.dp)
     val panelBackdrop = rememberLayerBackdrop()
@@ -1105,6 +1191,13 @@ private fun MeloXPlaylistDetailScreen(
     val operationsClient = remember(appContext) {
         NeteaseMusicOperationsClient(cookieProvider = { NeteaseSessionStore.readCookie(appContext) })
     }
+    val providerPlaylist = initialPlaylist.providerPlaylist
+    val providerPlaylistCapability = remember(providerPlaylist?.id?.source, appContext) {
+        providerPlaylist?.let { backing ->
+            MeloXMusicProviders.create(appContext).require(backing.id.source) as? PlaylistCapability
+        }
+    }
+    val isProviderPlaylist = providerPlaylist != null
     var detail by remember(initialPlaylist.id) { mutableStateOf<NeteasePlaylistDetail?>(null) }
     var loading by remember(initialPlaylist.id) { mutableStateOf(true) }
     var errorMessage by remember(initialPlaylist.id) { mutableStateOf<String?>(null) }
@@ -1116,7 +1209,7 @@ private fun MeloXPlaylistDetailScreen(
     var palette by remember(initialPlaylist.coverUrl) { mutableStateOf(MeloXDetailPalette.LightFallback) }
 
     DisposableEffect(showPlaylistActions, selectedTrackAction) {
-        val visible = showPlaylistActions || selectedTrackAction != null
+        val visible = !isProviderPlaylist && (showPlaylistActions || selectedTrackAction != null)
         onModalVisibilityChanged(visible)
         onDispose {
             if (visible) onModalVisibilityChanged(false)
@@ -1124,6 +1217,10 @@ private fun MeloXPlaylistDetailScreen(
     }
 
     suspend fun refreshSavedState() {
+        if (isProviderPlaylist) {
+            isSaved = null
+            return
+        }
         val cookie = NeteaseSessionStore.readCookie(appContext)
         if (!NeteaseSessionStore.containsMusicU(cookie)) {
             isSaved = null
@@ -1131,7 +1228,7 @@ private fun MeloXPlaylistDetailScreen(
         }
         runCatching {
             val profile = accountClient.accountProfile(cookie)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 client.userPlaylistsBlocking(profile.userId)
             }.any { it.id == initialPlaylist.id }
         }.onSuccess { isSaved = it }
@@ -1140,24 +1237,44 @@ private fun MeloXPlaylistDetailScreen(
     suspend fun refreshPlaylist() {
         loading = true
         errorMessage = null
-        runCatching { client.playlistDetail(initialPlaylist.id) }
-            .onSuccess {
-                detail = it
-                cache.savePlaylistDetail(initialPlaylist.id, it)
+        if (providerPlaylist != null) {
+            val capability = providerPlaylistCapability
+            if (capability == null) {
+                errorMessage = "${providerPlaylist.id.source.displayName} 尚未实现歌单详情能力"
+                loading = false
+                return
             }
-            .onFailure { errorMessage = it.message ?: "歌单加载失败" }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    capability.playlistDetail(providerPlaylist, page = 1, pageSize = 150)
+                }
+            }.onSuccess { providerDetail ->
+                detail = MeloXLegacyUiBridge.playlistDetail(providerDetail)
+            }.onFailure { errorMessage = it.message ?: "歌单加载失败" }
+        } else {
+            runCatching { client.playlistDetail(initialPlaylist.id) }
+                .onSuccess {
+                    detail = it
+                    cache.savePlaylistDetail(initialPlaylist.id, it)
+                }
+                .onFailure { errorMessage = it.message ?: "歌单加载失败" }
+        }
         loading = false
     }
 
-    LaunchedEffect(initialPlaylist.id) {
-        cache.loadPlaylistDetail(initialPlaylist.id)?.let { detail = it }
-        loading = detail == null
-        if (NeteaseLibraryCache.beginPlaylistColdStartRefresh(initialPlaylist.id)) {
+    LaunchedEffect(initialPlaylist.id, providerPlaylist?.id) {
+        if (providerPlaylist != null) {
             refreshPlaylist()
+        } else {
+            cache.loadPlaylistDetail(initialPlaylist.id)?.let { detail = it }
+            loading = detail == null
+            if (NeteaseLibraryCache.beginPlaylistColdStartRefresh(initialPlaylist.id)) {
+                refreshPlaylist()
+            }
         }
     }
 
-    LaunchedEffect(initialPlaylist.id) {
+    LaunchedEffect(initialPlaylist.id, isProviderPlaylist) {
         refreshSavedState()
     }
 
@@ -1186,8 +1303,7 @@ private fun MeloXPlaylistDetailScreen(
             .fillMaxSize()
             .background(Color.Black),
     ) {
-        // Use the exact same artwork-driven background renderer as the full
-        // now-playing artwork page: 160px artwork -> 3x3 palette -> flowing fields.
+        // Keep the exact MeloX artwork-driven background renderer for every source.
         MeloXFlowingLightBackdrop(
             artworkUrl = displayed.coverUrl,
             isPlaying = false,
@@ -1203,6 +1319,7 @@ private fun MeloXPlaylistDetailScreen(
                 foreground = foreground,
                 onBack = onBack,
                 onShare = { sharePlaylistFromDetail(context, displayed) },
+                showMore = !isProviderPlaylist,
                 onMore = { showPlaylistActions = true },
             )
             MeloXPlaylistSearchField(
@@ -1222,6 +1339,7 @@ private fun MeloXPlaylistDetailScreen(
                         tracks = songs,
                         foreground = foreground,
                         secondary = secondary,
+                        sourceLabel = displayed.providerPlaylist?.id?.source?.displayName ?: "网易云音乐",
                         onPlay = {
                             songs.firstOrNull()?.let { first ->
                                 PlaybackCommands.playQueue(
@@ -1244,19 +1362,23 @@ private fun MeloXPlaylistDetailScreen(
                             }
                         },
                         isSaved = isSaved == true,
+                        showSaveAction = !isProviderPlaylist,
+                        showDownloadAction = !isProviderPlaylist,
                         onDownloadAll = {
-                            val quality = MusicQualityPreferences.read(appContext)
-                            val source = MeloXDownloadPlaylistRef(
-                                id = displayed.id,
-                                name = displayed.name,
-                                artworkUrl = displayed.coverUrl,
-                            )
-                            songs.forEach { song ->
-                                downloadStore.start(song, quality, source)
+                            if (!isProviderPlaylist) {
+                                val quality = MusicQualityPreferences.read(appContext)
+                                val downloadSource = MeloXDownloadPlaylistRef(
+                                    id = displayed.id,
+                                    name = displayed.name,
+                                    artworkUrl = displayed.coverUrl,
+                                )
+                                songs.forEach { song ->
+                                    downloadStore.start(song, quality, downloadSource)
+                                }
                             }
                         },
                         onToggleSaved = {
-                            if (!savingPlaylist) {
+                            if (!isProviderPlaylist && !savingPlaylist) {
                                 val desired = isSaved != true
                                 savingPlaylist = true
                                 scope.launch {
@@ -1333,6 +1455,7 @@ private fun MeloXPlaylistDetailScreen(
                             song = song,
                             index = index,
                             foreground = foreground,
+                            showMore = !isProviderPlaylist,
                             onClick = {
                                 PlaybackCommands.playQueue(
                                     context = context,
@@ -1355,25 +1478,27 @@ private fun MeloXPlaylistDetailScreen(
             }
         }
 
-        MeloXPlaylistActionsOverlay(
-            playlist = displayed,
-            visible = showPlaylistActions,
-            onDismiss = { showPlaylistActions = false },
-            onRefresh = { scope.launch { refreshPlaylist() } },
-        )
-        val actionSong = selectedTrackAction
-        if (actionSong != null) {
-            MeloXSongActionsOverlay(
-                song = actionSong,
-                queue = songs,
-                visible = true,
-                onDismiss = { selectedTrackAction = null },
-                sourcePlaylist = MeloXDownloadPlaylistRef(
-                    id = displayed.id,
-                    name = displayed.name,
-                    artworkUrl = displayed.coverUrl,
-                ),
+        if (!isProviderPlaylist) {
+            MeloXPlaylistActionsOverlay(
+                playlist = displayed,
+                visible = showPlaylistActions,
+                onDismiss = { showPlaylistActions = false },
+                onRefresh = { scope.launch { refreshPlaylist() } },
             )
+            val actionSong = selectedTrackAction
+            if (actionSong != null) {
+                MeloXSongActionsOverlay(
+                    song = actionSong,
+                    queue = songs,
+                    visible = true,
+                    onDismiss = { selectedTrackAction = null },
+                    sourcePlaylist = MeloXDownloadPlaylistRef(
+                        id = displayed.id,
+                        name = displayed.name,
+                        artworkUrl = displayed.coverUrl,
+                    ),
+                )
+            }
         }
     }
 }
@@ -1383,6 +1508,7 @@ private fun MeloXPlaylistToolbar(
     foreground: Color,
     onBack: () -> Unit,
     onShare: () -> Unit,
+    showMore: Boolean = true,
     onMore: () -> Unit,
 ) {
     Row(
@@ -1412,18 +1538,20 @@ private fun MeloXPlaylistToolbar(
             ) {
                 MeloXShareGlyph(Modifier.size(22.dp), Color(0xFFFF3147))
             }
-            MeloXGlassCircleButton(
-                foreground = foreground,
-                size = 44.dp,
-                onClick = onMore,
-            ) {
-                Text(
-                    "•••",
-                    color = Color(0xFFFF3147),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                )
+            if (showMore) {
+                MeloXGlassCircleButton(
+                    foreground = foreground,
+                    size = 44.dp,
+                    onClick = onMore,
+                ) {
+                    Text(
+                        "•••",
+                        color = Color(0xFFFF3147),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                    )
+                }
             }
         }
     }
@@ -1484,9 +1612,12 @@ private fun MeloXStandardPlaylistHero(
     tracks: List<SearchSong>,
     foreground: Color,
     secondary: Color,
+    sourceLabel: String,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     isSaved: Boolean,
+    showSaveAction: Boolean,
+    showDownloadAction: Boolean,
     onDownloadAll: () -> Unit,
     onToggleSaved: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
@@ -1539,7 +1670,7 @@ private fun MeloXStandardPlaylistHero(
             )
 
             Text(
-                text = playlist.creatorName.ifBlank { "网易云音乐" },
+                text = playlist.creatorName.ifBlank { sourceLabel },
                 modifier = Modifier.padding(top = 8.dp),
                 color = foreground,
                 fontSize = 20.sp,
@@ -1612,44 +1743,48 @@ private fun MeloXStandardPlaylistHero(
                     }
                 }
 
-                MeloXGlassCircleButton(
-                    foreground = foreground,
-                    size = 54.dp,
-                    onClick = onToggleSaved,
-                ) {
-                    Text(
-                        if (isSaved) "✓" else "+",
-                        color = foreground,
-                        fontSize = if (isSaved) 24.sp else 34.sp,
-                        lineHeight = 34.sp,
-                        fontWeight = if (isSaved) FontWeight.SemiBold else FontWeight.Light,
-                    )
+                if (showSaveAction) {
+                    MeloXGlassCircleButton(
+                        foreground = foreground,
+                        size = 54.dp,
+                        onClick = onToggleSaved,
+                    ) {
+                        Text(
+                            if (isSaved) "✓" else "+",
+                            color = foreground,
+                            fontSize = if (isSaved) 24.sp else 34.sp,
+                            lineHeight = 34.sp,
+                            fontWeight = if (isSaved) FontWeight.SemiBold else FontWeight.Light,
+                        )
+                    }
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .padding(top = 14.dp)
-                    .width(148.dp)
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(21.dp))
-                    .meloXLiquidButton(
-                        shape = RoundedCornerShape(21.dp),
-                        enabled = tracks.isNotEmpty(),
-                        tint = glassColor(foreground).copy(alpha = .10f),
-                        surfaceColor = glassColor(foreground).copy(alpha = .46f),
-                        lensRadius = 10.dp,
-                        refractionHeight = 16.dp,
+            if (showDownloadAction) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .width(148.dp)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(21.dp))
+                        .meloXLiquidButton(
+                            shape = RoundedCornerShape(21.dp),
+                            enabled = tracks.isNotEmpty(),
+                            tint = glassColor(foreground).copy(alpha = .10f),
+                            surfaceColor = glassColor(foreground).copy(alpha = .46f),
+                            lensRadius = 10.dp,
+                            refractionHeight = 16.dp,
+                        )
+                        .clickable(enabled = tracks.isNotEmpty(), onClick = onDownloadAll),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "↓ 一键下载",
+                        color = foreground,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    .clickable(enabled = tracks.isNotEmpty(), onClick = onDownloadAll),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "↓ 一键下载",
-                    color = foreground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                }
             }
 
             playlist.description
@@ -1677,6 +1812,7 @@ private fun MeloXPlaylistTrackRow(
     song: SearchSong,
     index: Int,
     foreground: Color,
+    showMore: Boolean = true,
     onClick: () -> Unit,
     onMore: () -> Unit,
 ) {
@@ -1712,23 +1848,25 @@ private fun MeloXPlaylistTrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Box(
-            modifier = Modifier
-                .size(width = 42.dp, height = 44.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onMore,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "•••",
-                color = foreground,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp,
-            )
+        if (showMore) {
+            Box(
+                modifier = Modifier
+                    .size(width = 42.dp, height = 44.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onMore,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "•••",
+                    color = foreground,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                )
+            }
         }
     }
 }
@@ -1900,11 +2038,30 @@ private fun optimized160Artwork(url: String?): String? {
 }
 
 private fun sharePlaylistFromDetail(context: android.content.Context, playlist: NeteasePlaylistSummary) {
-    com.lladlam.melox.ui.sharing.MeloXNeteaseResourceShareActivity.launch(
-        context = context,
-        type = "playlist",
-        id = playlist.id,
-        title = playlist.name,
-        url = "https://music.163.com/playlist?id=${playlist.id}",
-    )
+    val providerPlaylist = playlist.providerPlaylist
+    if (providerPlaylist == null) {
+        com.lladlam.melox.ui.sharing.MeloXNeteaseResourceShareActivity.launch(
+            context = context,
+            type = "playlist",
+            id = playlist.id,
+            title = playlist.name,
+            url = "https://music.163.com/playlist?id=${playlist.id}",
+        )
+        return
+    }
+
+    val text = buildString {
+        append(providerPlaylist.title)
+        if (!providerPlaylist.creatorName.isNullOrBlank()) append(" · ").append(providerPlaylist.creatorName)
+        append('\n').append(providerPlaylist.id.source.displayName)
+    }
+    val intent = android.content.Intent.createChooser(
+        android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        },
+        "分享歌单",
+    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(intent)
 }

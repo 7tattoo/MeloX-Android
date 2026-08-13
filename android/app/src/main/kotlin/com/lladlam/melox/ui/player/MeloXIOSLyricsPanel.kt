@@ -54,7 +54,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -69,13 +68,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricRomanizationAligner
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.lyrics.withPseudoTiming
-import com.lladlam.melox.core.download.MeloXDownloadStore
-import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXLyricsStyle
 import com.lladlam.melox.ui.settings.MeloXLyricAnnotationDisplayMode
@@ -139,7 +135,6 @@ private object UpstreamLyrics {
     const val UNPLAYED_BLUR_LEAD_MS = 2400f
     const val MIN_UNPLAYED_BLUR_FRACTION = 0.12f
     const val LIFT_CONTINUATION_MS = 320f
-
 }
 
 @Composable
@@ -180,11 +175,6 @@ private fun MeloXAppleMusicLyricsPanel(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val haptics = LocalHapticFeedback.current
-    val client = remember(context) {
-        NeteaseSearchClient(
-            cookieProvider = { NeteaseSessionStore.readCookie(appContext) },
-        )
-    }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
     val mediaId = state.mediaId
@@ -203,14 +193,11 @@ private fun MeloXAppleMusicLyricsPanel(
         renderedPositionState.longValue = state.positionMs
     }
 
-    LaunchedEffect(mediaId) {
-        val songId = mediaId?.toLongOrNull() ?: return@LaunchedEffect
+    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (mediaId.isNullOrBlank()) return@LaunchedEffect
         isLoading = true
         errorMessage = null
-        val downloaded = MeloXDownloadStore.get(appContext).localLyrics(songId)
-        if (downloaded != null) {
-            lyrics = downloaded
-        } else runCatching { client.lyrics(songId) }
+        runCatching { MeloXProviderLyricsLoader.load(appContext, state) }
             .onSuccess { lyrics = it }
             .onFailure { errorMessage = it.message ?: "歌词加载失败" }
         isLoading = false
@@ -336,8 +323,6 @@ private fun MeloXAppleMusicLyricsPanel(
         if (MeloXSettingsRuntime.showLyricRomanization && !line?.romanization.isNullOrBlank()) {
             height += annotationFontPx * 1.2f + annotationSpacingPx
         }
-        // Upstream defaults translation to focused-line mode. Reserve its layout
-        // height so focus promotion never changes the scroll geometry.
         if (MeloXSettingsRuntime.showLyricTranslation && !line?.translation.isNullOrBlank()) {
             height += annotationFontPx * 1.2f + annotationSpacingPx
         }
@@ -358,9 +343,6 @@ private fun MeloXAppleMusicLyricsPanel(
         val destination = cascadeDestinationOffsets[index] ?: 0f
         val scrollProgress = cascadeScrollProgress.value
         val lineProgress = cascadeLineProgress[index].value
-        // The list itself moves by -distance * scrollProgress. This translation
-        // cancels that motion until the row's delayed progress starts, then lets
-        // the row catch up to its destination with the source spring.
         return initial + cascadeDistancePx * scrollProgress -
             (cascadeDistancePx + initial - destination) * lineProgress
     }
@@ -428,21 +410,18 @@ private fun MeloXAppleMusicLyricsPanel(
         if (colorHighlightedIndex in lines.indices) handOffFocusColor(colorHighlightedIndex)
     }
 
-    // Only real pointer/nested-scroll input enters browsing mode. Programmatic
-    // scrollTo/animateScrollTo must never disable its own lyric following.
     val scrollHideThresholdPx = with(density) { MeloXSettingsRuntime.lyricScrollHideThresholdDp.dp.toPx() }
     val lyricInteractionConnection = remember(document, scrollHideThresholdPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput) return Offset.Zero
-                val offsetDelta = -available.y // match SwiftUI contentOffset delta
+                val offsetDelta = -available.y
                 if (kotlin.math.abs(offsetDelta) < 0.01f) return Offset.Zero
 
                 isBrowsingLyrics = true
                 browseGeneration += 1
 
                 if (offsetDelta < 0f) {
-                    // Browsing back toward previous lyrics restores controls immediately.
                     scrollHideDistancePx = 0f
                     if (latestInterfaceHidden.value) {
                         latestVisibilityCallback.value.invoke(true)
@@ -450,9 +429,6 @@ private fun MeloXAppleMusicLyricsPanel(
                         latestInteractionCallback.value.invoke()
                     }
                 } else if (!latestInterfaceHidden.value) {
-                    // Forward browsing keeps an already-hidden interface hidden; if
-                    // controls are visible, activity resets the 5-second idle timer
-                    // and 200dp of continued scrolling hides them, matching upstream.
                     latestInteractionCallback.value.invoke()
                     scrollHideDistancePx += offsetDelta
                     if (scrollHideDistancePx >= scrollHideThresholdPx) {
@@ -472,8 +448,6 @@ private fun MeloXAppleMusicLyricsPanel(
         playbackFocusGeneration += 1
     }
 
-    // A real drag cancels the automatic cascade. Remove any remaining visual
-    // compensation so the rows track the user's finger one-to-one.
     LaunchedEffect(isBrowsingLyrics, document) {
         if (isBrowsingLyrics) clearCascadePresentation(visualFocusIndex)
     }
@@ -495,8 +469,6 @@ private fun MeloXAppleMusicLyricsPanel(
             val viewportAnchor = viewportHeightPx * focusPosition
             val desiredItemTop = viewportAnchor -
                 estimatedHeight(index) * focusPosition
-            // LazyListState uses a positive value to scroll the item farther past
-            // the viewport start. A negative value places its top below the start.
             return -desiredItemTop.roundToInt()
         }
 
@@ -530,9 +502,7 @@ private fun MeloXAppleMusicLyricsPanel(
                 return@LaunchedEffect
             }
 
-            if (previousIndex == nextIndex) {
-                return@LaunchedEffect
-            }
+            if (previousIndex == nextIndex) return@LaunchedEffect
 
             if (!MeloXSettingsRuntime.lyricAutoFollowEnabled) {
                 handOffFocusScale(previousIndex, nextIndex)
@@ -591,19 +561,11 @@ private fun MeloXAppleMusicLyricsPanel(
             val firstVisible = visibleLineIndexes.minOrNull() ?: max(nextIndex - 1, 0)
             val lastVisible = visibleLineIndexes.maxOrNull() ?: nextIndex
             val firstMoving = min(firstVisible, max(nextIndex - 1, 0))
-            val lastMoving = max(
-                lastVisible,
-                min(nextIndex + 8, lines.lastIndex), // six safety + two preload
-            )
+            val lastMoving = max(lastVisible, min(nextIndex + 8, lines.lastIndex))
             val movingIndexes = firstMoving..lastMoving
             val carriedOffsets = movingIndexes.associateWith(::currentMovementOffset)
-            val destinations = movingIndexes.associateWith {
-                settledMovementOffset(it, nextIndex)
-            }
+            val destinations = movingIndexes.associateWith { settledMovementOffset(it, nextIndex) }
 
-            // Prepare a new transition from the current presentation. Animatable's
-            // cancellation and carried values make dense lyric changes continue
-            // smoothly instead of restarting every row from zero.
             cascadeDistancePx = movementDistance
             cascadeInitialOffsets = carriedOffsets
             cascadeDestinationOffsets = destinations
@@ -621,9 +583,6 @@ private fun MeloXAppleMusicLyricsPanel(
 
             coroutineScope {
                 launch { handOffFocusScale(previousIndex, nextIndex) }
-
-                // Drive the logical LazyColumn scroll and its compensation from
-                // one frame-clock value, avoiding drift between two animations.
                 launch {
                     var previousScrollProgress = 0f
                     listState.scroll {
@@ -651,9 +610,7 @@ private fun MeloXAppleMusicLyricsPanel(
                         MeloXSettingsRuntime.lyricCascadeChaseSpeedGradient
                     val bounce = sourceCascadeBounce(chaseOrder, maximumChaseOrder)
                     launch {
-                        if (movementTiming.delayMs > 0f) {
-                            delay(movementTiming.delayMs.toLong())
-                        }
+                        if (movementTiming.delayMs > 0f) delay(movementTiming.delayMs.toLong())
                         cascadeLineProgress[index].animateTo(
                             targetValue = 1f,
                             animationSpec = tween(
@@ -674,18 +631,14 @@ private fun MeloXAppleMusicLyricsPanel(
                     color = Color.White.copy(alpha = 0.9f),
                 )
             }
-
             errorMessage != null && document == null -> {
                 Text(
                     text = errorMessage.orEmpty(),
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp),
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     color = Color.White.copy(alpha = 0.52f),
                     fontSize = 15.sp,
                 )
             }
-
             document == null || lines.isEmpty() -> {
                 Text(
                     text = "暂无歌词",
@@ -694,19 +647,15 @@ private fun MeloXAppleMusicLyricsPanel(
                     fontSize = 18.sp,
                 )
             }
-
             else -> {
                 val focusAnchorY = viewportHeightPx * focusPosition
-                val annotationHeightPx =
-                    annotationFontPx * 1.2f * 2f + annotationSpacingPx * 2f
+                val annotationHeightPx = annotationFontPx * 1.2f * 2f + annotationSpacingPx * 2f
                 val lyricStridePx = max(primaryHeightPx + annotationHeightPx + lineSpacingPx, 1f)
                 val visibleItemsByIndex = listState.layoutInfo.visibleItemsInfo.associateBy { it.index }
 
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .nestedScroll(lyricInteractionConnection),
+                    modifier = Modifier.fillMaxSize().nestedScroll(lyricInteractionConnection),
                 ) {
                     item(key = "lyrics-top-padding") {
                         Spacer(Modifier.height(with(density) { topPaddingPx.toDp() }))
@@ -724,11 +673,6 @@ private fun MeloXAppleMusicLyricsPanel(
                         val frameMinY = visibleItemsByIndex[index + 1]?.offset?.toFloat()
                             ?: focusAnchorY + (index - visualFocusIndex) * lyricStridePx
                         val visualMidY = frameMinY + visualOffset + height * 0.5f
-                        // Automatic movement should not feed its own changing row
-                        // geometry back into blur/opacity. The upstream transition
-                        // freezes presentation geometry while the cascade runs.
-                        // Index distance is its stable LazyColumn equivalent; while
-                        // browsing, actual viewport distance remains interactive.
                         val distance = if (isBrowsingLyrics || visualFocusIndex !in lines.indices) {
                             abs(visualMidY - focusAnchorY)
                         } else {
@@ -780,8 +724,7 @@ private fun MeloXAppleMusicLyricsPanel(
                         MeloXUpstreamLyricLine(
                             line = line,
                             playbackTimeProvider = playbackTimeProvider,
-                            supportsTimedLyrics = line.syllables.isNotEmpty() &&
-                                MeloXSettingsRuntime.lyricWordByWordEnabled,
+                            supportsTimedLyrics = line.syllables.isNotEmpty() && MeloXSettingsRuntime.lyricWordByWordEnabled,
                             fontScale = lyricFontScale,
                             reduceMotion = MeloXSettingsRuntime.lyricReduceMotion,
                             focusProgress = effectiveFocus,
@@ -792,18 +735,14 @@ private fun MeloXAppleMusicLyricsPanel(
                             focusBlurDp = focusBlur,
                             showTranslation = MeloXSettingsRuntime.showLyricTranslation &&
                                 !line.translation.isNullOrBlank() &&
-                                (MeloXSettingsRuntime.lyricTranslationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines ||
-                                    index == visualFocusIndex),
+                                (MeloXSettingsRuntime.lyricTranslationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines || index == visualFocusIndex),
                             showRomanization = MeloXSettingsRuntime.showLyricRomanization &&
                                 !line.romanization.isNullOrBlank() &&
-                                (MeloXSettingsRuntime.lyricRomanizationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines ||
-                                    index == visualFocusIndex),
+                                (MeloXSettingsRuntime.lyricRomanizationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines || index == visualFocusIndex),
                             reserveTranslation = MeloXSettingsRuntime.showLyricTranslation && !line.translation.isNullOrBlank(),
                             reserveRomanization = MeloXSettingsRuntime.showLyricRomanization && !line.romanization.isNullOrBlank(),
                             onMeasured = { measured ->
-                                if (measured > 0 && rowHeightsPx[index] != measured) {
-                                    rowHeightsPx[index] = measured
-                                }
+                                if (measured > 0 && rowHeightsPx[index] != measured) rowHeightsPx[index] = measured
                             },
                             tapSeekEnabled = MeloXSettingsRuntime.lyricTapSeekEnabled,
                             onClick = { onInterfaceInteraction(); state.seekTo(line.timeMs) },
@@ -823,7 +762,6 @@ private fun MeloXAppleMusicLyricsPanel(
                         Spacer(Modifier.height(with(density) { bottomPaddingPx.toDp() }))
                     }
                 }
-
             }
         }
     }
@@ -852,8 +790,6 @@ private fun MeloXUpstreamLyricLine(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    // One blur layer is materially cheaper than stacking distance and focus
-    // blurs on every visible row, and removes a common source of scroll jank.
     val blurModifier = Modifier.blur(
         radius = max(max(distanceBlurDp, focusBlurDp), 0f).dp,
         edgeTreatment = BlurredEdgeTreatment.Unbounded,
@@ -899,9 +835,6 @@ private fun MeloXUpstreamLyricLine(
             )
         }
 
-        // When the user enables translation, every source line that has a
-        // translation keeps it directly underneath. Keeping annotations resident
-        // also prevents focus changes from reflowing the scroll geometry.
         val romanSize = max(UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricRomanizationFontScale, 13f)
         if (!showRomanization && reserveRomanization) {
             val romanHeight = with(LocalDensity.current) { (romanSize * 1.2f).sp.toDp() }
@@ -912,19 +845,11 @@ private fun MeloXUpstreamLyricLine(
         if (showTranslation) {
             Text(
                 text = line.translation.orEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = UpstreamLyrics.ANNOTATION_SPACING_DP.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = UpstreamLyrics.ANNOTATION_SPACING_DP.dp),
                 color = Color.White.copy(alpha = MeloXSettingsRuntime.lyricTranslationOpacity),
                 textAlign = TextAlign.Start,
-                fontSize = max(
-                    UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricTranslationFontScale,
-                    13f,
-                ).sp,
-                lineHeight = max(
-                    UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricTranslationFontScale,
-                    13f,
-                ).sp * 1.2f,
+                fontSize = translationSize.sp,
+                lineHeight = translationSize.sp * 1.2f,
                 fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
             )
         } else if (reserveTranslation) {
@@ -988,9 +913,6 @@ private fun MeloXRubyLyricText(
                 if (!unit.romanizationText.isNullOrBlank()) {
                     val originalUnits = unit.originalText.codePointCount(0, unit.originalText.length).coerceAtLeast(1)
                     val rubyUnits = unit.romanizationText.codePointCount(0, unit.romanizationText.length).coerceAtLeast(1)
-                    // Match upstream ruby cells: a long phonetic annotation may
-                    // compress inside its base glyph cell instead of forcing an
-                    // otherwise short lyric unit onto its own wrapped row.
                     val rubyCompression = (originalUnits * 1.85f / rubyUnits).coerceIn(.68f, 1f)
                     Text(
                         text = unit.romanizationText,
@@ -1072,7 +994,11 @@ private fun MeloXLyricInterludeCountdown(
 }
 
 private fun shareLyric(context: Context, state: MeloXPlaybackUiState, line: LyricLine) {
-    val songUrl = state.mediaId?.let { "https://music.163.com/song?id=$it" }.orEmpty()
+    val songUrl = state.mediaId
+        ?.toLongOrNull()
+        ?.takeIf { it > 0L }
+        ?.let { "https://music.163.com/song?id=$it" }
+        .orEmpty()
     val text = buildString {
         append(line.text)
         if (state.title.isNotBlank()) {
@@ -1091,14 +1017,6 @@ private fun shareLyric(context: Context, state: MeloXPlaybackUiState, line: Lyri
     context.startActivity(intent)
 }
 
-/**
- * Compose counterpart of upstream LyricGlowTextRenderer.
- *
- * Layout is measured once at the promoted line geometry. Timing effects are
- * applied only during Canvas drawing using TextLayoutResult glyph paths. This is
- * the important invariant from the SwiftUI TextRenderer implementation: lift,
- * long-tone expansion and glow never reflow the line or move the focus anchor.
- */
 @Composable
 private fun MeloXGlyphLyricText(
     line: LyricLine,
@@ -1137,16 +1055,10 @@ private fun MeloXGlyphLyricText(
                 focusProgress = timingEffectsStrength,
             )
             if (!supportsTimedLyrics || effectsStrength <= 0.0001f || line.text.isEmpty()) {
-                // drawText keeps Compose/Android's normal shaping and font fallback,
-                // including Japanese/CJK/emoji fallback fonts. This is also the
-                // zero-strength state of MeloX's timed renderer, not a second
-                // competing text path with different opacity.
                 drawText(layout, color = Color.White)
                 return@Canvas
             }
 
-            // Reading the frame clock state inside the draw phase invalidates this
-            // Canvas only. It avoids recomposing or relaying out the lyric row.
             val visuals = sourceGlyphVisuals(
                 line = line,
                 playbackTimeMs = playbackTimeMs,
@@ -1155,9 +1067,6 @@ private fun MeloXGlyphLyricText(
                 fontScale = fontScale,
             )
 
-            // Render each timed character by clipping the *normally shaped full
-            // TextLayoutResult*. This preserves fallback glyphs. getPathForRange()
-            // is a selection/range enclosure path, not a glyph-outline API.
             for (offset in line.text.indices) {
                 val ch = line.text[offset]
                 if (ch == '\n' || ch == '\r' || Character.isLowSurrogate(ch)) continue
@@ -1180,7 +1089,6 @@ private fun MeloXGlyphLyricText(
                         right = bounds.right,
                         bottom = bounds.bottom,
                     ) {
-                        // Upstream draws a complete unplayed layer first.
                         drawText(
                             layout,
                             color = Color.White.copy(
@@ -1239,9 +1147,6 @@ private fun MeloXGlyphLyricText(
                             }
                         }
 
-                        // Keep the upstream long-tone envelope without relying on
-                        // vector glyph extraction. Two low-opacity passes provide
-                        // the bloom while the final pass is the actual played text.
                         val glow = fx.glow * effectsStrength * MeloXSettingsRuntime.lyricGlowStrength
                         if (glow > 0.001f) {
                             drawRevealed((glow * .10f).coerceIn(0f, .24f))
@@ -1262,9 +1167,7 @@ private fun sourceGlyphVisuals(
     reduceMotion: Boolean,
     fontScale: Float,
 ): List<MeloXGlyphVisual> {
-    val result = MutableList(line.text.length) {
-        MeloXGlyphVisual(0f, 0f, 1f, 0f)
-    }
+    val result = MutableList(line.text.length) { MeloXGlyphVisual(0f, 0f, 1f, 0f) }
     var searchFrom = 0
     for (syllable in line.syllables) {
         if (syllable.text.isEmpty()) continue
@@ -1333,13 +1236,6 @@ private fun sourceGlyphVisuals(
     return result
 }
 
-/**
- * MeloX feeds focus-colour presentation progress into LyricGlowTextRenderer so
- * its unplayed opacity, lift, scale and glow enter as one transition. Some YRC
- * files place the line timestamp slightly before the first syllable timestamp;
- * delaying presentation strength until that syllable begins prevents a fully
- * unplayed line from dimming during this metadata gap.
- */
 private fun sourceTimingEffectsStrength(
     line: LyricLine,
     playbackTimeMs: Long,
@@ -1378,20 +1274,13 @@ private fun sourceTimedAnnotatedString(line: LyricLine, playbackTimeMs: Long) =
                 }
                 val isLongTone = syllableDuration >= UpstreamLyrics.LONG_TONE_THRESHOLD_MS && !character.isWhitespace()
                 val revealProgress = sourceHighlightRevealProgress(
-                    playbackTimeMs.toFloat(),
-                    start,
-                    end,
-                    rawProgress,
-                    isLongTone,
+                    playbackTimeMs.toFloat(), start, end, rawProgress, isLongTone,
                 )
                 val liftEnd = end + UpstreamLyrics.LIFT_CONTINUATION_MS
                 val liftProgress = if (playbackTimeMs <= start) 0f else {
-                    sourceSmootherStep(
-                        ((playbackTimeMs - start) / max(liftEnd - start, 1f)).toFloat(),
-                    )
+                    sourceSmootherStep(((playbackTimeMs - start) / max(liftEnd - start, 1f)).toFloat())
                 }
                 val playedRise = min(max(UpstreamLyrics.FONT_SIZE_SP * 0.1f, 1.5f), 6f)
-
                 val longEnvelope = if (isLongTone) {
                     sourceLongToneEnvelope(
                         playbackTimeMs.toFloat(),
@@ -1609,12 +1498,6 @@ private object SourceSmoothStepEasing : Easing {
     }
 }
 
-/**
- * SwiftUI's .spring(duration:bounce:) has no byte-for-byte Compose equivalent.
- * This easing preserves MeloX's source duration and bounce parameter and uses a
- * normalized under-damped response so the visible overshoot/settling schedule
- * remains tied to the upstream values instead of arbitrary Compose stiffness.
- */
 private class SourceSpringEasing(private val bounce: Float) : Easing {
     override fun transform(fraction: Float): Float {
         val t = fraction.coerceIn(0f, 1f)

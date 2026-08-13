@@ -34,21 +34,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -56,12 +57,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lladlam.melox.core.account.NeteaseSessionStore
-import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.lyrics.withPseudoTiming
-import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXTextPVStyle
 import kotlinx.coroutines.isActive
@@ -75,21 +73,13 @@ private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeL
     var document by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
     var loading by remember(mediaId) { mutableStateOf(false) }
     var error by remember(mediaId) { mutableStateOf<String?>(null) }
-    val client = remember(context) {
-        NeteaseSearchClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
-    }
-    LaunchedEffect(mediaId) {
-        val songId = mediaId?.toLongOrNull() ?: return@LaunchedEffect
+    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (mediaId.isNullOrBlank()) return@LaunchedEffect
         loading = true
         error = null
-        val downloaded = MeloXDownloadStore.get(context).localLyrics(songId)
-        if (downloaded != null) {
-            document = downloaded
-        } else {
-            runCatching { client.lyrics(songId) }
-                .onSuccess { document = it }
-                .onFailure { error = it.message ?: "歌词加载失败" }
-        }
+        runCatching { MeloXProviderLyricsLoader.load(context, state) }
+            .onSuccess { document = it }
+            .onFailure { error = it.message ?: "歌词加载失败" }
         loading = false
     }
     val rendered = remember(document, MeloXSettingsRuntime.lyricPseudoTimingEnabled) {
@@ -102,11 +92,6 @@ private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeL
     return AlternativeLyricsState(lines, index, position, loading, error)
 }
 
-/**
- * Alternative lyric scenes used to inherit the 500 ms controller polling tick.
- * Extrapolate from the latest authoritative controller position on every frame so
- * short lines are not skipped and AnimatedContent is not restarted late.
- */
 @Composable
 private fun rememberSmoothPlaybackPosition(state: MeloXPlaybackUiState): Long {
     var position by remember(state.mediaId) { mutableLongStateOf(state.positionMs) }
@@ -134,6 +119,77 @@ private data class AlternativeLyricsState(
     val lines: List<LyricLine>,
     val index: Int,
     val positionMs: Long,
+    val loading: Boolean,
+    val error: String?,
+)
+
+@Composable
+private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState {
+    val context = LocalContext.current.applicationContext
+    val mediaId = state.mediaId
+    var document by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
+    var loading by remember(mediaId) { mutableStateOf(false) }
+    var error by remember(mediaId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (mediaId.isNullOrBlank()) return@LaunchedEffect
+        loading = true
+        error = null
+        runCatching { MeloXProviderLyricsLoader.load(context, state) }
+            .onSuccess { document = it }
+            .onFailure { error = it.message ?: "歌词加载失败" }
+        loading = false
+    }
+
+    val lines = document?.lines.orEmpty()
+    val advanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+    var index by remember(mediaId, document) {
+        mutableIntStateOf(
+            if (lines.isEmpty()) 0 else {
+                document?.highlightedIndex(state.positionMs + advanceMs)
+                    ?.coerceIn(0, lines.lastIndex) ?: 0
+            },
+        )
+    }
+
+    LaunchedEffect(mediaId, document, state.positionMs, state.isPlaying, state.durationMs, advanceMs) {
+        val activeDocument = document ?: return@LaunchedEffect
+        if (lines.isEmpty()) {
+            index = 0
+            return@LaunchedEffect
+        }
+
+        val anchorPosition = state.positionMs
+        if (!state.isPlaying) {
+            val nextIndex = activeDocument.highlightedIndex(anchorPosition + advanceMs)
+                ?.coerceIn(0, lines.lastIndex) ?: index
+            if (nextIndex != index) index = nextIndex
+            return@LaunchedEffect
+        }
+
+        var anchorFrameNanos = 0L
+        var lastCheckNanos = 0L
+        while (isActive) {
+            val frameNanos = withFrameNanos { it }
+            if (anchorFrameNanos == 0L) anchorFrameNanos = frameNanos
+            if (lastCheckNanos != 0L && frameNanos - lastCheckNanos < 33_000_000L) continue
+            lastCheckNanos = frameNanos
+            val elapsedMs = (frameNanos - anchorFrameNanos) / 1_000_000L
+            val position = (anchorPosition + elapsedMs).coerceAtMost(
+                state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
+            )
+            val nextIndex = activeDocument.highlightedIndex(position + advanceMs)
+                ?.coerceIn(0, lines.lastIndex) ?: index
+            if (nextIndex != index) index = nextIndex
+        }
+    }
+
+    return TextPVLyricsState(lines, index, loading, error)
+}
+
+private data class TextPVLyricsState(
+    val lines: List<LyricLine>,
+    val index: Int,
     val loading: Boolean,
     val error: String?,
 )
@@ -246,13 +302,13 @@ internal fun MeloXTextPVLyricsPanel(
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {},
 ) {
-    val state = rememberAlternativeLyrics(playback)
+    val state = rememberTextPVLyrics(playback)
     val transition = rememberInfiniteTransition(label = "text-pv-clock")
     val animationSpeed = MeloXSettingsRuntime.textPVAnimationSpeed
     val motionIntensity = if (MeloXSettingsRuntime.lyricReduceMotion) 0f else {
         MeloXSettingsRuntime.textPVMotionIntensity
     }
-    val phase by transition.animateFloat(
+    val phaseState = transition.animateFloat(
         initialValue = 0f,
         targetValue = if (animationSpeed <= 0f || motionIntensity <= 0f) 0f else 1f,
         animationSpec = infiniteRepeatable(
@@ -267,8 +323,12 @@ internal fun MeloXTextPVLyricsPanel(
         label = "text-pv-phase",
     )
     Box(modifier.fillMaxSize().clickable(onClick = onInteraction)) {
-        TextPVBackground(MeloXSettingsRuntime.textPVStyle, phase, motionIntensity)
-        AlternativeLoading(state)
+        TextPVBackground(
+            style = MeloXSettingsRuntime.textPVStyle,
+            phaseProvider = { phaseState.value },
+            motionIntensity = motionIntensity,
+        )
+        TextPVLoading(state)
         if (state.lines.isNotEmpty()) {
             AnimatedContent(
                 targetState = state.index,
@@ -283,7 +343,7 @@ internal fun MeloXTextPVLyricsPanel(
                     line = state.lines[index],
                     next = state.lines.getOrNull(index + 1),
                     style = MeloXSettingsRuntime.textPVStyle,
-                    phase = phase,
+                    phaseProvider = { phaseState.value },
                     motionIntensity = motionIntensity,
                     onSeek = { playback.seekTo(state.lines[index].timeMs) },
                 )
@@ -293,8 +353,16 @@ internal fun MeloXTextPVLyricsPanel(
 }
 
 @Composable
-private fun TextPVBackground(style: MeloXTextPVStyle, phase: Float, motionIntensity: Float) {
+private fun TextPVBackground(
+    style: MeloXTextPVStyle,
+    phaseProvider: () -> Float,
+    motionIntensity: Float,
+) {
     Canvas(Modifier.fillMaxSize()) {
+        if (!size.width.isFinite() || !size.height.isFinite() || size.width <= 0f || size.height <= 0f) {
+            return@Canvas
+        }
+        val phase = phaseProvider()
         when (style) {
             MeloXTextPVStyle.BlueBold, MeloXTextPVStyle.BluePlane, MeloXTextPVStyle.Dynamic -> {
                 drawRect(Color(0xFF123A91).copy(alpha = .56f))
@@ -317,16 +385,16 @@ private fun TextPVBackground(style: MeloXTextPVStyle, phase: Float, motionIntens
             MeloXTextPVStyle.CyberGrunge, MeloXTextPVStyle.RainCity, MeloXTextPVStyle.CyberpunkHUD,
             MeloXTextPVStyle.SpiderWeb, MeloXTextPVStyle.Cyber -> {
                 drawRect(Color(0xFF061018).copy(alpha = .52f))
-                val spacing = size.minDimension / 12f
-                var x = -spacing + phase * spacing * motionIntensity
-                while (x < size.width + spacing) {
+                val spacing = (size.minDimension / 12f).coerceAtLeast(8f)
+                val xCount = (size.width / spacing).toInt().coerceIn(0, 96) + 3
+                repeat(xCount) { index ->
+                    val x = -spacing + phase * spacing * motionIntensity + index * spacing
                     drawLine(Color(0xFF76E8FF).copy(alpha = .10f), Offset(x, 0f), Offset(x, size.height), 1f)
-                    x += spacing
                 }
-                var y = -spacing + phase * spacing * motionIntensity
-                while (y < size.height + spacing) {
+                val yCount = (size.height / spacing).toInt().coerceIn(0, 160) + 3
+                repeat(yCount) { index ->
+                    val y = -spacing + phase * spacing * motionIntensity + index * spacing
                     drawLine(Color(0xFFFF4B89).copy(alpha = .08f), Offset(0f, y), Offset(size.width, y), 1f)
-                    y += spacing
                 }
             }
             MeloXTextPVStyle.EmotionCinema, MeloXTextPVStyle.CalmVillain, MeloXTextPVStyle.Haruhikage,
@@ -361,11 +429,17 @@ private fun TextPVBackground(style: MeloXTextPVStyle, phase: Float, motionIntens
             }
             MeloXTextPVStyle.KawaiiPixel -> {
                 drawRect(Color(0xFFB8F1EA).copy(alpha = .52f))
-                val spacing = size.minDimension / 14f
-                var x = 0f
-                while (x < size.width) { drawLine(Color(0xFFFF79AE).copy(alpha = .08f), Offset(x, 0f), Offset(x, size.height), 2f); x += spacing }
-                var y = 0f
-                while (y < size.height) { drawLine(Color.White.copy(alpha = .09f), Offset(0f, y), Offset(size.width, y), 2f); y += spacing }
+                val spacing = (size.minDimension / 14f).coerceAtLeast(8f)
+                val xCount = (size.width / spacing).toInt().coerceIn(0, 96) + 1
+                repeat(xCount) { index ->
+                    val x = index * spacing
+                    drawLine(Color(0xFFFF79AE).copy(alpha = .08f), Offset(x, 0f), Offset(x, size.height), 2f)
+                }
+                val yCount = (size.height / spacing).toInt().coerceIn(0, 160) + 1
+                repeat(yCount) { index ->
+                    val y = index * spacing
+                    drawLine(Color.White.copy(alpha = .09f), Offset(0f, y), Offset(size.width, y), 2f)
+                }
             }
         }
     }
@@ -376,7 +450,7 @@ private fun TextPVComposition(
     line: LyricLine,
     next: LyricLine?,
     style: MeloXTextPVStyle,
-    phase: Float,
+    phaseProvider: () -> Float,
     motionIntensity: Float,
     onSeek: () -> Unit,
 ) {
@@ -386,7 +460,8 @@ private fun TextPVComposition(
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = alignment) {
         Column(Modifier.fillMaxWidth().clickable(onClick = onSeek)) {
             if (bottom) {
-                Text("LYRIC // ${(phase * 999).toInt().toString().padStart(3, '0')}", color = Color(0xFF76E8FF), fontSize = 11.sp, letterSpacing = 2.sp)
+                val marker = ((line.timeMs / 10L) % 1000L).toString().padStart(3, '0')
+                Text("LYRIC // $marker", color = Color(0xFF76E8FF), fontSize = 11.sp, letterSpacing = 2.sp)
             }
             Text(
                 line.text,
@@ -400,7 +475,12 @@ private fun TextPVComposition(
                 lineHeight = 52.sp,
                 fontWeight = FontWeight.Black,
                 textAlign = if (centered) TextAlign.Center else TextAlign.Start,
-                modifier = Modifier.scale(1f + sin(phase * 2f * PI.toFloat()) * .012f * motionIntensity),
+                modifier = Modifier.graphicsLayer {
+                    val phase = phaseProvider()
+                    val scale = 1f + sin(phase * 2f * PI.toFloat()) * .012f * motionIntensity
+                    scaleX = scale
+                    scaleY = scale
+                },
             )
             if (MeloXSettingsRuntime.showLyricTranslation && !line.translation.isNullOrBlank()) {
                 Text(line.translation.orEmpty(), color = Color.White.copy(alpha = .62f), fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
@@ -521,6 +601,15 @@ internal fun MeloXSkylineLyricsPanel(
 
 @Composable
 private fun AlternativeLoading(state: AlternativeLyricsState) {
+    when {
+        state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
+        state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(state.error, color = MaterialTheme.colorScheme.error) }
+        !state.loading && state.lines.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无歌词", color = Color.White.copy(alpha = .56f)) }
+    }
+}
+
+@Composable
+private fun TextPVLoading(state: TextPVLyricsState) {
     when {
         state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
         state.error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(state.error, color = MaterialTheme.colorScheme.error) }
