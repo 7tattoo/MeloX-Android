@@ -101,9 +101,20 @@ class QQMusicProvider(
     override suspend fun searchArtists(query: String, page: Int, pageSize: Int): MusicPage<MusicArtistSummary> =
         catalog.searchArtists(query, page, pageSize)
 
-    override suspend fun lyrics(track: MusicTrack): LyricsDocument =
-        runCatching { richLyrics.lyrics(track) }
-            .getOrElse { api.lyrics(track) }
+    override suspend fun lyrics(track: MusicTrack): LyricsDocument {
+        val rich = runCatching { richLyrics.lyrics(track) }.getOrNull()
+            ?: return api.lyrics(track)
+        val needsTranslation = rich.lines.none { !it.translation.isNullOrBlank() }
+        val needsRomanization = rich.lines.none { !it.romanization.isNullOrBlank() }
+        if (!needsTranslation && !needsRomanization) return rich
+
+        // QQ occasionally serves genuine QRC timing while the rich translation
+        // field is empty. The ordinary lyric endpoint can still contain the
+        // translation. Keep the QRC syllable timeline and only fill missing
+        // annotations from the line-timed response.
+        val fallback = runCatching { api.lyrics(track) }.getOrNull() ?: return rich
+        return mergeFallbackAnnotations(rich, fallback)
+    }
 
     override suspend fun resolvePlayback(
         track: MusicTrack,
@@ -148,4 +159,31 @@ class QQMusicProvider(
         page: Int,
         pageSize: Int,
     ): MusicArtistDetail = catalog.artistDetail(artist, page, pageSize)
+
+    private fun mergeFallbackAnnotations(
+        rich: LyricsDocument,
+        fallback: LyricsDocument,
+    ): LyricsDocument {
+        if (fallback.lines.isEmpty()) return rich
+        return rich.copy(
+            lines = rich.lines.map { line ->
+                val annotation = fallback.lines
+                    .minByOrNull { candidate -> kotlin.math.abs(candidate.timeMs - line.timeMs) }
+                    ?.takeIf { candidate -> kotlin.math.abs(candidate.timeMs - line.timeMs) <= AnnotationToleranceMs }
+                line.copy(
+                    translation = line.translation
+                        ?: annotation?.translation?.takeIf(String::isNotBlank),
+                    romanization = line.romanization
+                        ?: annotation?.romanization?.takeIf(String::isNotBlank),
+                    romanizationSyllables = line.romanizationSyllables.ifEmpty {
+                        annotation?.romanizationSyllables.orEmpty()
+                    },
+                )
+            },
+        )
+    }
+
+    private companion object {
+        const val AnnotationToleranceMs = 1_500L
+    }
 }
