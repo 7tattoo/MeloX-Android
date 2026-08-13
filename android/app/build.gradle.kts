@@ -70,6 +70,13 @@ dependencies {
     implementation("io.github.proify.lyricon:provider:0.1.70")
     // HyperOS Focus / Super Island notification payload builder.
     implementation("com.xzakota.hyper.notification:focus-api:1.4")
+    // Optional non-root HyperOS compatibility path. If Shizuku is unavailable or
+    // permission is denied, MeloX continues publishing Focus notifications directly.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // Framework Binder signatures used only at compile time. Android supplies the
+    // real hidden interfaces at runtime; this module is never packaged in the APK.
+    compileOnly(project(":hidden-api"))
 
     testImplementation("junit:junit:4.13.2")
 

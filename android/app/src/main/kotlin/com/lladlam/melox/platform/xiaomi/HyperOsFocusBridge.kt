@@ -44,6 +44,16 @@ object HyperOsFocusBridge {
             protocol(context) == Protocol.HyperOs3
 
     /**
+     * Ask Shizuku for access only when HyperOS 3 and a live Shizuku service are present.
+     * Missing Shizuku, a denied request, or an incompatible firewall backend simply leaves
+     * the already-working direct Focus path untouched.
+     */
+    fun prepareShizukuCompatibility(context: Context) {
+        if (!supportsSuperIsland(context)) return
+        ShizukuXmsfNetworkHelper.prepare(context.applicationContext)
+    }
+
+    /**
      * Publishes the dedicated Focus V3 notification as a side effect.
      *
      * The return type stays Bundle-compatible with the legacy call site, but this method returns
@@ -137,8 +147,11 @@ object HyperOsFocusBridge {
             .addExtras(focusExtras)
             .build()
 
-        appContext.getSystemService(NotificationManager::class.java)
-            .notify(SUPER_ISLAND_NOTIFICATION_ID, notification)
+        ShizukuXmsfNetworkHelper.dispatchFocusNotification(
+            context = appContext,
+            notificationId = SUPER_ISLAND_NOTIFICATION_ID,
+            notification = notification,
+        )
         return null
     }
 
@@ -148,9 +161,10 @@ object HyperOsFocusBridge {
 
     fun clearSuperIsland(context: Context) {
         lastPublishedKey = null
-        context.applicationContext
-            .getSystemService(NotificationManager::class.java)
-            .cancel(SUPER_ISLAND_NOTIFICATION_ID)
+        ShizukuXmsfNetworkHelper.clearFocusNotification(
+            context.applicationContext,
+            SUPER_ISLAND_NOTIFICATION_ID,
+        )
     }
 
     private fun ensureSuperIslandChannel(context: Context) {
