@@ -20,44 +20,58 @@ class QQMusicRichLyricsClient(
     private val sessionProvider: () -> QQMusicSession,
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
+    private data class SongIdentity(
+        val songMid: String,
+        val songId: Long?,
+        val songType: Int,
+    )
+
+    private enum class RequestProfile {
+        Android,
+        Web,
+        Desktop,
+    }
+
     suspend fun lyrics(track: MusicTrack): LyricsDocument = withContext(Dispatchers.IO) {
         require(track.id.source == MusicSource.QQMusic)
         val metadata = track.providerMetadata as? ProviderTrackMetadata.QQMusic
         val songMid = metadata?.songMid?.takeIf(String::isNotBlank) ?: track.id.value
-        val songId = metadata?.numericSongId?.takeIf { it > 0L }
         val session = sessionProvider()
+        val identity = resolveSongIdentity(
+            songMid = songMid,
+            knownSongId = metadata?.numericSongId?.takeIf { it > 0L },
+            session = session,
+        )
 
-        // Rich lyrics must not depend on QQ Android's device Session/QIMEI setup.
-        // Our login state is a web cookie, so use the web musicu profile here.
-        val playLyric = runCatching {
-            requestPlayLyricInfo(songMid, songId, session)
-        }.getOrNull()
-
-        if (playLyric != null &&
-            playLyric.lines.any { it.syllables.isNotEmpty() } &&
-            playLyric.lines.any { !it.translation.isNullOrBlank() }
-        ) {
-            return@withContext playLyric
+        var best: LyricsDocument? = null
+        for (profile in listOf(RequestProfile.Android, RequestProfile.Web, RequestProfile.Desktop)) {
+            val parsed = runCatching {
+                requestPlayLyricInfo(identity, session, profile)
+            }.getOrNull() ?: continue
+            if (parsed.lines.any { it.syllables.isNotEmpty() }) {
+                if (parsed.lines.any { !it.translation.isNullOrBlank() }) return@withContext parsed
+                if (best == null) best = parsed
+            }
         }
 
-        // QQ also exposes the PC lyric_download path used by Lyricify. It can
-        // return encrypted QRC while translation is already plain LRC, so the
-        // shared parser deliberately accepts either encrypted or decoded fields.
+        // The legacy PC download endpoint remains useful as a compatibility path.
+        // Some QQ deployments return encrypted QRC but plain LRC translation; the
+        // shared parser intentionally accepts either representation field-by-field.
         val downloaded = runCatching {
-            requestDownloadedLyrics(songMid, songId, session)
+            requestDownloadedLyrics(identity, session)
         }.getOrNull()
-
-        when {
-            downloaded != null && downloaded.lines.any { it.syllables.isNotEmpty() } -> downloaded
-            playLyric != null && playLyric.lines.any { it.syllables.isNotEmpty() } -> playLyric
-            else -> throw IOException("QQ音乐没有返回可用的逐字歌词")
+        if (downloaded != null && downloaded.lines.any { it.syllables.isNotEmpty() }) {
+            if (downloaded.lines.any { !it.translation.isNullOrBlank() }) return@withContext downloaded
+            if (best == null) best = downloaded
         }
+
+        best ?: throw IOException("QQ音乐没有返回可用的逐字歌词")
     }
 
     private fun requestPlayLyricInfo(
-        songMid: String,
-        songId: Long?,
+        identity: SongIdentity,
         session: QQMusicSession,
+        profile: RequestProfile,
     ): LyricsDocument {
         val lyricParam = JSONObject()
             .put("crypt", 1)
@@ -69,26 +83,12 @@ class QQMusicRichLyricsClient(
             .put("roma", 1)
             .put("roma_t", 0)
             .put("needSingingAnnotations", false)
-            .put("type", 1)
-        if (songId != null) lyricParam.put("songId", songId) else lyricParam.put("songMid", songMid)
-
-        val gtk = hash33(session.musicKey)
-        val comm = JSONObject()
-            .put("ct", 24)
-            .put("cv", 4_747_474)
-            .put("platform", "yqq.json")
-            .put("chid", "0")
-            .put("uin", session.uin.toLongOrNull() ?: 0L)
-            .put("g_tk", gtk)
-            .put("g_tk_new_20200303", gtk)
-            .put("format", "json")
-            .put("inCharset", "utf-8")
-            .put("outCharset", "utf-8")
-            .put("notice", 0)
-            .put("need_new_code", 1)
+            .put("type", identity.songType)
+        identity.songId?.let { lyricParam.put("songId", it) }
+            ?: lyricParam.put("songMid", identity.songMid)
 
         val payload = JSONObject()
-            .put("comm", comm)
+            .put("comm", commonParams(profile, session))
             .put(
                 "req_0",
                 JSONObject()
@@ -99,10 +99,12 @@ class QQMusicRichLyricsClient(
 
         val request = Request.Builder()
             .url("https://u.y.qq.com/cgi-bin/musicu.fcg")
-            .header("User-Agent", DesktopUserAgent)
-            .header("Referer", "https://y.qq.com/")
+            .header("User-Agent", userAgent(profile))
             .header("Accept", "application/json, text/plain, */*")
-            .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
+            .apply {
+                if (profile != RequestProfile.Android) header("Referer", "https://y.qq.com/")
+                if (session.cookie.isNotBlank()) header("Cookie", session.cookie)
+            }
             .post(payload.toString().toRequestBody(JsonMediaType))
             .build()
 
@@ -135,13 +137,57 @@ class QQMusicRichLyricsClient(
         }
     }
 
+    private fun commonParams(profile: RequestProfile, session: QQMusicSession): JSONObject {
+        return when (profile) {
+            RequestProfile.Android -> JSONObject()
+                .put("ct", AndroidClientType)
+                .put("cv", AndroidClientVersion)
+                .put("v", AndroidClientVersion)
+                .put("chid", "10003505")
+                .put("qq", session.uin)
+                .put("authst", session.musicKey)
+                .put("tmeAppID", "qqmusic")
+                .put("tmeLoginType", qqMusicLoginType(session.musicKey))
+                .put("format", "json")
+
+            RequestProfile.Web -> {
+                val gtk = hash33(session.musicKey)
+                JSONObject()
+                    .put("ct", 24)
+                    .put("cv", 4_747_474)
+                    .put("platform", "yqq.json")
+                    .put("chid", "0")
+                    .put("uin", session.uin.toLongOrNull() ?: 0L)
+                    .put("g_tk", gtk)
+                    .put("g_tk_new_20200303", gtk)
+                    .put("format", "json")
+                    .put("inCharset", "utf-8")
+                    .put("outCharset", "utf-8")
+                    .put("notice", 0)
+                    .put("need_new_code", 1)
+            }
+
+            RequestProfile.Desktop -> JSONObject()
+                .put("ct", 19)
+                .put("cv", 2201)
+                .put("chid", "0")
+                .put("uin", session.uin.toLongOrNull() ?: 0L)
+                .put("g_tk", hash33(session.musicKey))
+                .put("format", "json")
+        }
+    }
+
+    private fun userAgent(profile: RequestProfile): String = when (profile) {
+        RequestProfile.Android -> "QQMusic $AndroidClientVersion(android 15)"
+        RequestProfile.Web,
+        RequestProfile.Desktop -> DesktopUserAgent
+    }
+
     private fun requestDownloadedLyrics(
-        songMid: String,
-        knownSongId: Long?,
+        identity: SongIdentity,
         session: QQMusicSession,
     ): LyricsDocument {
-        val songId = knownSongId ?: resolveNumericSongId(songMid, session)
-            ?: throw IOException("QQ音乐无法解析歌曲数字 ID")
+        val songId = identity.songId ?: throw IOException("QQ音乐无法解析歌曲数字 ID")
         val body = FormBody.Builder()
             .add("version", "15")
             .add("miniversion", "82")
@@ -177,7 +223,11 @@ class QQMusicRichLyricsClient(
         }
     }
 
-    private fun resolveNumericSongId(songMid: String, session: QQMusicSession): Long? {
+    private fun resolveSongIdentity(
+        songMid: String,
+        knownSongId: Long?,
+        session: QQMusicSession,
+    ): SongIdentity {
         val url = okhttp3.HttpUrl.Builder()
             .scheme("https")
             .host("c.y.qq.com")
@@ -200,14 +250,28 @@ class QQMusicRichLyricsClient(
             .apply { if (session.cookie.isNotBlank()) header("Cookie", session.cookie) }
             .get()
             .build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            val root = runCatching { JSONObject(response.body.string()) }.getOrNull() ?: return null
-            val data = root.optJSONArray("data") ?: return null
-            val song = data.optJSONObject(0) ?: return null
-            return song.optLong("songid", 0L).takeIf { it > 0L }
-                ?: song.optLong("id", 0L).takeIf { it > 0L }
-        }
+        val song = runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val root = runCatching { JSONObject(response.body.string()) }.getOrNull() ?: return@use null
+                root.optJSONArray("data")?.optJSONObject(0)
+            }
+        }.getOrNull()
+        val songId = knownSongId
+            ?: song?.optLong("songid", 0L)?.takeIf { it > 0L }
+            ?: song?.optLong("id", 0L)?.takeIf { it > 0L }
+        val songType = sequenceOf("type", "songtype", "songType")
+            .mapNotNull { key ->
+                when (val raw = song?.opt(key)) {
+                    is Number -> raw.toInt()
+                    is String -> raw.toIntOrNull()
+                    else -> null
+                }
+            }
+            .firstOrNull()
+            ?.takeIf { it >= 0 }
+            ?: 1
+        return SongIdentity(songMid = songMid, songId = songId, songType = songType)
     }
 
     private fun extractXmlText(xml: String, tag: String): String {
@@ -232,6 +296,8 @@ class QQMusicRichLyricsClient(
     }
 
     private companion object {
+        const val AndroidClientType = 11
+        const val AndroidClientVersion = 14_090_008
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
         const val DesktopUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
