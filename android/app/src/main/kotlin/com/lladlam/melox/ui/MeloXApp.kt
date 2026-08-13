@@ -369,7 +369,8 @@ fun MeloXApp(
                                 tabBarMinimized = false
                                 libraryModalVisible = false
                                 heartModeLaunchAttempted = false
-                                selectedTab = AppTab.Home
+                                // Provider switching changes only the backing data source.
+                                // Stay on the current Settings route and preserve all MeloX settings UI/state.
                             },
                             neteaseSession = neteaseSession,
                             onNeteaseLogin = {
@@ -901,13 +902,8 @@ private fun RowScope.RootTabButton(
 
 private enum class RootGlyph { Home, Explore, Library, Settings, Search }
 
-private fun AppTab.titleFor(source: MusicSource): String = when (this) {
-    AppTab.Home -> "首页"
-    AppTab.Explore -> if (source == MusicSource.Kugou) "乐库" else "发现"
-    AppTab.Library -> if (source == MusicSource.Netease) "音乐库" else "我的"
-    AppTab.Settings -> "设置"
-    AppTab.Search -> "搜索"
-}
+@Suppress("UNUSED_PARAMETER")
+private fun AppTab.titleFor(source: MusicSource): String = title
 
 private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Home -> RootGlyph.Home
