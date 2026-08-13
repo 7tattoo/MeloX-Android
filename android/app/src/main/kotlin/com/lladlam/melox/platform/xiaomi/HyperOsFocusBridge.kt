@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import com.xzakota.hyper.notification.focus.FocusNotification
@@ -39,7 +40,8 @@ object HyperOsFocusBridge {
     }
 
     fun supportsSuperIsland(context: Context): Boolean =
-        protocol(context) == Protocol.HyperOs3
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 &&
+            protocol(context) == Protocol.HyperOs3
 
     /**
      * Publishes the dedicated Focus V3 notification as a side effect.
