@@ -65,5 +65,14 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Shows the currently playing lyric in a user-enabled overlay." />
         </service>
+
+        <meta-data android:name="lyricon_module" android:value="true" />
+        <meta-data android:name="lyricon_module_author" android:value="lladlam" />
+        <meta-data
+            android:name="lyricon_module_description"
+            android:value="MeloX player lyrics provider with word timing and translation support" />
+        <meta-data
+            android:name="lyricon_module_tags"
+            android:resource="@array/lyricon_module_tags" />
     </application>
 </manifest>
