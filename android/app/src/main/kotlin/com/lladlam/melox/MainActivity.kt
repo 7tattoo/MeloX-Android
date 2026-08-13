@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.core.network.parseNeteaseListenTogetherInvitation
+import com.lladlam.melox.platform.lyricon.MeloXLyriconBridge
 import com.lladlam.melox.ui.player.MeloXListenTogetherInviteActivity
 import com.lladlam.melox.ui.MeloXApp
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         consumePlaybackIntent(intent)
         MeloXSettingsPreferences.initialize(this)
+        MeloXLyriconBridge.start(applicationContext)
         // Restore/monitor an existing NetEase Together session as soon as the app
         // process starts, rather than waiting for the song actions sheet to open.
         MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
