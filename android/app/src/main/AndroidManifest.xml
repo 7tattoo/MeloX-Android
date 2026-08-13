@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- focus-api itself declares API 27. MeloX only invokes it behind the
+         Android 8.1 + HyperOS 3 runtime guard in HyperOsFocusBridge, so the
+         app can safely keep its existing API 26 fallback support. -->
+    <uses-sdk tools:overrideLibrary="com.xzakota.hyper.notification.focus" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -10,6 +17,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
 
     <application
         android:allowBackup="true"
@@ -47,6 +55,15 @@
                 android:resource="@xml/melox_file_paths" />
         </provider>
 
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <meta-data android:name="moe.shizuku.client.V3_SUPPORT" android:value="true" />
+
         <service
             android:name=".playback.MeloXPlaybackService"
             android:exported="true"
@@ -65,5 +82,14 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Shows the currently playing lyric in a user-enabled overlay." />
         </service>
+
+        <meta-data android:name="lyricon_module" android:value="true" />
+        <meta-data android:name="lyricon_module_author" android:value="lladlam" />
+        <meta-data
+            android:name="lyricon_module_description"
+            android:value="MeloX player lyrics provider with word timing and translation support" />
+        <meta-data
+            android:name="lyricon_module_tags"
+            android:resource="@array/lyricon_module_tags" />
     </application>
 </manifest>

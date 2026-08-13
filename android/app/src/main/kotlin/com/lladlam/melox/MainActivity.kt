@@ -13,6 +13,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.core.network.parseNeteaseListenTogetherInvitation
+import com.lladlam.melox.platform.lyricon.MeloXLyriconBridge
+import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.player.MeloXListenTogetherInviteActivity
 import com.lladlam.melox.ui.MeloXApp
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
@@ -28,6 +30,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         consumePlaybackIntent(intent)
         MeloXSettingsPreferences.initialize(this)
+        MeloXLyriconBridge.start(applicationContext)
         // Restore/monitor an existing NetEase Together session as soon as the app
         // process starts, rather than waiting for the song actions sheet to open.
         MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
@@ -51,6 +54,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Shizuku is optional. On HyperOS 3, request permission only when its
+        // service is actually running; permission itself acts as the user's opt-in
+        // to the short XMSF compatibility pulse used by some restricted ROM builds.
+        HyperOsFocusBridge.prepareShizukuCompatibility(this)
+
         if (!com.lladlam.melox.ui.settings.MeloXSettingsRuntime.clipboardLinksEnabled) return
         val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = manager.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()

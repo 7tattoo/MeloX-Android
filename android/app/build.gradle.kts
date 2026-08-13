@@ -11,8 +11,8 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0-Dev"
+        versionCode = 4
+        versionName = "0.3.1-Dev"
     }
 
     buildFeatures {
@@ -65,6 +65,18 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.google.zxing:core:3.5.4")
+
+    // External lyric integrations.
+    implementation("io.github.proify.lyricon:provider:0.1.70")
+    // HyperOS Focus / Super Island notification payload builder.
+    implementation("com.xzakota.hyper.notification:focus-api:1.4")
+    // Optional non-root HyperOS compatibility path. If Shizuku is unavailable or
+    // permission is denied, MeloX continues publishing Focus notifications directly.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // Framework Binder signatures used only at compile time. Android supplies the
+    // real hidden interfaces at runtime; this module is never packaged in the APK.
+    compileOnly(project(":hidden-api"))
 
     testImplementation("junit:junit:4.13.2")
 
