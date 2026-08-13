@@ -5,6 +5,7 @@ import com.lladlam.melox.core.music.model.MusicTrack
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -34,34 +35,86 @@ class QQMusicFavoriteClient(
         val session = sessionProvider()
         if (!session.isLoggedIn) throw IOException("请先登录 QQ音乐账号")
 
-        val song = resolveWriteRef(track.id.value, session)
-        val param = buildWriteParam(song)
-        val data = postMusicu(
-            session = session,
-            module = "music.musicasset.PlaylistDetailWrite",
-            method = qqFavoriteWriteMethod(favorite),
-            param = param,
-        )
-        val retCode = findInt(data, "retCode", "retcode", "code") ?: 0
-        if (retCode != 0) {
-            throw IOException("QQ音乐${if (favorite) "收藏" else "取消收藏"}失败：$retCode")
+        val songMid = track.id.value
+        val song = resolveWriteRef(songMid, session)
+        val primary = runCatching {
+            val data = postMusicu(
+                session = session,
+                module = "music.musicasset.PlaylistDetailWrite",
+                method = qqFavoriteWriteMethod(favorite),
+                param = buildWriteParam(song),
+            )
+            val retCode = findInt(data, "retCode", "retcode", "code") ?: 0
+            if (retCode != 0) throw IOException("QQ音乐账号写入返回 $retCode")
         }
+        if (primary.isSuccess) return@withContext
+
+        // Some QQ accounts reject PlaylistDetailWrite unless the Android client
+        // has a complete device-session/QIMEI context. The authenticated Web
+        // playlist endpoints perform the same user-owned playlist operation and
+        // only consume the QQ cookies already stored locally by MeloX.
+        runCatching { legacySetFavorite(session, songMid, song, favorite) }
+            .getOrElse { fallbackError ->
+                val primaryMessage = primary.exceptionOrNull()?.message.orEmpty()
+                throw IOException(
+                    "QQ音乐${if (favorite) "收藏" else "取消收藏"}失败" +
+                        primaryMessage.takeIf(String::isNotBlank)?.let { "：$it" }.orEmpty(),
+                    fallbackError,
+                )
+            }
     }
 
     private fun resolveWriteRef(songMid: String, session: QQMusicSession): SongWriteRef {
-        val data = postMusicu(
-            session = session,
-            module = "music.trackInfo.UniformRuleCtrl",
-            method = "CgiGetTrackInfo",
-            param = JSONObject()
-                .put("ctx", 0)
-                .put("client", 1)
-                .put("types", JSONArray().put(0))
-                .put("modify_stamp", JSONArray().put(0))
-                .put("mids", JSONArray().put(songMid)),
-        )
-        return parseWriteRef(data, songMid)
+        val appResult = runCatching {
+            val data = postMusicu(
+                session = session,
+                module = "music.trackInfo.UniformRuleCtrl",
+                method = "CgiGetTrackInfo",
+                param = JSONObject()
+                    .put("ctx", 0)
+                    .put("client", 1)
+                    .put("types", JSONArray().put(0))
+                    .put("modify_stamp", JSONArray().put(0))
+                    .put("mids", JSONArray().put(songMid)),
+            )
+            parseWriteRef(data, songMid)
+        }.getOrNull()
+        if (appResult != null) return appResult
+
+        return resolveWebSongRef(songMid, session)
             ?: throw IOException("QQ音乐无法解析歌曲收藏标识")
+    }
+
+    private fun resolveWebSongRef(songMid: String, session: QQMusicSession): SongWriteRef? {
+        val url = "https://c.y.qq.com/v8/fcg-bin/fcg_play_single_song.fcg".toHttpUrl()
+            .newBuilder()
+            .addQueryParameter("songmid", songMid)
+            .addQueryParameter("tpl", "yqq_song_detail")
+            .addQueryParameter("format", "json")
+            .addQueryParameter("g_tk", hash33(session.musicKey).toString())
+            .addQueryParameter("loginUin", session.uin)
+            .addQueryParameter("hostUin", "0")
+            .addQueryParameter("outCharset", "utf8")
+            .addQueryParameter("notice", "0")
+            .addQueryParameter("platform", "yqq")
+            .addQueryParameter("needNewCode", "0")
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", DesktopUserAgent)
+            .header("Referer", "https://y.qq.com/")
+            .header("Cookie", session.cookie)
+            .get()
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+            val root = runCatching { JSONObject(response.body.string()) }.getOrNull() ?: return null
+            val item = root.optJSONArray("data")?.optJSONObject(0) ?: return null
+            val id = firstLong(item, "id", "songid", "songId")
+            if (id <= 0L) return null
+            val type = firstInt(item, "type", "songtype", "songType") ?: 0
+            return SongWriteRef(id, type)
+        }
     }
 
     internal fun buildWriteParam(song: SongWriteRef): JSONObject = JSONObject()
@@ -97,9 +150,6 @@ class QQMusicFavoriteClient(
         method: String,
         param: JSONObject,
     ): JSONObject {
-        // Current QQMusicApi executes both CgiGetTrackInfo and PlaylistDetailWrite
-        // in the Android account context. Keep the same credential semantics here:
-        // qq/authst/tmeLoginType rather than the Web uin/g_tk context.
         val payload = JSONObject()
             .put(
                 "comm",
@@ -146,6 +196,81 @@ class QQMusicFavoriteClient(
             }
             return req.optJSONObject("data") ?: JSONObject()
         }
+    }
+
+    private fun legacySetFavorite(
+        session: QQMusicSession,
+        songMid: String,
+        song: SongWriteRef,
+        favorite: Boolean,
+    ) {
+        val gtk = hash33(session.musicKey).toString()
+        val builder = if (favorite) {
+            "https://c.y.qq.com/splcloud/fcgi-bin/fcg_music_add2songdir.fcg".toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("g_tk", gtk)
+                .addQueryParameter("midlist", songMid)
+                .addQueryParameter("typelist", "13")
+                .addQueryParameter("dirid", QQ_LIKED_DIRECTORY_ID.toString())
+                .addQueryParameter("addtype", "")
+                .addQueryParameter("sender", "4")
+                .addQueryParameter("formsender", "4")
+                .addQueryParameter("r2", "0")
+                .addQueryParameter("r3", "1")
+                .addQueryParameter("utf8", "1")
+        } else {
+            "https://c.y.qq.com/qzone/fcg-bin/fcg_music_delbatchsong.fcg".toHttpUrl()
+                .newBuilder()
+                .addQueryParameter("g_tk", gtk)
+                .addQueryParameter("loginUin", session.uin)
+                .addQueryParameter("hostUin", "0")
+                .addQueryParameter("format", "json")
+                .addQueryParameter("inCharset", "utf8")
+                .addQueryParameter("outCharset", "utf-8")
+                .addQueryParameter("notice", "0")
+                .addQueryParameter("platform", "yqq.post")
+                .addQueryParameter("needNewCode", "0")
+                .addQueryParameter("uin", session.uin)
+                .addQueryParameter("dirid", QQ_LIKED_DIRECTORY_ID.toString())
+                .addQueryParameter("ids", song.songId.toString())
+                .addQueryParameter("source", "103")
+                .addQueryParameter("types", "3")
+                .addQueryParameter("formsender", "4")
+                .addQueryParameter("flag", "2")
+                .addQueryParameter("utf8", "1")
+                .addQueryParameter("from", "3")
+        }
+        val request = Request.Builder()
+            .url(builder.build())
+            .header("User-Agent", DesktopUserAgent)
+            .header("Referer", "https://y.qq.com/n/yqq/playlist")
+            .header("Cookie", session.cookie)
+            .get()
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("QQ音乐 Web 收藏请求失败：HTTP ${response.code}")
+            val body = response.body.string().trim()
+            if (body.isBlank()) throw IOException("QQ音乐 Web 收藏返回空响应")
+            val json = runCatching { JSONObject(stripJsonp(body)) }
+                .getOrElse { throw IOException("QQ音乐 Web 收藏响应无法解析", it) }
+            val code = firstInt(json, "code") ?: -1
+            if (code != 0) throw IOException(json.optString("msg").ifBlank { "QQ音乐 Web 收藏错误码 $code" })
+        }
+    }
+
+    private fun stripJsonp(value: String): String {
+        val trimmed = value.trim()
+        if (trimmed.startsWith('{')) return trimmed
+        val first = trimmed.indexOf('{')
+        val last = trimmed.lastIndexOf('}')
+        if (first >= 0 && last > first) return trimmed.substring(first, last + 1)
+        throw IOException("QQ音乐返回无法解析的数据")
+    }
+
+    private fun hash33(value: String): Int {
+        var hash = 5381L
+        value.forEach { char -> hash += (hash shl 5) + char.code }
+        return (hash and 0x7fffffffL).toInt()
     }
 
     private fun findArray(value: Any?, vararg keys: String): JSONArray? = when (value) {
@@ -198,5 +323,8 @@ class QQMusicFavoriteClient(
         const val AndroidClientType = 11
         const val AndroidClientVersion = 14_090_008
         val JsonMediaType = "application/json; charset=utf-8".toMediaType()
+        const val DesktopUserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }
