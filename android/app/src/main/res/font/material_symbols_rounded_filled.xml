@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/material_symbols_rounded"
+        android:fontStyle="normal"
+        android:fontWeight="500"
+        android:fontVariationSettings="'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24" />
+</font-family>

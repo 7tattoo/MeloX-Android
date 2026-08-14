@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +20,8 @@ import com.lladlam.melox.ui.player.MeloXListenTogetherInviteActivity
 import com.lladlam.melox.ui.MeloXApp
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.ui.theme.MeloXTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var openNowPlayingRequest by mutableIntStateOf(0)
@@ -30,10 +33,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         consumePlaybackIntent(intent)
         MeloXSettingsPreferences.initialize(this)
-        MeloXLyriconBridge.start(applicationContext)
-        // Restore/monitor an existing NetEase Together session as soon as the app
-        // process starts, rather than waiting for the song actions sheet to open.
-        MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
 
         setContent {
             MeloXTheme {
@@ -43,6 +42,16 @@ class MainActivity : ComponentActivity() {
                     onClipboardLinkConsumed = { clipboardLinkRequest = null },
                 )
             }
+        }
+
+        // These integrations build MediaControllers and register cross-process
+        // providers. Starting them before setContent delayed the first frame and
+        // left a white window on cold launch. Give the app chrome one frame to
+        // render, then restore the same process-lifetime behavior.
+        lifecycleScope.launch {
+            delay(250L)
+            MeloXLyriconBridge.start(applicationContext)
+            MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
         }
     }
 
@@ -57,7 +66,10 @@ class MainActivity : ComponentActivity() {
         // Shizuku is optional. On HyperOS 3, request permission only when its
         // service is actually running; permission itself acts as the user's opt-in
         // to the short XMSF compatibility pulse used by some restricted ROM builds.
-        HyperOsFocusBridge.prepareShizukuCompatibility(this)
+        lifecycleScope.launch {
+            delay(250L)
+            HyperOsFocusBridge.prepareShizukuCompatibility(this@MainActivity)
+        }
 
         if (!com.lladlam.melox.ui.settings.MeloXSettingsRuntime.clipboardLinksEnabled) return
         val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

@@ -51,6 +51,8 @@ import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.PlaybackTrackIdentity
 import com.lladlam.melox.playback.ProviderPlaybackQualityRuntime
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassDialog
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -115,43 +117,11 @@ internal fun MeloXQualitySelectionOverlay(
 
     BackHandler(enabled = visible, onBack = onDismiss)
 
-    AnimatedVisibility(
+    MeloXGlassDialog(
         visible = visible,
-        enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.96f),
-        exit = fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = 0.97f),
+        onDismiss = onDismiss,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.22f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 34.dp)
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-                    .meloXLiquidButton(
-                        shape = RoundedCornerShape(30.dp),
-                        tint = Color.White.copy(alpha = 0.08f),
-                        surfaceColor = Color.Black.copy(alpha = 0.12f),
-                        blurRadius = 16.dp,
-                        lensRadius = 20.dp,
-                        refractionHeight = 24.dp,
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    )
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -236,7 +206,7 @@ internal fun MeloXQualitySelectionOverlay(
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         )
                         if (isSelected) {
-                            Text("✓", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            MeloXActionIcon("✓", Modifier.size(18.dp), Color.White)
                         } else if (!supported) {
                             Text(
                                 when {
@@ -247,9 +217,8 @@ internal fun MeloXQualitySelectionOverlay(
                                 color = Color.White.copy(alpha = 0.30f),
                                 fontSize = 12.sp,
                             )
-                        }
-                    }
-                }
+    }
+}
                 Spacer(Modifier.height(2.dp))
             }
         }

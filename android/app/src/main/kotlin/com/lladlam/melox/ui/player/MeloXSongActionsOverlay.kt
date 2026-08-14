@@ -70,6 +70,8 @@ import com.lladlam.melox.core.network.NeteaseSocialExtrasClient
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassSheet
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -202,50 +204,19 @@ fun MeloXSongActionsOverlay(
         }
     }
 
-    AnimatedVisibility(
+    MeloXGlassSheet(
         visible = visible,
-        enter = fadeIn(spring(stiffness = 520f)),
-        exit = fadeOut(spring(stiffness = 620f)),
+        onDismiss = onDismiss,
     ) {
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = .22f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                )
-                .padding(horizontal = 18.dp)
-                .navigationBarsPadding(),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 18.dp)
-                    .meloXLiquidButton(
-                        shape = RoundedCornerShape(30.dp),
-                        tint = Color.White.copy(alpha = .08f),
-                        surfaceColor = Color.Black.copy(alpha = .12f),
-                        blurRadius = 14.dp,
-                        lensRadius = 20.dp,
-                        refractionHeight = 22.dp,
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    ),
-            ) {
-                AnimatedContent(
+        AnimatedContent(
                     targetState = page,
                     transitionSpec = {
                         (fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = .96f)) togetherWith
                             (fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = .96f))
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = "song-action-page",
-                ) { target ->
+            modifier = Modifier.fillMaxWidth(),
+            label = "song-action-page",
+        ) { target ->
                     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp)) {
                         ActionHeader(
                             song,
@@ -589,11 +560,10 @@ fun MeloXSongActionsOverlay(
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
                             }
                         }
-                    }
-                }
-            }
         }
     }
+}
+
 }
 
 @Composable
@@ -618,7 +588,11 @@ private fun ActionItem(title: String, symbol: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-            Text(symbol, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            MeloXActionIcon(
+                token = symbol,
+                modifier = Modifier.size(20.dp),
+                color = Color.White.copy(alpha = 0.86f),
+            )
         }
         Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))

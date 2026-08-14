@@ -18,8 +18,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -56,20 +56,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -83,13 +82,17 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.shapes.Capsule
 import com.lladlam.melox.ui.library.LibraryScreen
 import com.lladlam.melox.ui.discovery.MeloXExploreScreen
 import com.lladlam.melox.ui.discovery.MeloXHomeScreen
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSymbolVariant
+import com.lladlam.melox.ui.glass.MeloXSystemColors
+import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
@@ -114,6 +117,7 @@ import com.lladlam.melox.core.update.MeloXUpdateClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackRuntime
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -126,7 +130,6 @@ enum class AppTab(val title: String) {
     Search("搜索"),
 }
 
-private val MeloXAccent = Color(0xFFFF3147)
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -190,23 +193,13 @@ fun MeloXApp(
         }
     }
     val neteaseSession = rememberNeteaseSessionStore()
-    val darkGlass = isSystemInDarkTheme()
-    val screenControlBackdrop = rememberCanvasBackdrop {
-        drawRect(
-            brush = Brush.linearGradient(
-                colors = if (darkGlass) {
-                    listOf(Color(0xFF31323A), Color(0xFF111219))
-                } else {
-                    listOf(Color(0xFFFDFDFE), Color(0xFFD9DCE2))
-                },
-                start = Offset.Zero,
-                end = Offset(size.width, size.height),
-            ),
-        )
-    }
     val bottomChromeBackdrop = rememberLayerBackdrop()
 
     LaunchedEffect(Unit) {
+        // Provider registry creation touches every configured music backend.
+        // Defer it until after the first app frame instead of extending the
+        // Android splash/blank-window interval on a cold process start.
+        delay(250L)
         ProviderPlaybackRuntime.initialize(context)
         if (MeloXSettingsPreferences.boolean(context, "update_auto_check", true)) {
             val now = System.currentTimeMillis()
@@ -324,7 +317,12 @@ fun MeloXApp(
         }
     }
 
-    CompositionLocalProvider(LocalMeloXBackdrop provides screenControlBackdrop) {
+    // Never let a subtree record itself while its descendants sample that same
+    // backdrop. HWUI recursively prepares such RenderNodes and can terminate
+    // the app on device with a native RenderThread stack overflow. Dedicated
+    // scenes (player and bottom chrome) provide sibling backdrops themselves;
+    // content-layer controls use their standard material fallback here.
+    CompositionLocalProvider(LocalMeloXBackdrop provides null) {
       Box(modifier = Modifier.fillMaxSize()) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
@@ -413,22 +411,6 @@ fun MeloXApp(
                 )
             }
 
-            if (fullPlayerVisible) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(10f)
-                        .pointerInput(fullPlayerVisible) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    event.changes.forEach { change -> change.consume() }
-                                }
-                            }
-                        },
-                )
-            }
-
             playerTransition.AnimatedVisibility(
                 visible = { value -> value },
                 enter = EnterTransition.None,
@@ -437,31 +419,42 @@ fun MeloXApp(
                     .fillMaxSize()
                     .zIndex(20f),
             ) {
-                MeloXIOSNowPlayingSharedHost(
-                    state = playbackState,
-                    onDismiss = closePlayer,
-                    onNavigateSearch = { query, kind ->
-                        if (selectedSource == MusicSource.Netease) {
-                            MeloXSearchLaunchBus.post(query, kind)
-                        }
-                        selectedTab = AppTab.Search
-                        closePlayer()
-                    },
-                    onSeekCollapse = { fraction ->
-                        playerTransitionState.seekTo(
-                            fraction = fraction.coerceIn(0f, 0.999f),
-                            targetState = false,
-                        )
-                    },
-                    onSettleCollapse = { collapse ->
-                        playerTransitionState.animateTo(
-                            targetState = !collapse,
-                            animationSpec = playerGestureSettleSpec(),
-                        )
-                    },
-                    sharedTransitionScope = sharedScope,
-                    animatedVisibilityScope = this,
-                )
+                val fullPlayerAnimatedVisibilityScope = this
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
+                ) {
+                    MeloXIOSNowPlayingSharedHost(
+                        state = playbackState,
+                        onDismiss = closePlayer,
+                        onNavigateSearch = { query, kind ->
+                            if (selectedSource == MusicSource.Netease) {
+                                MeloXSearchLaunchBus.post(query, kind)
+                            }
+                            selectedTab = AppTab.Search
+                            closePlayer()
+                        },
+                        onSeekCollapse = { fraction ->
+                            playerTransitionState.seekTo(
+                                fraction = fraction.coerceIn(0f, 0.999f),
+                                targetState = false,
+                            )
+                        },
+                        onSettleCollapse = { collapse ->
+                            playerTransitionState.animateTo(
+                                targetState = !collapse,
+                                animationSpec = playerGestureSettleSpec(),
+                            )
+                        },
+                        sharedTransitionScope = sharedScope,
+                        animatedVisibilityScope = fullPlayerAnimatedVisibilityScope,
+                    )
+                }
             }
 
         }
@@ -610,9 +603,9 @@ private fun MeloXBottomChrome(
     val shrinkStage = smoothStep(progress, 0.25f, 0.82f)
     val dropStage = smoothStep(progress, 0.78f, 1.00f)
 
-    val navHeight = lerpDp(56.dp, 52.dp, sizeStage)
+    val navHeight = lerpDp(58.dp, 52.dp, sizeStage)
     val searchSize = lerpDp(56.dp, 52.dp, sizeStage)
-    val expandedChromeHeight = if (hasMedia) 119.dp else 62.dp
+    val expandedChromeHeight = if (hasMedia) 121.dp else 64.dp
     val chromeHeight = lerpDp(expandedChromeHeight, 58.dp, dropStage)
     val labelAlpha = 1f - labelStage
     val expandedLayerAlpha = 1f - smoothStep(progress, 0.43f, 0.72f)
@@ -667,16 +660,16 @@ private fun MeloXBottomChrome(
                 }
             }
 
-            val dark = isSystemInDarkTheme()
+            val dark = isMeloXDarkTheme()
             val selectionTint = if (dark) {
-                MeloXAccent.copy(alpha = 0.28f)
+                MeloXSystemColors.Blue.copy(alpha = 0.28f)
             } else {
-                MeloXAccent.copy(alpha = 0.16f)
+                MeloXSystemColors.Blue.copy(alpha = 0.16f)
             }
             val selectionBorder = if (dark) {
                 Color.White.copy(alpha = 0.42f)
             } else {
-                MeloXAccent.copy(alpha = 0.34f)
+                MeloXSystemColors.Blue.copy(alpha = 0.34f)
             }
 
             BoxWithConstraints(
@@ -809,8 +802,9 @@ private fun MeloXBottomChrome(
                                 color = if (selectedTab == AppTab.Search) {
                                     MaterialTheme.colorScheme.onSurface
                                 } else {
-                                    MeloXAccent
+                                    MeloXSystemColors.Blue
                                 },
+                                selected = true,
                             )
                         }
                     }
@@ -830,17 +824,21 @@ private fun MeloXBottomChrome(
                         refractionHeight = 18.dp,
                         surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.16f),
                     )
-                    .clickable { onSelect(AppTab.Search) },
+                    .clickable(role = Role.Button) { onSelect(AppTab.Search) }
+                    .semantics {
+                        contentDescription = AppTab.Search.title
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 RootGlyphIcon(
                     glyph = RootGlyph.Search,
                     modifier = Modifier.size(lerpDp(28.dp, 27.dp, sizeStage)),
                     color = if (selectedTab == AppTab.Search) {
-                        MeloXAccent
+                        MeloXSystemColors.Blue
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+                    selected = selectedTab == AppTab.Search,
                 )
             }
         }
@@ -849,7 +847,7 @@ private fun MeloXBottomChrome(
 
 @Composable
 private fun bottomLiquidGlassTint(): Color =
-    if (isSystemInDarkTheme()) {
+    if (isMeloXDarkTheme()) {
         Color.Black.copy(alpha = 0.10f)
     } else {
         Color.White.copy(alpha = 0.12f)
@@ -857,7 +855,7 @@ private fun bottomLiquidGlassTint(): Color =
 
 @Composable
 private fun bottomGlassFallbackColor(): Color =
-    if (isSystemInDarkTheme()) {
+    if (isMeloXDarkTheme()) {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.58f)
     } else {
         Color.White.copy(alpha = 0.56f)
@@ -873,7 +871,7 @@ private fun RowScope.RootTabButton(
 ) {
     val foreground by animateColorAsState(
         targetValue = if (selected) {
-            MeloXAccent
+            MeloXSystemColors.Blue
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
         },
@@ -884,16 +882,26 @@ private fun RowScope.RootTabButton(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+            .semantics {
+                contentDescription = title
+                role = Role.Tab
+                this.selected = selected
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        RootGlyphIcon(glyph = glyph, modifier = Modifier.size(24.dp), color = foreground)
+        RootGlyphIcon(
+            glyph = glyph,
+            modifier = Modifier.size(24.dp),
+            color = foreground,
+            selected = selected,
+        )
         Text(
             text = title,
             modifier = Modifier.graphicsLayer { alpha = labelAlpha },
-            fontSize = 9.sp,
-            lineHeight = 11.sp,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = foreground,
         )
@@ -918,92 +926,20 @@ private fun RootGlyphIcon(
     glyph: RootGlyph,
     modifier: Modifier,
     color: Color,
+    selected: Boolean = false,
 ) {
-    Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = size.minDimension * 0.115f
-
-        when (glyph) {
-            RootGlyph.Home -> {
-                val roof = Path().apply {
-                    moveTo(w * 0.10f, h * 0.48f)
-                    lineTo(w * 0.50f, h * 0.14f)
-                    lineTo(w * 0.90f, h * 0.48f)
-                }
-                drawPath(roof, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
-                drawRoundRect(
-                    color = color,
-                    topLeft = Offset(w * 0.24f, h * 0.43f),
-                    size = Size(w * 0.52f, h * 0.43f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.05f),
-                    style = Stroke(width = stroke),
-                )
-            }
-            RootGlyph.Explore -> {
-                drawCircle(color, radius = w * 0.35f, style = Stroke(width = stroke))
-                val needle = Path().apply {
-                    moveTo(w * 0.38f, h * 0.62f)
-                    lineTo(w * 0.57f, h * 0.36f)
-                    lineTo(w * 0.63f, h * 0.55f)
-                    close()
-                }
-                drawPath(needle, color)
-            }
-            RootGlyph.Library -> {
-                val p = Path().apply {
-                    moveTo(w * 0.26f, h * 0.22f)
-                    lineTo(w * 0.26f, h * 0.72f)
-                    cubicTo(w * 0.26f, h * 0.83f, w * 0.10f, h * 0.84f, w * 0.10f, h * 0.70f)
-                    cubicTo(w * 0.10f, h * 0.57f, w * 0.29f, h * 0.55f, w * 0.37f, h * 0.62f)
-                    lineTo(w * 0.37f, h * 0.28f)
-                    lineTo(w * 0.83f, h * 0.18f)
-                    lineTo(w * 0.83f, h * 0.61f)
-                    cubicTo(w * 0.83f, h * 0.74f, w * 0.66f, h * 0.77f, w * 0.61f, h * 0.66f)
-                }
-                drawPath(p, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
-            }
-            RootGlyph.Settings -> {
-                drawCircle(color, radius = w * 0.33f, style = Stroke(width = stroke))
-                drawCircle(color, radius = w * 0.095f)
-                repeat(8) { index ->
-                    val angle = Math.toRadians((index * 45.0) - 90.0)
-                    val cx = w / 2f
-                    val cy = h / 2f
-                    val r1 = w * 0.37f
-                    val r2 = w * 0.47f
-                    drawLine(
-                        color = color,
-                        start = Offset(
-                            cx + kotlin.math.cos(angle).toFloat() * r1,
-                            cy + kotlin.math.sin(angle).toFloat() * r1,
-                        ),
-                        end = Offset(
-                            cx + kotlin.math.cos(angle).toFloat() * r2,
-                            cy + kotlin.math.sin(angle).toFloat() * r2,
-                        ),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
-            RootGlyph.Search -> {
-                drawCircle(
-                    color = color,
-                    radius = w * 0.29f,
-                    center = Offset(w * 0.43f, h * 0.40f),
-                    style = Stroke(width = stroke),
-                )
-                drawLine(
-                    color = color,
-                    start = Offset(w * 0.64f, h * 0.62f),
-                    end = Offset(w * 0.86f, h * 0.84f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-            }
-        }
-    }
+    MeloXSymbolIcon(
+        symbol = when (glyph) {
+            RootGlyph.Home -> MeloXSymbol.Home
+            RootGlyph.Explore -> MeloXSymbol.Explore
+            RootGlyph.Library -> MeloXSymbol.Library
+            RootGlyph.Settings -> MeloXSymbol.Settings
+            RootGlyph.Search -> MeloXSymbol.Search
+        },
+        modifier = modifier,
+        color = color,
+        variant = if (selected) MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
+    )
 }
 
 private fun playerAutomaticFractionSpec() = tween<Float>(

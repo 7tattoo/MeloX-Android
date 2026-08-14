@@ -3,6 +3,7 @@ package com.lladlam.melox.ui.discovery
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +70,9 @@ import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.account.MeloXAccountActivity
 import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
+import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import kotlinx.coroutines.Dispatchers
@@ -238,9 +243,11 @@ private fun NeteaseHomeDataScreen() {
 
     val account = session.profile?.let { profile ->
         HomeAccountUi(
-            name = profile.nickname,
+            name = profile.nickname.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) } ?: "网易云音乐用户",
             avatarUrl = profile.avatarUrl,
-            subtitle = profile.signature ?: "查看主页、听歌排行与歌单",
+            subtitle = profile.signature
+                ?.takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+                ?: "查看主页、听歌排行与歌单",
             onClick = { MeloXAccountActivity.launch(context, profile.userId) },
         )
     }
@@ -348,7 +355,11 @@ private fun ProviderHomeDataScreen(source: MusicSource) {
         HomeAccountUi(
             name = it.displayName,
             avatarUrl = it.avatarUrl,
-            subtitle = it.subtitle ?: source.displayName,
+            // Some providers serialize a missing subtitle as the literal string "null".
+            // Keep that transport detail out of the UI and show a useful source label.
+            subtitle = it.subtitle
+                ?.takeUnless { value -> value.isBlank() || value.equals("null", ignoreCase = true) }
+                ?: source.displayName,
         )
     }
 
@@ -383,8 +394,8 @@ private fun MeloXHomeLayout(
             EmptyOrLoading(refreshing, error)
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 70.dp, bottom = 146.dp),
+                modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 146.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 item { LargeTitle("首页") }
@@ -461,36 +472,56 @@ private fun HomeAccountCard(account: HomeAccountUi) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (account.onClick != null) Text("›", fontSize = 24.sp)
+        if (account.onClick != null) MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .55f))
     }
 }
 
 @Composable
 private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
-    val actions = listOf(
-        Triple("每日推荐", "每日更新", Color(0xFFFF3155)),
-        Triple("热歌榜", "全站热门", Color(0xFFFF7A28)),
-        Triple("心动模式", "为你心动", Color(0xFFEF4F9A)),
-        Triple("私人漫游", "探索模式", Color(0xFF4285F4)),
-        Triple("私人雷达", "你的雷达歌单", Color(0xFF7B61FF)),
-        Triple("相似歌曲", "从当前歌曲出发", Color(0xFF17A589)),
+    data class Action(
+        val title: String,
+        val eyebrow: String,
+        val subtitle: String,
+        val symbol: MeloXSymbol,
+        val colors: List<Color>,
     )
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(actions, key = { it.first }) { (title, eyebrow, tint) ->
+    val actions = listOf(
+        Action("每日推荐", "每日更新", "为你定制的歌曲", MeloXSymbol.Calendar, listOf(Color(0xFFFF5B8A), Color(0xFFFF3147))),
+        Action("热歌榜", "全站热门", "大家都在听", MeloXSymbol.Flame, listOf(Color(0xFFFFA14A), Color(0xFFFF5A36))),
+        Action("心动模式", "为你心动", "喜欢与惊喜交替播放", MeloXSymbol.Heart, listOf(Color(0xFFFF6EAC), Color(0xFF9B5DE5))),
+        Action("私人雷达", "持续发现", "发现符合你口味的歌单", MeloXSymbol.RadioWaves, listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF))),
+        Action("私人漫游", "探索模式", "漫游到新的好音乐", MeloXSymbol.Walk, listOf(Color(0xFF26C6DA), Color(0xFF4285F4))),
+        Action("相似歌曲", "从当前歌曲出发", "播放更多相似歌曲", MeloXSymbol.List, listOf(Color(0xFF58C9A3), Color(0xFF159D9A))),
+    )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        items(actions, key = { it.title }) { action ->
             Column(
                 Modifier
-                    .width(172.dp)
-                    .height(102.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(tint)
-                    .clickable(enabled = active == null) { perform(title) }
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                    .width(310.dp)
+                    .clickable(enabled = active == null) { perform(action.title) },
             ) {
-                Text(eyebrow, color = Color.White.copy(alpha = .76f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                    if (active == title) CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                Text(action.eyebrow.uppercase(), color = MaterialTheme.colorScheme.onBackground.copy(alpha = .55f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text(action.title, modifier = Modifier.padding(top = 3.dp), fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+                Text(action.subtitle, modifier = Modifier.padding(top = 2.dp), color = MaterialTheme.colorScheme.onBackground.copy(alpha = .52f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.48f)
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Brush.linearGradient(action.colors)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MeloXSymbolIcon(
+                        symbol = action.symbol,
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color.White.copy(alpha = .24f),
+                        iconSize = 72.sp,
+                    )
+                    Text(action.title, modifier = Modifier.align(Alignment.BottomStart).padding(18.dp), color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    if (active == action.title) {
+                        CircularProgressIndicator(Modifier.size(52.dp), color = Color.White, strokeWidth = 3.dp)
+                    }
                 }
             }
         }
@@ -630,7 +661,7 @@ private fun MeloXExploreLayout(
     showPodcast: Boolean,
     onCollection: (DiscoveryCollection) -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().padding(top = 70.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 18.dp)) {
         LargeTitle("发现", Modifier.padding(horizontal = 20.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
@@ -666,8 +697,10 @@ private fun MeloXExploreLayout(
 private fun LargeTitle(text: String, modifier: Modifier = Modifier) = Text(
     text,
     modifier,
-    fontSize = 40.sp,
-    lineHeight = 46.sp,
+    // Match iOS largeTitle metrics instead of letting the CJK fallback
+    // overpower the content below it.
+    fontSize = 34.sp,
+    lineHeight = 41.sp,
     fontWeight = FontWeight.Bold,
     color = MaterialTheme.colorScheme.onBackground,
 )
@@ -677,7 +710,7 @@ private fun SectionTitle(title: String, trailing: String) = Row(
     Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceBetween,
 ) {
-    Text(title, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+    Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
     Text(trailing, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .42f), fontSize = 13.sp)
 }
 
@@ -707,12 +740,24 @@ private fun CollectionGrid(values: List<DiscoveryCollection>, onSelect: (Discove
 @Composable
 private fun CollectionCard(value: DiscoveryCollection, modifier: Modifier, onClick: () -> Unit) {
     Column(modifier.clickable(onClick = onClick)) {
-        AsyncImage(
-            value.artworkUrl,
-            null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(174.dp).clip(RoundedCornerShape(14.dp)),
-        )
+        val artworkShape = RoundedCornerShape(14.dp)
+        // Keep the card visually complete while remote artwork is loading.
+        // Without a stable surface, the fixed image slot becomes a blank hole
+        // and the title appears detached from its card on slower networks.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(174.dp)
+                .clip(artworkShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            AsyncImage(
+                value.artworkUrl,
+                null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Text(
             value.title,
             modifier = Modifier.padding(top = 7.dp),
@@ -736,11 +781,19 @@ private fun compactCount(value: Long): String = when {
 
 @Composable
 private fun SongRow(song: DiscoveryTrack, onClick: () -> Unit) {
+    val artworkShape = RoundedCornerShape(9.dp)
     Row(
         Modifier.fillMaxWidth().height(58.dp).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(9.dp)))
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(artworkShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            AsyncImage(song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
@@ -794,7 +847,9 @@ private fun DiscoveryCollectionDetail(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("‹", fontSize = 44.sp, modifier = Modifier.clickable(onClick = onBack).padding(end = 10.dp))
+                Box(Modifier.size(40.dp).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+                    MeloXActionIcon("‹", Modifier.size(22.dp), MaterialTheme.colorScheme.onBackground)
+                }
                 Text(collection.title, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

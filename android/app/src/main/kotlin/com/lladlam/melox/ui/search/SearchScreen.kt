@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +40,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,7 +76,13 @@ import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.account.MeloXAccountActivity
 import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
-import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
+import com.lladlam.melox.ui.glass.MeloXGlassTextField
+import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSystemColors
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +98,7 @@ object MeloXSearchLaunchBus {
     fun consume(request: MeloXSearchLaunch) { if (this.request == request) this.request = null }
 }
 
-private val SearchAccent = Color(0xFFFF3147)
+private val SearchAccent = MeloXSystemColors.Blue
 private val SearchCategories = listOf("排行榜", "播客", "华语", "欧美", "日语", "韩语", "粤语", "流行", "摇滚", "民谣", "电子", "说唱", "R&B/Soul", "古典", "ACG", "影视原声", "学习", "工作", "放松", "夜晚")
 
 private sealed interface ProviderSearchDestination {
@@ -498,41 +506,52 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit, source: MusicSource) {
-    Row(
+    MeloXGlassTextField(
+        value = value,
+        onValueChange = onValueChange,
         modifier = Modifier
-            .padding(horizontal = 20.dp)
-            .fillMaxWidth()
-            .height(50.dp)
-            .meloXLiquidButton(
-                shape = RoundedCornerShape(25.dp),
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .055f),
-                lensRadius = 9.dp,
-                refractionHeight = 16.dp,
+            .padding(horizontal = 20.dp),
+        leadingContent = {
+            MeloXSymbolIcon(
+                symbol = MeloXSymbol.Search,
+                modifier = Modifier.size(21.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f),
             )
-            .padding(horizontal = 15.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("⌕", fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isBlank()) {
-                Text(
-                    if (source == MusicSource.Netease) "音乐内容或网易云链接" else "搜索音乐内容",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
-                )
+        },
+        placeholder = {
+            Text(
+                if (source == MusicSource.Netease) "音乐内容或网易云链接" else "搜索音乐内容",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
+                fontSize = 17.sp,
+            )
+        },
+        trailingContent = if (value.isNotBlank()) {
+            {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable(role = Role.Button) { onValueChange("") }
+                        .semantics {
+                            contentDescription = "清除搜索内容"
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MeloXSymbolIcon(
+                        symbol = MeloXSymbol.Xmark,
+                        modifier = Modifier.size(15.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .56f),
+                    )
+                }
             }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                textStyle = androidx.compose.ui.text.TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 17.sp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (value.isNotBlank()) Text("×", modifier = Modifier.clickable { onValueChange("") }.padding(5.dp), fontSize = 22.sp)
-    }
+        } else null,
+        textStyle = androidx.compose.ui.text.TextStyle(
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 17.sp,
+            lineHeight = 22.sp,
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {}),
+    )
 }
 
 @Composable
@@ -546,17 +565,16 @@ private fun SearchScopes(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(availableKinds) { item ->
-            Box(
-                Modifier
-                    .height(34.dp)
-                    .meloXLiquidButton(
-                        shape = RoundedCornerShape(17.dp),
-                        tint = if (item == kind) SearchAccent.copy(alpha = .30f) else Color.Transparent,
-                        surfaceColor = if (item == kind) SearchAccent.copy(alpha = .16f) else MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
-                    )
-                    .clickable { onKind(item) }
-                    .padding(horizontal = 15.dp),
-                contentAlignment = Alignment.Center,
+            MeloXGlassButton(
+                onClick = { onKind(item) },
+                modifier = Modifier
+                    .height(44.dp)
+                    .padding(horizontal = 0.dp),
+                style = MeloXGlassButtonStyle.Bordered,
+                shape = RoundedCornerShape(17.dp),
+                tint = if (item == kind) MeloXSystemColors.Blue.copy(alpha = .28f) else Color.Transparent,
+                surfaceColor = if (item == kind) MeloXSystemColors.Blue.copy(alpha = .16f) else MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
+                contentPadding = PaddingValues(horizontal = 15.dp),
             ) {
                 Text(
                     item.title,
@@ -716,7 +734,7 @@ private fun ProviderSearchMediaResults(
                         fontSize = 13.sp,
                     )
                 }
-                Text("›", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
+                MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
             }
         }
     }
@@ -752,7 +770,7 @@ private fun SearchMediaResults(values: List<MeloXSearchMediaItem>, onOpen: (Melo
                     Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 17.sp)
                     Text(item.subtitle.ifBlank { if (item.trackCount > 0) "${item.trackCount} 首" else item.kind.title }, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), fontSize = 13.sp)
                 }
-                Text("›", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
+                MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
             }
         }
     }
@@ -930,7 +948,14 @@ private fun SearchCollectionDetail(
 @Composable
 private fun SearchDetailHeader(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(44.dp).meloXLiquidButton(shape = CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) { Text("‹", fontSize = 30.sp) }
+        MeloXGlassButton(
+            onClick = onBack,
+            modifier = Modifier.size(44.dp),
+            shape = CircleShape,
+            contentPadding = PaddingValues(11.dp),
+        ) {
+            MeloXSymbolIcon(MeloXSymbol.ChevronLeft, Modifier.fillMaxSize(), MaterialTheme.colorScheme.onSurface)
+        }
         Spacer(Modifier.width(12.dp))
         Text(title, Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -938,14 +963,14 @@ private fun SearchDetailHeader(title: String, onBack: () -> Unit) {
 
 @Composable
 private fun SearchPlayButton(title: String, onClick: () -> Unit) {
-    Box(
-        Modifier.height(44.dp).width(120.dp).meloXLiquidButton(
-            shape = RoundedCornerShape(22.dp),
-            surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .08f),
-        ).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+    MeloXGlassButton(
+        onClick = onClick,
+        modifier = Modifier.height(44.dp).width(120.dp),
+        style = MeloXGlassButtonStyle.BorderedProminent,
+        shape = RoundedCornerShape(22.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
-        Text(title, fontWeight = FontWeight.SemiBold)
+        Text(title, fontWeight = FontWeight.SemiBold, color = Color.White)
     }
 }
 

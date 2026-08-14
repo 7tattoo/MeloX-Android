@@ -1,5 +1,10 @@
 package com.lladlam.melox.ui.player
 
+import android.content.Context
+import android.content.Intent
+import android.media.MediaRouter2
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -53,6 +58,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -228,7 +235,9 @@ private fun SceneQualityChip(
             } else {
                 providerActual = ProviderPlaybackQualityRuntime.actualFor(identity)
             }
-            delay(180L)
+            // Quality changes are user-driven and infrequent; polling at frame-
+            // like cadence needlessly recomposed the entire controls column.
+            delay(750L)
         }
     }
 
@@ -497,6 +506,7 @@ internal fun ScenePageSelector(
     page: MeloXNowPlayingPage,
     onPageSelected: (MeloXNowPlayingPage) -> Unit,
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -513,10 +523,10 @@ internal fun ScenePageSelector(
         )
 
         ScenePageButton(
-            kind = SceneGlyphKind.PipEnter,
+            kind = SceneGlyphKind.AirPlay,
             selected = false,
-            enabled = false,
-            onClick = {},
+            enabled = true,
+            onClick = { showSystemAudioOutputSwitcher(context) },
         )
 
         Box {
@@ -552,6 +562,21 @@ internal fun ScenePageSelector(
                 }
             }
         }
+    }
+}
+
+private fun showSystemAudioOutputSwitcher(context: Context) {
+    if (
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        MediaRouter2.getInstance(context).showSystemOutputSwitcher()
+    ) {
+        return
+    }
+    runCatching {
+        context.startActivity(
+            Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 
@@ -596,6 +621,14 @@ private fun ScenePageButton(
             }
             .clip(CircleShape)
             .background(Color.White.copy(alpha = backgroundAlpha * 0.16f))
+            .semantics {
+                contentDescription = when (kind) {
+                    SceneGlyphKind.Lyrics -> "歌词"
+                    SceneGlyphKind.AirPlay -> "AirPlay"
+                    SceneGlyphKind.Queue -> "接下来播放"
+                    else -> kind.name
+                }
+            }
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,
@@ -624,7 +657,7 @@ private enum class SceneGlyphKind {
     SpeakerLow,
     SpeakerHigh,
     Lyrics,
-    PipEnter,
+    AirPlay,
     Queue,
     Waveform,
 }
@@ -645,11 +678,11 @@ private fun SceneCupertinoGlyph(
             SceneGlyphKind.Play -> {
                 val p = Path().apply {
                     moveTo(w * 0.28f, h * 0.13f)
-                    quadraticBezierTo(w * 0.22f, h * 0.10f, w * 0.22f, h * 0.22f)
+                    quadraticTo(w * 0.22f, h * 0.10f, w * 0.22f, h * 0.22f)
                     lineTo(w * 0.22f, h * 0.78f)
-                    quadraticBezierTo(w * 0.22f, h * 0.90f, w * 0.30f, h * 0.86f)
+                    quadraticTo(w * 0.22f, h * 0.90f, w * 0.30f, h * 0.86f)
                     lineTo(w * 0.82f, h * 0.56f)
-                    quadraticBezierTo(w * 0.91f, h * 0.50f, w * 0.82f, h * 0.44f)
+                    quadraticTo(w * 0.91f, h * 0.50f, w * 0.82f, h * 0.44f)
                     close()
                 }
                 drawPath(p, color)
@@ -697,9 +730,9 @@ private fun SceneCupertinoGlyph(
                     moveTo(w * 0.08f, h * 0.41f)
                     lineTo(w * 0.29f, h * 0.41f)
                     lineTo(w * 0.54f, h * 0.22f)
-                    quadraticBezierTo(w * 0.58f, h * 0.19f, w * 0.58f, h * 0.27f)
+                    quadraticTo(w * 0.58f, h * 0.19f, w * 0.58f, h * 0.27f)
                     lineTo(w * 0.58f, h * 0.73f)
-                    quadraticBezierTo(w * 0.58f, h * 0.81f, w * 0.54f, h * 0.78f)
+                    quadraticTo(w * 0.58f, h * 0.81f, w * 0.54f, h * 0.78f)
                     lineTo(w * 0.29f, h * 0.59f)
                     lineTo(w * 0.08f, h * 0.59f)
                     close()
@@ -771,34 +804,32 @@ private fun SceneCupertinoGlyph(
                 )
             }
 
-            SceneGlyphKind.PipEnter -> {
-                drawRoundRect(
+            SceneGlyphKind.AirPlay -> {
+                drawArc(
                     color = color,
-                    topLeft = Offset(w * 0.10f, h * 0.12f),
-                    size = Size(w * 0.80f, h * 0.68f),
-                    cornerRadius = CornerRadius(w * 0.10f),
+                    startAngle = 205f,
+                    sweepAngle = 130f,
+                    useCenter = false,
+                    topLeft = Offset(w * 0.08f, h * 0.02f),
+                    size = Size(w * 0.84f, h * 0.72f),
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                drawRoundRect(
+                drawArc(
                     color = color,
-                    topLeft = Offset(w * 0.48f, h * 0.51f),
-                    size = Size(w * 0.38f, h * 0.34f),
-                    cornerRadius = CornerRadius(w * 0.07f),
+                    startAngle = 205f,
+                    sweepAngle = 130f,
+                    useCenter = false,
+                    topLeft = Offset(w * 0.24f, h * 0.18f),
+                    size = Size(w * 0.52f, h * 0.44f),
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                drawLine(
-                    color = color,
-                    start = Offset(w * 0.29f, h * 0.31f),
-                    end = Offset(w * 0.47f, h * 0.49f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-                val arrow = Path().apply {
-                    moveTo(w * 0.39f, h * 0.48f)
-                    lineTo(w * 0.49f, h * 0.49f)
-                    lineTo(w * 0.48f, h * 0.39f)
+                val output = Path().apply {
+                    moveTo(w * 0.50f, h * 0.50f)
+                    lineTo(w * 0.78f, h * 0.92f)
+                    lineTo(w * 0.22f, h * 0.92f)
+                    close()
                 }
-                drawPath(arrow, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
+                drawPath(output, color)
             }
 
             SceneGlyphKind.Queue -> {

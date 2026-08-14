@@ -93,6 +93,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
     private val transferSlots = Semaphore(3)
     private val jobs = ConcurrentHashMap<Long, Job>()
     private val pendingPlaylistRefs = ConcurrentHashMap<Long, MutableList<MeloXDownloadPlaylistRef>>()
+    private val downloadsBySongId = ConcurrentHashMap<Long, MeloXDownloadedSong>()
 
     val downloads = mutableStateListOf<MeloXDownloadedSong>()
     val activeDownloads = mutableStateMapOf<Long, MeloXActiveDownload>()
@@ -100,7 +101,12 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         private set
 
     init {
-        loadIndex()
+        scope.launch {
+            val restored = withContext(Dispatchers.IO) { readIndex() }
+            restored.forEach { record ->
+                if (downloadsBySongId.putIfAbsent(record.song.id, record) == null) downloads += record
+            }
+        }
     }
 
     val downloadedSongs: List<SearchSong>
@@ -128,9 +134,9 @@ class MeloXDownloadStore private constructor(private val context: Context) {
             }
         }
 
-    fun contains(songId: Long): Boolean = downloads.any { it.song.id == songId }
+    fun contains(songId: Long): Boolean = downloadsBySongId.containsKey(songId)
     fun isDownloading(songId: Long): Boolean = activeDownloads.containsKey(songId)
-    fun recordFor(songId: Long): MeloXDownloadedSong? = downloads.firstOrNull { it.song.id == songId }
+    fun recordFor(songId: Long): MeloXDownloadedSong? = downloadsBySongId[songId]
     fun downloadedQuality(songId: Long): MusicQuality? = recordFor(songId)?.quality
 
     /** Counts actual player transitions and starts the same native download pipeline at the configured threshold. */
@@ -241,6 +247,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
             record.lyricsFileName?.let { File(directory, it).delete() }
         }
         downloads.removeAll { it.song.id in songIds }
+        songIds.forEach(downloadsBySongId::remove)
         cleanupUnusedPlaylistArtwork()
         saveIndex()
     }
@@ -249,6 +256,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         jobs.keys.toList().forEach(::cancel)
         pendingPlaylistRefs.clear()
         downloads.clear()
+        downloadsBySongId.clear()
         directory.listFiles()?.forEach { it.deleteRecursively() }
         directory.mkdirs()
         saveIndex()
@@ -356,6 +364,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
             )
             downloads.removeAll { it.song.id == song.id }
             downloads.add(0, record)
+            downloadsBySongId[song.id] = record
             activeDownloads.remove(song.id)
             jobs.remove(song.id)
             saveIndex()
@@ -385,7 +394,9 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         if (record.sourcePlaylists.any { it.id == ref.id }) return
         val index = downloads.indexOf(record)
         if (index < 0) return
-        downloads[index] = record.copy(sourcePlaylists = record.sourcePlaylists + ref)
+        val updated = record.copy(sourcePlaylists = record.sourcePlaylists + ref)
+        downloads[index] = updated
+        downloadsBySongId[record.song.id] = updated
         saveIndex()
         scope.launch { downloadPlaylistArtworkIfAvailable(ref) }
     }
@@ -523,10 +534,11 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         return LyricsDocument(lines)
     }
 
-    private fun loadIndex() {
+    private fun readIndex(): List<MeloXDownloadedSong> {
         val raw = runCatching { indexFile.takeIf(File::isFile)?.readText() }.getOrNull().orEmpty()
-        if (raw.isBlank()) return
-        val array = runCatching { JSONArray(raw) }.getOrNull() ?: return
+        if (raw.isBlank()) return emptyList()
+        val array = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        val restored = ArrayList<MeloXDownloadedSong>(array.length())
         for (i in 0 until array.length()) {
             val value = array.optJSONObject(i) ?: continue
             val song = SearchSong(
@@ -556,7 +568,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                     )
                 }
             }
-            downloads += MeloXDownloadedSong(
+            restored += MeloXDownloadedSong(
                 song = song,
                 quality = MusicQuality.fromApiLevel(value.optString("quality")) ?: MusicQuality.Standard,
                 fileName = fileName,
@@ -569,6 +581,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                 sourcePlaylists = refs,
             )
         }
+        return restored
     }
 
     private fun saveIndex() {
@@ -613,6 +626,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
 
     private fun removeMissingRecord(songId: Long) {
         downloads.removeAll { it.song.id == songId }
+        downloadsBySongId.remove(songId)
         cleanupUnusedPlaylistArtwork()
         saveIndex()
     }

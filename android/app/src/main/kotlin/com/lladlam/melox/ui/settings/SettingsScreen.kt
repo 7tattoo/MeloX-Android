@@ -75,6 +75,11 @@ import com.lladlam.melox.playback.MeloXPlaybackModePreferences
 import com.lladlam.melox.platform.floating.MeloXFloatingLyricsService
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.MeloXBottomContentClearance
+import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXGlassTextField
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -176,9 +181,9 @@ fun SettingsScreen(
             .statusBarsPadding()
             .verticalScroll(rootScrollState)
             .padding(horizontal = 20.dp)
-            .padding(top = 34.dp, bottom = MeloXBottomContentClearance),
+            .padding(top = 18.dp, bottom = MeloXBottomContentClearance),
     ) {
-        Text("设置", fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Bold)
+        Text("设置", fontSize = 34.sp, lineHeight = 41.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(20.dp))
         SettingsSearchField(search, { search = it })
         Spacer(Modifier.height(22.dp))
@@ -220,35 +225,24 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .meloXLiquidButton(
-                shape = RoundedCornerShape(24.dp),
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
-                lensRadius = 9.dp,
-                refractionHeight = 15.dp,
+    MeloXGlassTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        leadingContent = {
+            MeloXSymbolIcon(
+                symbol = MeloXSymbol.Search,
+                modifier = Modifier.size(20.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f),
             )
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text("⌕", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isBlank()) Text("搜索设置", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f))
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
+        },
+        placeholder = { Text("搜索设置", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f), fontSize = 16.sp) },
+        textStyle = androidx.compose.ui.text.TextStyle(
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 16.sp,
+            lineHeight = 21.sp,
+        ),
+    )
 }
 
 @Composable
@@ -262,12 +256,9 @@ private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Uni
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .meloXLiquidButton(
+            .meloXContentSurface(
                 shape = RoundedCornerShape(28.dp),
-                enabled = !session.isLoggedIn,
                 surfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                lensRadius = 10.dp,
-                refractionHeight = 18.dp,
             )
             .clickable(enabled = !session.isLoggedIn, onClick = onLogin),
         shape = RoundedCornerShape(28.dp), color = Color.Transparent,
@@ -292,7 +283,7 @@ private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Uni
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Text("›", fontSize = 28.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
+                    MeloXActionIcon("›", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
                 }
             }
             session.isLoggedIn && session.isRefreshing -> Row(
@@ -303,13 +294,15 @@ private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Uni
                 Text("正在读取账号信息")
             }
             else -> Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) { Text("＋", fontSize = 30.sp) }
+                Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+                    MeloXActionIcon("＋", Modifier.size(25.dp), MaterialTheme.colorScheme.primary)
+                }
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("登录网易云音乐", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("同步收藏、歌单与播放记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
                 }
-                Text("›", fontSize = 28.sp)
+                MeloXActionIcon("›", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
             }
         }
     }
@@ -320,11 +313,9 @@ private fun SettingsSectionCard(section: SettingsSection, onOpen: (SettingsRoute
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .meloXLiquidButton(
+            .meloXContentSurface(
                 shape = RoundedCornerShape(26.dp),
                 surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
-                lensRadius = 10.dp,
-                refractionHeight = 17.dp,
             )
             .padding(vertical = 5.dp),
     ) {
@@ -337,14 +328,14 @@ private fun SettingsSectionCard(section: SettingsSection, onOpen: (SettingsRoute
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                    Text(item.symbol, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
+                    MeloXActionIcon(item.symbol, Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.size(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.route.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Text(item.subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f), maxLines = 2)
                 }
-                Text("›", fontSize = 25.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .28f))
+                MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .28f))
             }
         }
     }
@@ -920,6 +911,19 @@ private fun LyricsSettings(context: android.content.Context) {
         }
     }
     Spacer(Modifier.height(16.dp))
+    LyricsStringChoiceSetting(
+        context,
+        "歌词渲染质量",
+        "lyrics_rendering_quality",
+        MeloXLyricsRenderingQuality.Balanced.name,
+        MeloXLyricsRenderingQuality.entries.map { it.name },
+    ) { value ->
+        when (MeloXLyricsRenderingQuality.valueOf(value)) {
+            MeloXLyricsRenderingQuality.Low -> "低 · 更省电"
+            MeloXLyricsRenderingQuality.Balanced -> "均衡 · 推荐"
+            MeloXLyricsRenderingQuality.High -> "高 · 完整 iOS 效果"
+        }
+    }
     SettingsToggleRow(context, "显示翻译", "lyrics_translation", true)
     SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true)
     LyricsStringChoiceSetting(
@@ -982,13 +986,13 @@ private fun LyricsSettings(context: android.content.Context) {
     SettingsToggleRow(context, "仅长音显示光晕", "lyrics_glow_long_tones_only", true)
     LyricsChoiceSetting(context, "长音判定时长", "lyrics_long_tone_threshold_ms", 950, listOf(300, 500, 700, 950, 1_200, 1_500)) { "${it / 1000f} 秒" }
     LyricsFloatChoiceSetting(context, "行间距", "lyrics_spacing_scale", 1f, listOf(.8f, 1f, 1.2f, 1.4f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .5f, .8f, 1f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
     PreferenceFloatSlider(context, "焦点垂直位置", "lyrics_focus_position", .25f, .05f..8f / 10f, 74) { "距顶部 ${(it * 100).toInt()}%" }
     PreferenceFloatSlider(context, "默认逐句模糊加强", "lyrics_distance_blur_scale", 1.05f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
     PreferenceFloatSlider(context, "隐藏 UI 逐句模糊加强", "lyrics_hidden_blur_scale", .85f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 9) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 49) { "${(it * 100).toInt()}%" }
     LyricsFloatChoiceSetting(context, "当前行放大", "lyrics_focus_scale", 1.02f, listOf(1f, 1.02f, 1.04f, 1.08f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .3f, listOf(.2f, .3f, .45f, .6f)) { "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .42f, listOf(.3f, .42f, .5f, .6f)) { "${(it * 100).toInt()}%" }
     LyricsFloatChoiceSetting(context, "逐字光晕", "lyrics_glow_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
     LyricsFloatChoiceSetting(context, "长音延展", "lyrics_long_tone_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
     LyricsChoiceSetting(context, "控制栏自动隐藏", "lyrics_interface_auto_hide_ms", 5_000, (3..15).map { it * 1_000 }) { "${it / 1_000} 秒" }
@@ -1187,7 +1191,7 @@ private fun MessagesSettings(context: android.content.Context) {
                         Text(contact.name, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         if (contact.signature.isNotBlank()) Text(contact.signature, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f))
                     }
-                    Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
+                    MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .3f))
                 }
             }
         }
@@ -1381,14 +1385,14 @@ private fun TabLayoutSettings(context: android.content.Context) {
         order.forEachIndexed { index, page ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(when (page) { "Home" -> "首页"; "Explore" -> "发现"; "Library" -> "音乐库"; else -> "设置" }, Modifier.weight(1f))
-                Text("↑", modifier = Modifier.clickable(enabled = index > 0) {
+                MeloXActionIcon("↑", Modifier.size(18.dp).clickable(enabled = index > 0) {
                     order = order.toMutableList().apply { add(index - 1, removeAt(index)) }
                     MeloXSettingsPreferences.setString(context, "tab_order", order.joinToString(","))
-                }.padding(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = if (index > 0) 1f else .25f))
-                Text("↓", modifier = Modifier.clickable(enabled = index < order.lastIndex) {
+                }.padding(10.dp), MaterialTheme.colorScheme.primary.copy(alpha = if (index > 0) 1f else .25f))
+                MeloXActionIcon("↓", Modifier.size(18.dp).clickable(enabled = index < order.lastIndex) {
                     order = order.toMutableList().apply { add(index + 1, removeAt(index)) }
                     MeloXSettingsPreferences.setString(context, "tab_order", order.joinToString(","))
-                }.padding(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = if (index < order.lastIndex) 1f else .25f))
+                }.padding(10.dp), MaterialTheme.colorScheme.primary.copy(alpha = if (index < order.lastIndex) 1f else .25f))
             }
         }
     }
@@ -1405,14 +1409,14 @@ private fun TabLayoutSettings(context: android.content.Context) {
         homeOrder.forEachIndexed { index, section ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(when (section) { "QuickActions" -> "快捷入口"; "Playlists" -> "推荐歌单"; else -> "推荐新歌" }, Modifier.weight(1f))
-                Text("↑", modifier = Modifier.clickable(enabled = index > 0) {
+                MeloXActionIcon("↑", Modifier.size(18.dp).clickable(enabled = index > 0) {
                     homeOrder = homeOrder.toMutableList().apply { add(index - 1, removeAt(index)) }
                     MeloXSettingsPreferences.setString(context, "home_section_order", homeOrder.joinToString(","))
-                }.padding(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = if (index > 0) 1f else .25f))
-                Text("↓", modifier = Modifier.clickable(enabled = index < homeOrder.lastIndex) {
+                }.padding(10.dp), MaterialTheme.colorScheme.primary.copy(alpha = if (index > 0) 1f else .25f))
+                MeloXActionIcon("↓", Modifier.size(18.dp).clickable(enabled = index < homeOrder.lastIndex) {
                     homeOrder = homeOrder.toMutableList().apply { add(index + 1, removeAt(index)) }
                     MeloXSettingsPreferences.setString(context, "home_section_order", homeOrder.joinToString(","))
-                }.padding(10.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = if (index < homeOrder.lastIndex) 1f else .25f))
+                }.padding(10.dp), MaterialTheme.colorScheme.primary.copy(alpha = if (index < homeOrder.lastIndex) 1f else .25f))
             }
         }
     }
@@ -1733,11 +1737,9 @@ private fun SettingsChoiceRow(title: String, selected: Boolean, onClick: () -> U
 @Composable
 private fun SettingsGlassGroup(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().meloXLiquidButton(
+        Modifier.fillMaxWidth().meloXContentSurface(
             shape = RoundedCornerShape(24.dp),
             surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
-            lensRadius = 9.dp,
-            refractionHeight = 15.dp,
         ),
     ) { content() }
 }
@@ -1768,7 +1770,7 @@ private fun SettingsRoundButton(text: String, onClick: () -> Unit) {
     Box(
         Modifier.size(44.dp).meloXLiquidButton(shape = CircleShape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Text(text, fontSize = 30.sp) }
+    ) { MeloXActionIcon(text, Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface) }
 }
 
 @Composable

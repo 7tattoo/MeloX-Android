@@ -9,4 +9,6 @@ import androidx.compose.ui.unit.dp
  * content below it. Lists therefore reserve their clearance as trailing scroll
  * space instead of shrinking the whole scene or painting an opaque bottom bar.
  */
+// Expanded chrome includes the mini-player, so keep enough trailing space for
+// both the player and the floating tab/search controls.
 val MeloXBottomContentClearance = 156.dp

@@ -1,33 +1,35 @@
 package com.lladlam.melox.ui.player
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.playback.MeloXAudioReactiveRuntime
+import com.lladlam.melox.ui.settings.MeloXLyricsRenderingQuality
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlin.math.cos
 import kotlin.math.sin
-
-private const val PALETTE_TRANSITION_MS = 800
-private const val FLOW_FRAME_MS = 33L
 
 @Composable
 internal fun MeloXBlurredArtworkBackdrop(
@@ -68,75 +70,103 @@ internal fun MeloXFlowingLightBackdrop(
 ) {
     val context = LocalContext.current
     var targetPalette by remember { mutableStateOf(ArtworkDynamicPalette.Fallback) }
-    var phase by remember { mutableFloatStateOf(0f) }
-    var energy by remember { mutableFloatStateOf(.18f) }
-    var beatPulse by remember { mutableFloatStateOf(0f) }
-    var downbeatPulse by remember { mutableFloatStateOf(0f) }
+    val renderingQuality = MeloXSettingsRuntime.lyricRenderingQuality
+    val meshWidth = when (renderingQuality) {
+        MeloXLyricsRenderingQuality.Low -> 24
+        MeloXLyricsRenderingQuality.Balanced -> 32
+        MeloXLyricsRenderingQuality.High -> 48
+    }
+    val meshHeight = meshWidth * 23 / 10
+    val meshBitmaps = remember(meshWidth, meshHeight) {
+        List(2) { Bitmap.createBitmap(meshWidth, meshHeight, Bitmap.Config.ARGB_8888) }
+    }
+    val meshImages = remember(meshBitmaps) { meshBitmaps.map(Bitmap::asImageBitmap) }
+    var meshImage by remember(meshImages) { mutableStateOf(meshImages.first()) }
 
     LaunchedEffect(artworkUrl) {
         targetPalette = ArtworkDynamicPaletteProvider.paletteFor(context, artworkUrl)
     }
 
-    LaunchedEffect(isPlaying, artworkUrl, mediaId) {
+    LaunchedEffect(isPlaying, artworkUrl, mediaId, renderingQuality, meshBitmaps, targetPalette) {
+        val frameDelayMs = when (renderingQuality) {
+            MeloXLyricsRenderingQuality.Low -> 50L
+            MeloXLyricsRenderingQuality.Balanced -> 33L
+            MeloXLyricsRenderingQuality.High -> 16L
+        }
+        var phase = 0f
+        var energy = .18f
+        var beatPulse = 0f
+        var downbeatPulse = 0f
+        var writeIndex = 1
+        val currentColors = MutableList(9) { index ->
+            targetPalette.cells.getOrElse(index) { targetPalette.average }
+        }
+        var currentAverage = targetPalette.average
+        val pixels = IntArray(meshWidth * meshHeight)
+        if (!isPlaying) {
+            withContext(Dispatchers.Default) {
+                fillFlowingMeshPixels(
+                    pixels = pixels,
+                    meshWidth = meshWidth,
+                    meshHeight = meshHeight,
+                    colors = currentColors,
+                    average = currentAverage,
+                    phase = phase,
+                    energy = energy,
+                    beatPulse = beatPulse,
+                    downbeatPulse = downbeatPulse,
+                )
+                meshBitmaps[writeIndex].setPixels(pixels, 0, meshWidth, 0, 0, meshWidth, meshHeight)
+            }
+            meshImage = meshImages[writeIndex]
+            // Playlist/detail backdrops pass isPlaying=false. Their mesh is
+            // static, so keeping a 20-60 Hz generator alive underneath the
+            // full-screen player only steals CPU and invalidates hidden layers.
+            awaitCancellation()
+        }
         while (true) {
             val sample = MeloXAudioReactiveRuntime.sample(mediaId)
             energy += (sample.energy - energy) * .18f
             beatPulse += (sample.beat - beatPulse) * .32f
             downbeatPulse += (sample.downbeat - downbeatPulse) * .24f
-            if (isPlaying) {
-                val motion = .026f + energy.coerceIn(0f, 1f) * .038f + beatPulse * .016f
-                phase = (phase + motion) % (Math.PI.toFloat() * 2f)
+            val motion = .026f + energy.coerceIn(0f, 1f) * .038f + beatPulse * .016f
+            phase = (phase + motion) % (Math.PI.toFloat() * 2f)
+            val paletteBlend = (frameDelayMs / 800f).coerceIn(.02f, .18f)
+            currentColors.indices.forEach { index ->
+                currentColors[index] = lerpColor(
+                    currentColors[index],
+                    targetPalette.cells.getOrElse(index) { targetPalette.average },
+                    paletteBlend,
+                )
             }
-            delay(FLOW_FRAME_MS)
+            currentAverage = lerpColor(currentAverage, targetPalette.average, paletteBlend)
+            val bitmap = meshBitmaps[writeIndex]
+            withContext(Dispatchers.Default) {
+                fillFlowingMeshPixels(
+                    pixels = pixels,
+                    meshWidth = meshWidth,
+                    meshHeight = meshHeight,
+                    colors = currentColors,
+                    average = currentAverage,
+                    phase = phase,
+                    energy = energy,
+                    beatPulse = beatPulse,
+                    downbeatPulse = downbeatPulse,
+                )
+                bitmap.setPixels(pixels, 0, meshWidth, 0, 0, meshWidth, meshHeight)
+            }
+            meshImage = meshImages[writeIndex]
+            writeIndex = 1 - writeIndex
+            delay(frameDelayMs)
         }
     }
 
-    val c0 by animateColorAsState(targetPalette.cells.getOrElse(0) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c0")
-    val c1 by animateColorAsState(targetPalette.cells.getOrElse(1) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c1")
-    val c2 by animateColorAsState(targetPalette.cells.getOrElse(2) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c2")
-    val c3 by animateColorAsState(targetPalette.cells.getOrElse(3) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c3")
-    val c4 by animateColorAsState(targetPalette.cells.getOrElse(4) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c4")
-    val c5 by animateColorAsState(targetPalette.cells.getOrElse(5) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c5")
-    val c6 by animateColorAsState(targetPalette.cells.getOrElse(6) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c6")
-    val c7 by animateColorAsState(targetPalette.cells.getOrElse(7) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c7")
-    val c8 by animateColorAsState(targetPalette.cells.getOrElse(8) { targetPalette.average }, tween(PALETTE_TRANSITION_MS), label = "flow-c8")
-    val average by animateColorAsState(targetPalette.average, tween(PALETTE_TRANSITION_MS), label = "flow-average")
-    val colors = listOf(c0, c1, c2, c3, c4, c5, c6, c7, c8)
-
     Canvas(modifier = modifier.fillMaxSize()) {
-        drawRect(average)
-        val maxDimension = maxOf(size.width, size.height)
-        val radius = maxDimension * (0.58f + energy.coerceIn(0f, 1f) * .08f + beatPulse * .035f)
-
-        colors.forEachIndexed { index, color ->
-            val row = index / 3
-            val column = index % 3
-            val baseX = when (column) {
-                0 -> 0.08f
-                1 -> 0.50f
-                else -> 0.92f
-            }
-            val baseY = when (row) {
-                0 -> 0.10f
-                1 -> 0.50f
-                else -> 0.90f
-            }
-            val localPhase = phase + index * 0.71f
-            val displacement = .052f + energy.coerceIn(0f, 1f) * .045f
-            val x = size.width * (baseX + sin(localPhase) * displacement)
-            val y = size.height * (baseY + cos(localPhase * 0.83f) * displacement * .87f)
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        color.copy(alpha = (0.72f + energy * .12f + beatPulse * .08f).coerceIn(.68f, .94f)),
-                        color.copy(alpha = (0.28f + energy * .09f).coerceIn(.26f, .42f)),
-                        Color.Transparent,
-                    ),
-                    center = Offset(x, y),
-                    radius = radius,
-                ),
-            )
-        }
+        drawImage(
+            image = meshImage,
+            dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+            filterQuality = FilterQuality.High,
+        )
 
         // MeloX keeps the lower control region darker for white text/controls.
         drawRect(
@@ -149,10 +179,77 @@ internal fun MeloXFlowingLightBackdrop(
             ),
         )
 
-        // A short downbeat vignette gives the field the same musical breathing
-        // cue as upstream without flashing or changing the control contrast.
-        if (downbeatPulse > .01f) {
-            drawRect(Color.Black.copy(alpha = (downbeatPulse * .16f).coerceIn(0f, .16f)))
+        // The downbeat vignette is folded into the mesh pixels above so it does
+        // not require another full-screen blend pass.
+    }
+}
+
+private fun lerpColor(from: Color, to: Color, amount: Float): Color = Color(
+    red = from.red + (to.red - from.red) * amount,
+    green = from.green + (to.green - from.green) * amount,
+    blue = from.blue + (to.blue - from.blue) * amount,
+    alpha = 1f,
+)
+
+private fun fillFlowingMeshPixels(
+    pixels: IntArray,
+    meshWidth: Int,
+    meshHeight: Int,
+    colors: List<Color>,
+    average: Color,
+    phase: Float,
+    energy: Float,
+    beatPulse: Float,
+    downbeatPulse: Float,
+) {
+    val radiusNormalized = (0.58f + energy.coerceIn(0f, 1f) * .08f + beatPulse * .035f)
+        .coerceAtLeast(.01f)
+    val centersX = FloatArray(colors.size)
+    val centersY = FloatArray(colors.size)
+    colors.indices.forEach { index ->
+        val row = index / 3
+        val column = index % 3
+        val baseX = when (column) { 0 -> .08f; 1 -> .50f; else -> .92f }
+        val baseY = when (row) { 0 -> .10f; 1 -> .50f; else -> .90f }
+        val localPhase = phase + index * .71f
+        val displacement = .052f + energy.coerceIn(0f, 1f) * .045f
+        centersX[index] = baseX + sin(localPhase) * displacement
+        centersY[index] = baseY + cos(localPhase * .83f) * displacement * .87f
+    }
+    val maxDimension = maxOf(meshWidth, meshHeight).toFloat()
+    val widthScale = meshWidth / maxDimension
+    val heightScale = meshHeight / maxDimension
+    val baseWeight = .22f
+    val pulseGain = 1f + energy.coerceIn(0f, 1f) * .10f + beatPulse * .07f
+    val downbeatShade = 1f - (downbeatPulse * .16f).coerceIn(0f, .16f)
+    var pixelIndex = 0
+    for (yIndex in 0 until meshHeight) {
+        val v = yIndex.toFloat() / (meshHeight - 1).coerceAtLeast(1).toFloat()
+        for (xIndex in 0 until meshWidth) {
+            val u = xIndex.toFloat() / (meshWidth - 1).coerceAtLeast(1).toFloat()
+            var totalWeight = baseWeight
+            var red = average.red * baseWeight
+            var green = average.green * baseWeight
+            var blue = average.blue * baseWeight
+            colors.indices.forEach { colorIndex ->
+                val dx = (u - centersX[colorIndex]) * widthScale / radiusNormalized
+                val dy = (v - centersY[colorIndex]) * heightScale / radiusNormalized
+                val distanceSquared = dx * dx + dy * dy
+                val falloff = 1f / (1f + distanceSquared * 4.5f)
+                val weight = falloff * falloff
+                val color = colors[colorIndex]
+                totalWeight += weight
+                red += color.red * weight
+                green += color.green * weight
+                blue += color.blue * weight
+            }
+            val r = ((red / totalWeight) * pulseGain * downbeatShade).coerceIn(0f, 1f)
+            val g = ((green / totalWeight) * pulseGain * downbeatShade).coerceIn(0f, 1f)
+            val b = ((blue / totalWeight) * pulseGain * downbeatShade).coerceIn(0f, 1f)
+            pixels[pixelIndex++] = (0xFF shl 24) or
+                ((r * 255f).toInt() shl 16) or
+                ((g * 255f).toInt() shl 8) or
+                (b * 255f).toInt()
         }
     }
 }

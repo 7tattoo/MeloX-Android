@@ -55,6 +55,8 @@ import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassSheet
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -114,51 +116,19 @@ internal fun MeloXProviderSongActionsOverlay(
         if (page == ProviderSongActionPage.Main) onDismiss() else page = ProviderSongActionPage.Main
     }
 
-    AnimatedVisibility(
+    MeloXGlassSheet(
         visible = visible,
-        enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.96f),
-        exit = fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = 0.97f),
+        onDismiss = onDismiss,
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.22f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                )
-                .padding(horizontal = 18.dp)
-                .navigationBarsPadding(),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 18.dp)
-                    .meloXLiquidButton(
-                        shape = RoundedCornerShape(30.dp),
-                        tint = Color.White.copy(alpha = 0.08f),
-                        surfaceColor = Color.Black.copy(alpha = 0.12f),
-                        blurRadius = 14.dp,
-                        lensRadius = 20.dp,
-                        refractionHeight = 22.dp,
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    ),
-            ) {
-                AnimatedContent(
+        AnimatedContent(
                     targetState = page,
                     transitionSpec = {
                         (fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.96f)) togetherWith
                             (fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = 0.96f))
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = "provider-song-action-page",
-                ) { target ->
+            modifier = Modifier.fillMaxWidth(),
+            label = "provider-song-action-page",
+        ) { target ->
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -314,11 +284,10 @@ internal fun MeloXProviderSongActionsOverlay(
                                 ProviderActionItem("返回", "‹") { page = ProviderSongActionPage.Main }
                             }
                         }
-                    }
-                }
-            }
         }
     }
+}
+
 }
 
 @Composable
@@ -401,11 +370,11 @@ private fun ProviderActionItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val alpha = if (enabled) 1f else 0.38f
-        Text(
-            symbol,
-            color = Color.White.copy(alpha = 0.82f * alpha),
-            fontSize = 20.sp,
-            modifier = Modifier.size(34.dp),
+        MeloXActionIcon(
+            token = symbol,
+            color = Color.White.copy(alpha = 0.82f),
+            enabled = enabled,
+            modifier = Modifier.size(22.dp).padding(horizontal = 1.dp),
         )
         Text(
             title,

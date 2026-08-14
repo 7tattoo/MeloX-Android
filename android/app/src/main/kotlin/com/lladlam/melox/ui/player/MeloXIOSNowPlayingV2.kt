@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -60,6 +61,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -72,6 +75,8 @@ import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.audio.SongAudioAvailability
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassMaterial
+import com.lladlam.melox.ui.glass.meloXGlassSurface
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.delay
@@ -106,6 +111,7 @@ fun MeloXIOSNowPlayingV2(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 32.dp),
         ) {
             MeloXGrabber(onDismiss)
@@ -543,7 +549,7 @@ private fun MeloXQualityChipV3(
         val songId = state.mediaId?.toLongOrNull() ?: return@LaunchedEffect
         while (true) {
             actual = MusicQualityRuntime.actualFor(songId)
-            delay(180L)
+            delay(750L)
         }
     }
 
@@ -604,6 +610,17 @@ private fun MeloXQualityChipV3(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
+            modifier = Modifier.meloXGlassSurface(
+                shape = RoundedCornerShape(20.dp),
+                // The quality menu floats over album artwork, so it uses the
+                // clear variant rather than inventing a third material level.
+                material = MeloXGlassMaterial.Clear,
+                tint = Color.White.copy(alpha = 0.10f),
+                surfaceColor = Color.Black.copy(alpha = 0.16f),
+            ),
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
         ) {
             MusicQuality.entries.forEach { quality ->
                 val supported = availability.supports(quality.apiLevel) != false
@@ -846,7 +863,7 @@ private fun MeloXPageSelectorV3(
         )
 
         CupertinoPageButton(
-            kind = CupertinoGlyphKind.PipEnter,
+            kind = CupertinoGlyphKind.AirPlay,
             selected = false,
             enabled = false,
             onClick = {},
@@ -929,6 +946,14 @@ private fun CupertinoPageButton(
             }
             .clip(CircleShape)
             .background(Color.White.copy(alpha = backgroundAlpha * 0.16f))
+            .semantics {
+                contentDescription = when (kind) {
+                    CupertinoGlyphKind.Lyrics -> "歌词"
+                    CupertinoGlyphKind.AirPlay -> "AirPlay"
+                    CupertinoGlyphKind.Queue -> "接下来播放"
+                    else -> kind.name
+                }
+            }
             .clickable(
                 enabled = enabled,
                 interactionSource = interaction,
@@ -957,7 +982,7 @@ private enum class CupertinoGlyphKind {
     SpeakerLow,
     SpeakerHigh,
     Lyrics,
-    PipEnter,
+    AirPlay,
     Queue,
     Waveform,
 }
@@ -978,11 +1003,11 @@ private fun CupertinoGlyph(
             CupertinoGlyphKind.Play -> {
                 val p = Path().apply {
                     moveTo(w * 0.28f, h * 0.13f)
-                    quadraticBezierTo(w * 0.22f, h * 0.10f, w * 0.22f, h * 0.22f)
+                    quadraticTo(w * 0.22f, h * 0.10f, w * 0.22f, h * 0.22f)
                     lineTo(w * 0.22f, h * 0.78f)
-                    quadraticBezierTo(w * 0.22f, h * 0.90f, w * 0.30f, h * 0.86f)
+                    quadraticTo(w * 0.22f, h * 0.90f, w * 0.30f, h * 0.86f)
                     lineTo(w * 0.82f, h * 0.56f)
-                    quadraticBezierTo(w * 0.91f, h * 0.50f, w * 0.82f, h * 0.44f)
+                    quadraticTo(w * 0.91f, h * 0.50f, w * 0.82f, h * 0.44f)
                     close()
                 }
                 drawPath(p, color)
@@ -1030,9 +1055,9 @@ private fun CupertinoGlyph(
                     moveTo(w * 0.08f, h * 0.41f)
                     lineTo(w * 0.29f, h * 0.41f)
                     lineTo(w * 0.54f, h * 0.22f)
-                    quadraticBezierTo(w * 0.58f, h * 0.19f, w * 0.58f, h * 0.27f)
+                    quadraticTo(w * 0.58f, h * 0.19f, w * 0.58f, h * 0.27f)
                     lineTo(w * 0.58f, h * 0.73f)
-                    quadraticBezierTo(w * 0.58f, h * 0.81f, w * 0.54f, h * 0.78f)
+                    quadraticTo(w * 0.58f, h * 0.81f, w * 0.54f, h * 0.78f)
                     lineTo(w * 0.29f, h * 0.59f)
                     lineTo(w * 0.08f, h * 0.59f)
                     close()
@@ -1104,34 +1129,32 @@ private fun CupertinoGlyph(
                 )
             }
 
-            CupertinoGlyphKind.PipEnter -> {
-                drawRoundRect(
+            CupertinoGlyphKind.AirPlay -> {
+                drawArc(
                     color = color,
-                    topLeft = Offset(w * 0.10f, h * 0.12f),
-                    size = Size(w * 0.80f, h * 0.68f),
-                    cornerRadius = CornerRadius(w * 0.10f),
+                    startAngle = 205f,
+                    sweepAngle = 130f,
+                    useCenter = false,
+                    topLeft = Offset(w * 0.08f, h * 0.02f),
+                    size = Size(w * 0.84f, h * 0.72f),
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                drawRoundRect(
+                drawArc(
                     color = color,
-                    topLeft = Offset(w * 0.48f, h * 0.51f),
-                    size = Size(w * 0.38f, h * 0.34f),
-                    cornerRadius = CornerRadius(w * 0.07f),
+                    startAngle = 205f,
+                    sweepAngle = 130f,
+                    useCenter = false,
+                    topLeft = Offset(w * 0.24f, h * 0.18f),
+                    size = Size(w * 0.52f, h * 0.44f),
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                drawLine(
-                    color = color,
-                    start = Offset(w * 0.29f, h * 0.31f),
-                    end = Offset(w * 0.47f, h * 0.49f),
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                )
-                val arrow = Path().apply {
-                    moveTo(w * 0.39f, h * 0.48f)
-                    lineTo(w * 0.49f, h * 0.49f)
-                    lineTo(w * 0.48f, h * 0.39f)
+                val output = Path().apply {
+                    moveTo(w * 0.50f, h * 0.50f)
+                    lineTo(w * 0.78f, h * 0.92f)
+                    lineTo(w * 0.22f, h * 0.92f)
+                    close()
                 }
-                drawPath(arrow, color, style = Stroke(width = stroke, cap = StrokeCap.Round))
+                drawPath(output, color)
             }
 
             CupertinoGlyphKind.Queue -> {

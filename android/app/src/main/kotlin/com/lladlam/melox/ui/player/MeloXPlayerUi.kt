@@ -148,7 +148,10 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            refresh()
+            refresh(
+                rebuildQueue = events.contains(Player.EVENT_TIMELINE_CHANGED) ||
+                    events.contains(Player.EVENT_MEDIA_METADATA_CHANGED),
+            )
         }
     }
 
@@ -156,7 +159,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         controller?.removeListener(listener)
         controller = newController
         newController.addListener(listener)
-        refresh()
+        refresh(rebuildQueue = true)
     }
 
     internal fun unbind() {
@@ -166,7 +169,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         controller = null
     }
 
-    internal fun refresh() {
+    internal fun refresh(rebuildQueue: Boolean = false) {
         val player = controller ?: return
         val item = player.currentMediaItem
         if (item == null) {
@@ -214,7 +217,24 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
             SLEEP_TIMER_END_KEY,
             0L,
         ).takeIf { it > System.currentTimeMillis() } ?: 0L
-        queue = buildQueue(player)
+        if (rebuildQueue || queue.size != player.mediaItemCount) {
+            queue = buildQueue(player)
+        }
+    }
+
+    /**
+     * The playback clock is the only state that needs polling. Queue and metadata
+     * updates arrive through Player.Events; rebuilding them here made every clock
+     * tick walk both the Media3 timeline and the Compose download list.
+     */
+    internal fun refreshProgress() {
+        val player = controller ?: return
+        if (player.currentMediaItem == null) return
+        isPlaying = player.isPlaying
+        positionMs = player.currentPosition.coerceAtLeast(0L)
+        durationMs = player.duration
+            .takeUnless { it == C.TIME_UNSET || it < 0L }
+            ?: 0L
     }
 
     private fun scheduleDeferredMediaClear(player: Player) {
@@ -225,7 +245,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
             if (active === player && active.currentMediaItem == null) {
                 clearMediaState(active)
             } else {
-                refresh()
+                refresh(rebuildQueue = true)
             }
         }
         pendingMediaClearRunnable = runnable
@@ -357,7 +377,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         if (from == player.currentMediaItemIndex || from !in 0 until player.mediaItemCount) return
         val safeTarget = to.coerceIn(player.currentMediaItemIndex + 1, player.mediaItemCount - 1)
         if (from != safeTarget) player.moveMediaItem(from, safeTarget)
-        refresh()
+        refresh(rebuildQueue = true)
     }
 
     fun addCurrentToQueue() {
@@ -377,7 +397,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     }
     val insertion = (current + 1 + manualCount).coerceIn(0, player.mediaItemCount)
     player.addMediaItem(insertion, copied)
-    refresh()
+    refresh(rebuildQueue = true)
 }
 
     fun setSleepTimer(minutes: Int) {
@@ -435,7 +455,7 @@ fun rememberMeloXPlaybackUiState(): MeloXPlaybackUiState {
 
     LaunchedEffect(state.isPlaying, state.mediaId) {
         while (true) {
-            state.refresh()
+            state.refreshProgress()
             delay(if (state.isPlaying) 500L else 1_000L)
         }
     }

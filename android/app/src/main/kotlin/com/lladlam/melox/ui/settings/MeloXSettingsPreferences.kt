@@ -9,6 +9,7 @@ import androidx.compose.ui.text.font.FontWeight
 enum class MeloXThemeMode { System, Light, Dark }
 enum class MeloXLyricAnnotationDisplayMode { FocusedLine, AllLines }
 enum class MeloXLyricsStyle { AppleMusic, Eva, TextPV }
+enum class MeloXLyricsRenderingQuality { Low, Balanced, High }
 enum class MeloXTextPVStyle {
     BlueBold, KineticSplit, BluePlane, CyberGrunge, Geometric, RainCity,
     CyberpunkHUD, EmotionCinema, HystericNight, SpiderWeb, StaggeredText,
@@ -82,6 +83,8 @@ object MeloXSettingsRuntime {
         internal set
     var lyricRefreshRate by mutableStateOf(60)
         internal set
+    var lyricRenderingQuality by mutableStateOf(MeloXLyricsRenderingQuality.Balanced)
+        internal set
     var lyricRomanizationDisplayMode by mutableStateOf(MeloXLyricAnnotationDisplayMode.FocusedLine)
         internal set
     var lyricTranslationDisplayMode by mutableStateOf(MeloXLyricAnnotationDisplayMode.FocusedLine)
@@ -114,7 +117,7 @@ object MeloXSettingsRuntime {
         internal set
     var lyricFocusScale by mutableStateOf(1.02f)
         internal set
-    var lyricInactiveOpacity by mutableStateOf(.3f)
+    var lyricInactiveOpacity by mutableStateOf(.42f)
         internal set
     var lyricGlowStrength by mutableStateOf(1f)
         internal set
@@ -305,6 +308,15 @@ object MeloXSettingsRuntime {
         lyricAdvanceAppliesToWordByWord = MeloXSettingsPreferences.boolean(app, "lyrics_advance_word_by_word", false)
         lyricRefreshRate = MeloXSettingsPreferences.int(app, "lyrics_refresh_rate", 60)
             .takeIf { it in setOf(30, 60, 90, 120) } ?: 60
+        lyricRenderingQuality = runCatching {
+            MeloXLyricsRenderingQuality.valueOf(
+                MeloXSettingsPreferences.string(
+                    app,
+                    "lyrics_rendering_quality",
+                    MeloXLyricsRenderingQuality.Balanced.name,
+                ),
+            )
+        }.getOrDefault(MeloXLyricsRenderingQuality.Balanced)
         lyricRomanizationDisplayMode = annotationMode(app, "lyrics_romanization_display_mode")
         lyricTranslationDisplayMode = annotationMode(app, "lyrics_translation_display_mode")
         lyricFollowDelayMs = MeloXSettingsPreferences.int(app, "lyrics_follow_delay_ms", 3_000).coerceIn(1_000, 8_000)
@@ -327,7 +339,7 @@ object MeloXSettingsRuntime {
         lyricHiddenInterfaceBlurScale = MeloXSettingsPreferences.float(app, "lyrics_hidden_blur_scale", .85f).coerceIn(0f, 1.5f)
         lyricDimAmount = MeloXSettingsPreferences.float(app, "lyrics_dim_amount", 1f).coerceIn(0f, 1f)
         lyricFocusScale = MeloXSettingsPreferences.float(app, "lyrics_focus_scale", 1.02f).coerceIn(1f, 1.08f)
-        lyricInactiveOpacity = MeloXSettingsPreferences.float(app, "lyrics_inactive_opacity", .3f).coerceIn(.15f, .65f)
+        lyricInactiveOpacity = MeloXSettingsPreferences.float(app, "lyrics_inactive_opacity", .42f).coerceIn(.15f, .65f)
         lyricGlowStrength = MeloXSettingsPreferences.float(app, "lyrics_glow_strength", 1f).coerceIn(0f, 1.5f)
         lyricGlowEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_glow_enabled", true)
         lyricLongToneStrength = MeloXSettingsPreferences.float(app, "lyrics_long_tone_strength", 1f).coerceIn(0f, 1.5f)
@@ -598,6 +610,9 @@ object MeloXSettingsPreferences {
             "lyrics_translation_display_mode" -> MeloXSettingsRuntime.lyricTranslationDisplayMode = runCatching {
                 MeloXLyricAnnotationDisplayMode.valueOf(value)
             }.getOrDefault(MeloXLyricAnnotationDisplayMode.FocusedLine)
+            "lyrics_rendering_quality" -> MeloXSettingsRuntime.lyricRenderingQuality = runCatching {
+                MeloXLyricsRenderingQuality.valueOf(value)
+            }.getOrDefault(MeloXLyricsRenderingQuality.Balanced)
             "lyrics_style" -> MeloXSettingsRuntime.lyricsStyle = runCatching {
                 MeloXLyricsStyle.valueOf(value)
             }.getOrDefault(MeloXLyricsStyle.AppleMusic)

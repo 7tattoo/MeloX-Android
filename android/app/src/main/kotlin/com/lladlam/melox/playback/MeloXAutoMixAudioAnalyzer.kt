@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.os.Process
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
@@ -20,7 +21,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class MeloXAutoMixFrame(
@@ -66,6 +69,7 @@ data class MeloXAutoMixTrackAnalysis(
  */
 class MeloXAutoMixAudioAnalyzer(private val context: Context) {
     private val cache = ConcurrentHashMap<String, MeloXAutoMixTrackAnalysis>()
+    private val keyLocks = ConcurrentHashMap<String, Mutex>()
     // Allow the outgoing and incoming analysis to progress together while
     // preventing unrelated visual analysis from spawning an unbounded decoder set.
     private val decodePermits = Semaphore(2)
@@ -73,16 +77,25 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
     suspend fun analyze(songId: Long, uri: Uri): MeloXAutoMixTrackAnalysis =
         withContext(Dispatchers.IO) {
             val key = "$songId|$uri"
-            cache[key] ?: decodePermits.withPermit {
-                cache[key] ?: decode(uri).also { cache[key] = it }
+            cache[key] ?: keyLocks.getOrPut(key) { Mutex() }.withLock {
+                cache[key] ?: decodePermits.withPermit {
+                    cache[key] ?: decode(uri).also { cache[key] = it }
+                }
             }
         }
 
-    fun clear() = cache.clear()
+    fun clear() {
+        cache.clear()
+        keyLocks.clear()
+    }
 
     private suspend fun decode(uri: Uri): MeloXAutoMixTrackAnalysis {
+        val threadId = Process.myTid()
+        val previousPriority = Process.getThreadPriority(threadId)
+        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
+        var decodedBuffers = 0
         try {
             if (uri.scheme == "http" || uri.scheme == "https") {
                 extractor.setDataSource(
@@ -167,6 +180,8 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
                         }
                         outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                         decoder.releaseOutputBuffer(outputIndex, false)
+                        decodedBuffers += 1
+                        if (decodedBuffers % 12 == 0) Thread.yield()
                     }
                 }
             }
@@ -175,6 +190,7 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
             runCatching { codec?.stop() }
             runCatching { codec?.release() }
             extractor.release()
+            runCatching { Process.setThreadPriority(previousPriority) }
         }
     }
 

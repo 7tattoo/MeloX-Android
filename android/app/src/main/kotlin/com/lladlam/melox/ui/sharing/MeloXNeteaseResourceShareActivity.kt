@@ -33,6 +33,7 @@ import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.network.NeteaseSocialExtrasClient
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.theme.MeloXTheme
 import kotlinx.coroutines.launch
 
@@ -73,7 +74,7 @@ class MeloXNeteaseResourceShareActivity : ComponentActivity() {
     LaunchedEffect(resource.id) { val cookie = NeteaseSessionStore.readCookie(app); if (!NeteaseSessionStore.containsMusicU(cookie)) { message = "登录网易云音乐后可发送给好友或分享到动态。"; loading = false; return@LaunchedEffect }; runCatching { val profile = account.accountProfile(); ops.messageContacts(profile.userId) }.onSuccess { contacts = it }.onFailure { message = it.message ?: "联系人加载失败" }; loading = false }
     BackHandler(onBack = onBack)
     LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(20.dp, 14.dp, 20.dp, 36.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item { Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(44.dp).meloXLiquidButton(shape = CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) { Text("‹", fontSize = 30.sp) }; Column(Modifier.weight(1f).padding(start = 12.dp)) { Text("分享${resource.kindTitle}", fontSize = 25.sp, fontWeight = FontWeight.Bold); Text(resource.title.ifBlank { "网易云音乐" }, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f)) } } }
+        item { Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(44.dp).meloXLiquidButton(shape = CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) { MeloXActionIcon("‹", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface) }; Column(Modifier.weight(1f).padding(start = 12.dp)) { Text("分享${resource.kindTitle}", fontSize = 25.sp, fontWeight = FontWeight.Bold); Text(resource.title.ifBlank { "网易云音乐" }, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f)) } } }
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ShareAction("系统分享", Modifier.weight(1f), enabled = !busy) { val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${resource.title}\n${resource.url}"); val chooser = Intent.createChooser(send, "系统分享").putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(context, MeloXNeteaseResourceShareActivity::class.java))); context.startActivity(chooser) }; if (resource.supportsTimeline) ShareAction("分享到动态", Modifier.weight(1f), enabled = !busy && NeteaseSessionStore.containsMusicU(NeteaseSessionStore.readCookie(app))) { busy = true; scope.launch { runCatching { social.shareResourceToTimeline(resource.type, resource.id) }.onSuccess { message = "已分享到网易云动态" }.onFailure { message = it.message ?: "动态分享失败" }; busy = false } } } }
         message?.let { item { Text(it, color = if (it.startsWith("已")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 13.sp) } }
         if (loading) item { Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }

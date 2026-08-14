@@ -1,0 +1,10 @@
+Material Symbols Rounded
+
+Copyright 2022 Google LLC
+
+This font is licensed under the Apache License, Version 2.0. A copy of the
+license is available at:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Font source:
+https://fonts.google.com/icons

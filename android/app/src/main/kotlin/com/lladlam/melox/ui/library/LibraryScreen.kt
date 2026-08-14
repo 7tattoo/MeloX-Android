@@ -17,7 +17,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -99,12 +98,14 @@ import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
 import com.lladlam.melox.ui.player.MeloXSongActionsOverlay
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
+import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.cloud.MeloXCloudMusicScreen
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -333,8 +334,8 @@ fun LibraryScreen(
                     Text(
                         text = "音乐库",
                         modifier = Modifier.padding(start = 20.dp, top = 46.dp),
-                        fontSize = 36.sp,
-                        lineHeight = 42.sp,
+                        fontSize = 34.sp,
+                        lineHeight = 41.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -683,7 +684,7 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
               Text(group.playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
               Text("已下载 ${group.songs.size} 首", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp)
           }
-          Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
+          MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
       }
   }
         }
@@ -759,14 +760,16 @@ private fun DownloadNavigationCard(title: String, subtitle: String, onClick: () 
   Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
   Text(subtitle, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
         }
-        Text("›", fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .42f))
+        MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .42f))
     }
 }
 
 @Composable
 private fun DownloadsSubpageHeader(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("‹", fontSize = 30.sp, modifier = Modifier.clickable(onClick = onBack).padding(end = 12.dp))
+        Box(Modifier.size(34.dp).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+            MeloXActionIcon("‹", Modifier.size(20.dp), MaterialTheme.colorScheme.onBackground)
+        }
         Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -793,8 +796,8 @@ private fun MeloXLibraryLoginUnavailable(
         Text(
             "音乐库",
             modifier = Modifier.padding(top = 46.dp),
-            fontSize = 36.sp,
-            lineHeight = 42.sp,
+            fontSize = 34.sp,
+            lineHeight = 41.sp,
             fontWeight = FontWeight.Bold,
         )
         Box(
@@ -852,7 +855,7 @@ private fun MeloXLibrarySegmentedPicker(
     val panelShape = RoundedCornerShape(16.dp)
     val lensShape = RoundedCornerShape(15.dp)
     val panelBackdrop = rememberLayerBackdrop()
-    val dark = isSystemInDarkTheme()
+    val dark = isMeloXDarkTheme()
     val selectedIndex = pages.indexOf(selected).coerceAtLeast(0)
     val lensPosition by animateFloatAsState(
         targetValue = selectedIndex.toFloat(),
@@ -985,7 +988,7 @@ private fun MeloXLibrarySongsPage(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text("♥", color = Color(0xFFFF3147), fontSize = 23.sp)
+                    MeloXActionIcon("♥", Modifier.size(22.dp), Color(0xFFFF3B30))
                     Text("心动模式", fontSize = 17.sp, color = MaterialTheme.colorScheme.onBackground)
                 }
             }
@@ -1308,6 +1311,20 @@ private fun MeloXPlaylistDetailScreen(
             artworkUrl = displayed.coverUrl,
             isPlaying = false,
             modifier = Modifier.fillMaxSize(),
+        )
+        // The animated backdrop can drift darker or lighter than the source
+        // artwork used by the palette sampler. Add Apple's legibility layer so
+        // the chosen foreground remains readable throughout that motion.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    if (palette.prefersDarkAppearance) {
+                        Color.Black.copy(alpha = 0.26f)
+                    } else {
+                        Color.White.copy(alpha = 0.46f)
+                    },
+                ),
         )
 
         Column(
@@ -1788,7 +1805,9 @@ private fun MeloXStandardPlaylistHero(
             }
 
             playlist.description
-                ?.takeIf(String::isNotBlank)
+                ?.takeUnless { description ->
+                    description.isBlank() || description.equals("null", ignoreCase = true)
+                }
                 ?.let { description ->
                     Text(
                         text = description,

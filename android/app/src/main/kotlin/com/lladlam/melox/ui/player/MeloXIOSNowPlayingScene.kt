@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.lladlam.melox.ui.glass.meloXBackdropBlur
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
 import kotlinx.coroutines.delay
@@ -232,6 +234,7 @@ internal fun MeloXIOSNowPlayingScene(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 32.dp),
         ) {
         SceneGrabber(
@@ -374,7 +377,8 @@ internal fun MeloXIOSNowPlayingScene(
         AnimatedVisibility(
             visible = page != MeloXNowPlayingPage.Lyrics || showsLyricsControls,
             modifier = Modifier
-                .align(Alignment.BottomCenter),
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
             enter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
                 slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it / 8 },
             exit = fadeOut(tween(180, easing = FastOutSlowInEasing)) +
@@ -475,6 +479,7 @@ private fun MeloXIOSLandscapeNowPlayingScene(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(horizontal = 20.dp, vertical = 2.dp),
     ) {
         SceneGrabber(onDismiss = onDismiss, dragModifier = grabberDragModifier)
@@ -615,14 +620,14 @@ private fun LandscapeSongHeader(
                     .clickable(onClick = onShowSkyline),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("↗", color = Color.White.copy(alpha = .84f), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                MeloXActionIcon("↗", Modifier.size(19.dp), Color.White.copy(alpha = .84f))
             }
         }
         Box(
             modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onShowActions),
             contentAlignment = Alignment.Center,
         ) {
-            Text("•••", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            MeloXActionIcon("•••", Modifier.size(20.dp), Color.White)
         }
     }
 }

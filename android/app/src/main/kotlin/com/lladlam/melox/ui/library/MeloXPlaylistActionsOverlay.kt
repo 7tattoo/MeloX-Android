@@ -44,6 +44,8 @@ import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassSheet
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,9 +66,8 @@ internal fun MeloXPlaylistActionsOverlay(
     var message by remember(playlist.id,visible){mutableStateOf<String?>(null)}
     LaunchedEffect(visible,playlist.id){if(!visible)return@LaunchedEffect;runCatching{val p=account.accountProfile();withContext(Dispatchers.IO){client.userPlaylistsBlocking(p.userId)}.any{it.id==playlist.id}}.onSuccess{subscribed=it}}
     BackHandler(enabled=visible,onBack=onDismiss)
-    AnimatedVisibility(visible=visible,enter=fadeIn(spring(stiffness=520f)),exit=fadeOut(spring(stiffness=620f))){
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.20f)).clickable(interactionSource=remember{MutableInteractionSource()},indication=null,onClick=onDismiss).padding(horizontal=18.dp).navigationBarsPadding(),contentAlignment=Alignment.BottomCenter){
-            Column(Modifier.fillMaxWidth().padding(bottom=18.dp).meloXLiquidButton(shape=RoundedCornerShape(30.dp),tint=Color.White.copy(alpha=.08f),surfaceColor=Color.Black.copy(alpha=.12f),blurRadius=14.dp,lensRadius=20.dp,refractionHeight=22.dp).clickable(interactionSource=remember{MutableInteractionSource()},indication=null,onClick={}).padding(horizontal=18.dp,vertical=18.dp)){
+    MeloXGlassSheet(visible = visible, onDismiss = onDismiss) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=18.dp, vertical=18.dp)){
                 Text("歌单操作",color=Color.White.copy(alpha=.58f),fontSize=13.sp);Text(playlist.name,color=Color.White,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=3.dp,bottom=10.dp))
                 message?.let{Text(it,color=Color(0xFFFF8A90),fontSize=12.sp)}
                 PAction("分享歌单","↗"){sharePlaylist(context,playlist);onDismiss()}
@@ -76,8 +77,7 @@ internal fun MeloXPlaylistActionsOverlay(
                 PAction("刷新","↻"){onRefresh();onDismiss()}
                 if(busy)Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(18.dp),color=Color.White,strokeWidth=2.dp);Spacer(Modifier.size(10.dp));Text("正在处理",color=Color.White.copy(alpha=.6f))}
             }
-        }
     }
 }
-@Composable private fun PAction(title:String,symbol:String,onClick:()->Unit){Row(Modifier.fillMaxWidth().height(48.dp).clickable(onClick=onClick).padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){Box(Modifier.size(28.dp),contentAlignment=Alignment.Center){Text(symbol,color=Color.White,fontSize=19.sp)};Text(title,color=Color.White,fontSize=16.sp,fontWeight=FontWeight.Medium)}}
+@Composable private fun PAction(title:String,symbol:String,onClick:()->Unit){Row(Modifier.fillMaxWidth().height(48.dp).clickable(onClick=onClick).padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){Box(Modifier.size(28.dp),contentAlignment=Alignment.Center){MeloXActionIcon(token=symbol,modifier=Modifier.size(20.dp),color=Color.White.copy(alpha=.86f))};Text(title,color=Color.White,fontSize=16.sp,fontWeight=FontWeight.Medium)}}
 private fun sharePlaylist(context:Context,p:NeteasePlaylistSummary){runCatching{context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,"${p.name}\nhttps://music.163.com/playlist?id=${p.id}"),"分享歌单").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))}}

@@ -48,6 +48,7 @@ import com.lladlam.melox.core.network.MeloXPodcastCategory
 import com.lladlam.melox.core.network.MeloXPodcastProgram
 import com.lladlam.melox.core.network.NeteaseUniversalSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
+import com.lladlam.melox.ui.glass.MeloXActionIcon
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.async
@@ -414,7 +415,7 @@ private fun PodcastListRow(value: MeloXPodcast, onClick: () -> Unit) {
             Text(value.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
             Text(value.host?.nickname ?: value.category.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f), fontSize = 12.sp)
         }
-        Text("›", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .4f), fontSize = 24.sp)
+        MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
     }
 }
 
@@ -426,11 +427,11 @@ private fun PodcastProgramRow(value: MeloXPodcastProgram, onClick: (MeloXPodcast
             Text(value.name, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold, lineHeight = 19.sp)
             Text(formatDuration(value.durationMs), color = MaterialTheme.colorScheme.onBackground.copy(alpha = .45f), fontSize = 11.sp)
         }
-        Text("›", color = MaterialTheme.colorScheme.onBackground.copy(alpha = .4f), fontSize = 24.sp)
+        MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
     }
 }
 
-@Composable private fun PodcastBackHeader(title: String, onBack: () -> Unit) = Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) { Text("‹", fontSize = 36.sp, modifier = Modifier.clickable(onClick = onBack).padding(end = 10.dp)); Text(title, fontSize = 27.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+@Composable private fun PodcastBackHeader(title: String, onBack: () -> Unit) = Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(40.dp).clickable(onClick = onBack), contentAlignment = Alignment.Center) { MeloXActionIcon("‹", Modifier.size(22.dp), MaterialTheme.colorScheme.onBackground) }; Text(title, Modifier.padding(start = 6.dp), fontSize = 27.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis) }
 
 @Composable private fun PodcastPill(text: String, enabled: Boolean = true, onClick: () -> Unit) = Text(text, color = if (enabled) Color.White else Color.White.copy(alpha = .45f), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(PodcastAccent.copy(alpha = if (enabled) 1f else .4f)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp))
 

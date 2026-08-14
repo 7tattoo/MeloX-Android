@@ -35,6 +35,7 @@ import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
+import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.settings.SettingsScreen
 
@@ -349,7 +350,7 @@ private fun ProviderSourceSelectionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .meloXLiquidButton(
+            .meloXContentSurface(
                 shape = RoundedCornerShape(20.dp),
                 surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
             )

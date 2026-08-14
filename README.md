@@ -2,6 +2,11 @@
 
 [![Android](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml/badge.svg)](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.3.2--Dev-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.2-Dev)
+
+<p align="center">
+  <img src="android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="128" alt="MeloX Android icon" />
+</p>
 
 <p align="center">
   使用 Kotlin + Jetpack Compose 构建的 MeloX 原生 Android 迁移版
@@ -11,6 +16,13 @@
 > **MeloX Android 仍处于开发阶段。** 已完成当前 Android 平台范围内的核心功能迁移，并持续以 MeloX 主线作为行为基准；第三方接口、OEM 协议和不同系统版本仍可能带来兼容性变化。
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
+
+## 当前版本：0.3.2-Dev
+
+`0.3.2-Dev` 集中更新了 MeloX iOS / Apple Music 风格的播放器与歌词体验：统一三档歌词渲染逻辑，修复逐字上浮重影和底部歌词突显，增加后续两行预加载，并重构 Liquid Glass 组件与动态背景性能。应用图标现与 MeloX iOS 保持一致。
+
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.2-Dev)
+- 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
 
 
 > Android 迁移说明：收藏歌曲会按 100 首一批完整读取（不再截断）；播放开始与听歌时长会回传网易云；首页会消费网易云 `/homepage/block/page` 推荐块并在缺块时回退；用户主页/用户搜索、专辑收藏、歌手专辑、评论分页、歌曲/歌单/专辑站内资源分享与全局一起听邀请均已接入。
@@ -180,7 +192,7 @@ Liquid Glass 在 Android 上使用 Kyant0 `AndroidLiquidGlass` 的原生 Backdro
    android/app/build/outputs/apk/debug/app-debug.apk
    ```
 
-GitHub Actions 会在 `main` 分支代码更新时自动构建 Debug APK；以 `android-v*` 标签推送时可触发预发布 Release 工作流。
+GitHub Actions 会在 `main` 分支代码更新时自动构建 Debug APK。正式提供给用户的开发版 APK 会使用项目发布密钥签名，并随对应版本号的 GitHub Release 发布。
 
 ## 项目结构
 

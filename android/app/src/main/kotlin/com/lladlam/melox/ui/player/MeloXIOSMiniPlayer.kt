@@ -13,7 +13,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.shapes.Capsule
+import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -128,11 +129,11 @@ fun MeloXIOSMiniPlayer(
             .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
         val miniShape = Capsule()
-        val dark = isSystemInDarkTheme()
+        val dark = isMeloXDarkTheme()
         val fallbackTint = if (dark) {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.64f)
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
         } else {
-            Color.White.copy(alpha = 0.66f)
+            Color.White.copy(alpha = 0.88f)
         }
 
         Box(
@@ -140,13 +141,22 @@ fun MeloXIOSMiniPlayer(
                 .fillMaxWidth()
                 .height(50.dp)
                 .graphicsLayer { alpha = miniSurfaceAlpha }
-                // MiniPlayer is intentionally a sharp translucent surface: it
-                // must not sample or blur the scrolling content behind it.
-                .background(
-                    fallbackTint.copy(alpha = fallbackTint.alpha * 0.40f),
-                    miniShape,
+                // Avoid recursively sampling the scrolling backdrop here. A
+                // stable regular-glass fallback keeps list text from bleeding
+                // through while preserving the floating Liquid Glass depth.
+                .shadow(
+                    elevation = 10.dp,
+                    shape = miniShape,
+                    clip = false,
+                    ambientColor = Color.Black.copy(alpha = if (dark) 0.30f else 0.12f),
+                    spotColor = Color.Black.copy(alpha = if (dark) 0.36f else 0.16f),
                 )
-                .border(.75.dp, Color.White.copy(alpha = if (dark) .16f else .56f), miniShape),
+                .background(fallbackTint, miniShape)
+                .border(
+                    .75.dp,
+                    Color.White.copy(alpha = if (dark) .20f else .72f),
+                    miniShape,
+                ),
         )
 
         Row(
@@ -231,7 +241,7 @@ fun MeloXIOSMiniPlayer(
                             fontSize = 12.sp,
                             lineHeight = 15.sp,
                             softWrap = false,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.54f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.64f),
                         )
                     }
                 }
