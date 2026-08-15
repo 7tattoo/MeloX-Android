@@ -2,7 +2,7 @@
 
 [![Android](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml/badge.svg)](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.2--Dev-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.2-Dev)
+[![Version](https://img.shields.io/badge/version-0.3.3--Dev-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.3-Dev)
 
 <p align="center">
   <img src="android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="128" alt="MeloX Android icon" />
@@ -17,11 +17,11 @@
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
 
-## 当前版本：0.3.2-Dev
+## 当前版本：0.3.3-Dev
 
-`0.3.2-Dev` 集中更新了 MeloX iOS / Apple Music 风格的播放器与歌词体验：统一三档歌词渲染逻辑，修复逐字上浮重影和底部歌词突显，增加后续两行预加载，并重构 Liquid Glass 组件与动态背景性能。应用图标现与 MeloX iOS 保持一致。
+`0.3.3-Dev` 集中更新 MeloX iOS / Apple Music 风格的页面组件、Liquid Glass 交互、Dock 动画、音乐库布局和多音乐源服务页。
 
-- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.2-Dev)
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.3-Dev)
 - 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
 
 

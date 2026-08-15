@@ -17,15 +17,29 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastCoerceAtMost
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
+import com.lladlam.melox.ui.glass.publicdemo.PublicInteractiveHighlight
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tanh
 
 /** The screen backdrop sampled by all MeloX liquid controls. */
 val LocalMeloXBackdrop = staticCompositionLocalOf<Backdrop?> { null }
@@ -46,6 +60,10 @@ fun Modifier.meloXLiquidButton(
     refractionHeight: Dp? = null,
 ): Modifier {
     val baseSpec = MeloXGlassSpec.forMaterial(material)
+    val animationScope = rememberCoroutineScope()
+    val interactiveHighlight = remember(animationScope) {
+        PublicInteractiveHighlight(animationScope)
+    }
     return meloXGlassSurface(
         shape = shape,
         material = material,
@@ -58,9 +76,12 @@ fun Modifier.meloXLiquidButton(
             refractionHeight = refractionHeight ?: baseSpec.refractionHeight,
             // Apple reserves the clear variant for visually rich media.
             // Regular controls use blur/vibrancy without the lens distortion.
-            useLens = material != MeloXGlassMaterial.Regular,
+            useLens = true,
         ),
-    )
+        pressProgress = if (enabled) interactiveHighlight.pressProgress else 0f,
+        dragOffset = if (enabled) interactiveHighlight.offset else Offset.Zero,
+    ).then(if (enabled) interactiveHighlight.modifier else Modifier)
+        .then(if (enabled) interactiveHighlight.gestureModifier else Modifier)
 }
 
 /** Shared material entry point for all Native Component-style controls. */
@@ -71,14 +92,16 @@ fun Modifier.meloXGlassSurface(
     enabled: Boolean = true,
     tint: Color = Color.Unspecified,
     surfaceColor: Color = Color.Unspecified,
+    pressProgress: Float = 0f,
+    dragOffset: Offset = Offset.Zero,
     spec: MeloXGlassSpec = MeloXGlassSpec.forMaterial(material),
 ): Modifier {
     val backdrop = LocalMeloXBackdrop.current
     val alphaScale = if (enabled) 1f else 0.48f
     val isPlain = surfaceColor == Color.Transparent && tint == Color.Unspecified
+    val dark = isMeloXDarkTheme()
     if (isPlain) return this
     if (backdrop == null) {
-        val dark = isMeloXDarkTheme()
         // Keep explicit translucency intact. The previous fallback raised a
         // 5% white tint to 72%, turning every regular glass field into a solid
         // gray slab when no sampled backdrop was available.
@@ -109,11 +132,54 @@ fun Modifier.meloXGlassSurface(
                     lens(
                         spec.lensRadius.toPx(),
                         spec.refractionHeight.toPx(),
-                        chromaticAberration = false,
+                        depthEffect = pressProgress > 0.01f,
+                        chromaticAberration = true,
                     )
                 }
             },
+            highlight = {
+                Highlight.Default.copy(
+                    alpha = ((if (dark) 0.32f else 0.48f) + 0.30f * pressProgress)
+                        .coerceAtMost(1f),
+                )
+            },
+            shadow = {
+                Shadow(
+                    radius = 24.dp,
+                    color = Color.Black.copy(alpha = 0.12f),
+                    alpha = (0.08f + 0.22f * pressProgress) * if (enabled) 1f else 0.35f,
+                )
+            },
+            innerShadow = {
+                InnerShadow(
+                    radius = 4.dp + 8.dp * pressProgress,
+                    color = Color.Black.copy(alpha = 0.12f),
+                    alpha = (0.10f + 0.30f * pressProgress) * if (enabled) 1f else 0.35f,
+                )
+            },
+            layerBlock = {
+                val controlHeight = size.height.coerceAtLeast(1f)
+                val scale = 1f + (4.dp.toPx() / controlHeight) * pressProgress
+                val maxOffset = size.minDimension.coerceAtLeast(1f)
+                translationX = maxOffset * tanh(0.05f * dragOffset.x / maxOffset)
+                translationY = maxOffset * tanh(0.05f * dragOffset.y / maxOffset)
+                val maxDragScale = 4.dp.toPx() / controlHeight
+                val angle = atan2(dragOffset.y, dragOffset.x)
+                scaleX = scale + maxDragScale * abs(cos(angle) * dragOffset.x / size.maxDimension.coerceAtLeast(1f)) *
+                    (size.width / controlHeight).fastCoerceAtMost(1f)
+                scaleY = scale + maxDragScale * abs(sin(angle) * dragOffset.y / size.maxDimension.coerceAtLeast(1f)) *
+                    (controlHeight / size.width.coerceAtLeast(1f)).fastCoerceAtMost(1f)
+            },
             onDrawSurface = {
+                // iOS-style controls keep a faint milky edge in addition to
+                // the sampled/refraction layer, especially over album art.
+                drawRect(
+                    Color.White.copy(alpha = if (dark) 0.045f else 0.12f),
+                    blendMode = BlendMode.Screen,
+                )
+                if (pressProgress > 0.001f) {
+                    drawRect(Color.White.copy(alpha = 0.08f * pressProgress), blendMode = BlendMode.Plus)
+                }
                 if (tint != Color.Unspecified && tint.alpha > 0.001f) {
                     drawRect(tint.copy(alpha = tint.alpha * alphaScale), blendMode = BlendMode.Hue)
                     drawRect(tint.copy(alpha = tint.alpha * 0.75f * alphaScale))
@@ -179,6 +245,7 @@ fun Modifier.meloXLiquidBottomBar(
     shape: Shape,
     tint: Color,
     surfaceColor: Color,
+    pressProgress: Float = 0f,
 ): Modifier {
     val backdrop = LocalMeloXBackdrop.current
     if (backdrop == null) {
@@ -193,13 +260,32 @@ fun Modifier.meloXLiquidBottomBar(
                 shape,
             )
     }
+    val dark = isMeloXDarkTheme()
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             vibrancy()
             blur(8.dp.toPx())
-            lens(24.dp.toPx(), 24.dp.toPx(), chromaticAberration = false)
+            lens(24.dp.toPx(), 28.dp.toPx(), chromaticAberration = true)
+        },
+        highlight = {
+            Highlight.Default.copy(alpha = ((if (dark) 0.32f else 0.54f) + 0.38f * pressProgress).coerceAtMost(1f))
+        },
+        shadow = {
+            Shadow(radius = 24.dp, color = Color.Black.copy(alpha = 0.10f), alpha = 0.10f)
+        },
+        innerShadow = {
+            InnerShadow(
+                radius = 4.dp + 6.dp * pressProgress,
+                color = Color.Black.copy(alpha = 0.12f),
+                alpha = 0.10f + 0.18f * pressProgress,
+            )
+        },
+        layerBlock = {
+            val scale = 1f + 16.dp.toPx() / size.width.coerceAtLeast(1f) * pressProgress
+            scaleX = scale
+            scaleY = scale
         },
         onDrawSurface = {
             drawRect(surfaceColor)
@@ -214,6 +300,10 @@ fun Modifier.meloXLiquidTabSelection(
     selected: Boolean,
     tint: Color,
     panelBackdrop: Backdrop? = null,
+    pressProgress: Float = 0f,
+    scaleX: Float = 1f,
+    scaleY: Float = 1f,
+    velocity: Float = 0f,
 ): Modifier {
     if (!selected) return this
     val backdrop = LocalMeloXBackdrop.current
@@ -223,8 +313,6 @@ fun Modifier.meloXLiquidTabSelection(
     }
     // Official LiquidBottomTabs records the panel into a second Backdrop and
     // samples the combined page + panel scene for the moving selection.
-    // Without this, the selected capsule samples page artwork directly and
-    // appears skewed or punched through.
     val selectionBackdrop = if (panelBackdrop != null) {
         rememberCombinedBackdrop(backdrop, panelBackdrop)
     } else {
@@ -233,13 +321,28 @@ fun Modifier.meloXLiquidTabSelection(
     return drawBackdrop(
         backdrop = selectionBackdrop,
         shape = { shape },
-        // In the upstream LiquidBottomTabs demo all selection refraction,
-        // highlight and shadows are multiplied by pressProgress. At rest that
-        // progress is zero, so keep the stable selected capsule distortion-free.
-        effects = {},
-        highlight = null,
-        shadow = null,
-        innerShadow = null,
-        onDrawSurface = { drawRect(tint) },
+        effects = {
+            lens(
+                14.dp.toPx() * pressProgress,
+                22.dp.toPx() * pressProgress,
+                chromaticAberration = true,
+            )
+        },
+        highlight = { Highlight.Default.copy(alpha = 0.90f * pressProgress) },
+        shadow = { Shadow(alpha = 0.84f * pressProgress) },
+        innerShadow = {
+            InnerShadow(radius = 10.dp * pressProgress, alpha = 0.86f * pressProgress)
+        },
+        layerBlock = {
+            this.scaleX = scaleX
+            this.scaleY = scaleY
+            val normalizedVelocity = velocity / 10f
+            this.scaleX /= 1f - (normalizedVelocity * 0.75f).coerceIn(-0.2f, 0.2f)
+            this.scaleY *= 1f - (normalizedVelocity * 0.25f).coerceIn(-0.2f, 0.2f)
+        },
+        onDrawSurface = {
+            drawRect(tint, alpha = 1f - pressProgress)
+            drawRect(Color.Black.copy(alpha = 0.03f * pressProgress))
+        },
     )
 }

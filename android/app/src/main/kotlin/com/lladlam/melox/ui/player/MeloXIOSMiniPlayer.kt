@@ -9,8 +9,6 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -47,7 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.shapes.Capsule
-import com.lladlam.melox.ui.theme.isMeloXDarkTheme
+import com.lladlam.melox.ui.glass.meloXLiquidButton
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -128,34 +125,20 @@ fun MeloXIOSMiniPlayer(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 3.dp),
     ) {
-        val miniShape = Capsule()
-        val dark = isMeloXDarkTheme()
-        val fallbackTint = if (dark) {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
-        } else {
-            Color.White.copy(alpha = 0.88f)
-        }
-
         Box(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
                 .height(50.dp)
                 .graphicsLayer { alpha = miniSurfaceAlpha }
-                // Avoid recursively sampling the scrolling backdrop here. A
-                // stable regular-glass fallback keeps list text from bleeding
-                // through while preserving the floating Liquid Glass depth.
-                .shadow(
-                    elevation = 10.dp,
-                    shape = miniShape,
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = if (dark) 0.30f else 0.12f),
-                    spotColor = Color.Black.copy(alpha = if (dark) 0.36f else 0.16f),
-                )
-                .background(fallbackTint, miniShape)
-                .border(
-                    .75.dp,
-                    Color.White.copy(alpha = if (dark) .20f else .72f),
-                    miniShape,
+                // Mei's MiniPlayer is a real GlassSurface: the artwork behind
+                // it is sampled, blurred and refracted instead of being hidden
+                // under an opaque rounded rectangle.
+                .meloXLiquidButton(
+                    shape = Capsule(),
+                    blurRadius = 2.dp,
+                    lensRadius = 28.dp,
+                    refractionHeight = 16.dp,
+                    surfaceColor = Color.White.copy(alpha = 0.06f),
                 ),
         )
 

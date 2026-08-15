@@ -2,21 +2,22 @@ package com.lladlam.melox.ui.provider
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +40,12 @@ import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
 import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXGlassDialog
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
+import com.lladlam.melox.ui.glass.MeloXGlassSheet
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.settings.SettingsScreen
 
 private enum class ProviderAccountAction {
@@ -63,6 +72,7 @@ fun ProviderSettingsHub(
     onSourceSelected: (MusicSource) -> Unit,
     neteaseSession: NeteaseSessionStore,
     onNeteaseLogin: () -> Unit,
+    onOpenServices: () -> Unit,
 ) {
     val context = LocalContext.current
     val accountManager = remember(neteaseSession) {
@@ -118,31 +128,26 @@ fun ProviderSettingsHub(
 
         // Source/account management is deliberately a compact overlay so the
         // existing MeloX settings hierarchy, scroll state and visual design stay intact.
-        Row(
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(top = 36.dp, end = 20.dp)
+                .padding(top = 20.dp, end = 20.dp)
+                .size(56.dp)
                 .meloXLiquidButton(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = androidx.compose.foundation.shape.CircleShape,
                     surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
-                    lensRadius = 9.dp,
-                    refractionHeight = 15.dp,
+                    lensRadius = 12.dp,
+                    refractionHeight = 18.dp,
                 )
-                .clickable { showServiceDialog = true }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .clickable { onOpenServices() }
+                .semantics { contentDescription = "音乐服务：${currentSource.displayName}" },
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                "♫ ${currentSource.displayName}",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            Text(
-                "  ▾",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+            MeloXSymbolIcon(
+                MeloXSymbol.MusicNote,
+                Modifier.size(27.dp),
+                MaterialTheme.colorScheme.onBackground,
             )
         }
     }
@@ -151,15 +156,19 @@ fun ProviderSettingsHub(
         val currentAccount = remember(loginRevision, currentSource, showServiceDialog) {
             accountManager.state(currentSource)
         }
-        AlertDialog(
-            onDismissRequest = { showServiceDialog = false },
-            title = { Text("音乐服务") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                ) {
+        MeloXGlassSheet(
+            visible = true,
+            onDismiss = { showServiceDialog = false },
+            modifier = Modifier.fillMaxHeight(0.88f),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text("音乐服务", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(8.dp))
                     Text(
                         "只切换数据源。MeloX 的播放、歌词、外观、动画、背景和页面设置共用同一份配置。",
                         fontSize = 12.sp,
@@ -291,12 +300,13 @@ fun ProviderSettingsHub(
                         enabled = false,
                         onCheckedChange = {},
                     )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showServiceDialog = false }) { Text("完成") }
-            },
-        )
+            }
+            MeloXGlassButton(
+                onClick = { showServiceDialog = false },
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                style = MeloXGlassButtonStyle.BorderedProminent,
+            ) { Text("完成") }
+        }
     }
 
     pendingAccountAction?.let { pending ->
@@ -308,12 +318,26 @@ fun ProviderSettingsHub(
             ProviderAccountAction.Logout -> "只会清除 MeloX 本机保存的该平台登录态，其他音乐服务不会受影响。"
             ProviderAccountAction.SwitchAccount -> "会先清除当前账号的本机登录态，然后重新打开该平台登录流程。"
         }
-        AlertDialog(
-            onDismissRequest = { pendingAccountAction = null },
-            title = { Text(actionTitle) },
-            text = { Text(actionBody) },
-            confirmButton = {
-                TextButton(
+        MeloXGlassDialog(
+            visible = true,
+            onDismiss = { pendingAccountAction = null },
+        ) {
+            Text(actionTitle, style = MaterialTheme.typography.titleLarge)
+            Text(
+                actionBody,
+                modifier = Modifier.padding(top = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                MeloXGlassButton(
+                    onClick = { pendingAccountAction = null },
+                    modifier = Modifier.weight(1f),
+                    style = MeloXGlassButtonStyle.Plain,
+                ) { Text("取消") }
+                MeloXGlassButton(
                     onClick = {
                         when (pending.action) {
                             ProviderAccountAction.Logout -> accountManager.logout(pending.source)
@@ -329,14 +353,15 @@ fun ProviderSettingsHub(
                             }
                         }
                     },
-                ) {
-                    Text(if (pending.action == ProviderAccountAction.Logout) "退出" else "继续")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingAccountAction = null }) { Text("取消") }
-            },
-        )
+                    modifier = Modifier.weight(1f),
+                    style = if (pending.action == ProviderAccountAction.Logout) {
+                        MeloXGlassButtonStyle.Destructive
+                    } else {
+                        MeloXGlassButtonStyle.BorderedProminent
+                    },
+                ) { Text(if (pending.action == ProviderAccountAction.Logout) "退出" else "继续") }
+            }
+        }
     }
 }
 
@@ -373,7 +398,7 @@ private fun ProviderSourceSelectionRow(
         }
         Text(
             if (selected) "✓" else "",
-            color = MaterialTheme.colorScheme.primary,
+            color = com.lladlam.melox.ui.glass.MeloXSystemColors.Red,
             fontSize = 19.sp,
         )
     }

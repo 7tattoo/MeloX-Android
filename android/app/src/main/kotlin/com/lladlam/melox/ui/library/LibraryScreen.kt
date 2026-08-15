@@ -99,6 +99,12 @@ import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXTypography
+import com.lladlam.melox.ui.glass.meloXContentSurface
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
@@ -331,20 +337,15 @@ fun LibraryScreen(
                         .background(MaterialTheme.colorScheme.background)
                         .statusBarsPadding(),
                 ) {
-                    Text(
-                        text = "音乐库",
-                        modifier = Modifier.padding(start = 20.dp, top = 46.dp),
-                        fontSize = 34.sp,
-                        lineHeight = 41.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                    MeloXIosTopBar(
+                        title = "音乐库",
                     )
 
                     MeloXLibrarySegmentedPicker(
                         selected = selectedPage,
                         onSelected = { selectedPage = it },
                         source = source,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 24.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
 
                     if (errorMessage != null && snapshot == null) {
@@ -420,7 +421,11 @@ fun LibraryScreen(
 
                             MeloXLibraryPage.Podcasts -> MeloXPodcastScreen(subscriptionsOnly = true)
 
-                            MeloXLibraryPage.Cloud -> MeloXCloudMusicScreen()
+                            MeloXLibraryPage.Cloud -> Box(
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                            ) {
+                                MeloXCloudMusicScreen(embedded = true)
+                            }
 
                             MeloXLibraryPage.History -> MeloXLibrarySongsPage(
                                 songs = data.recentSongs,
@@ -750,8 +755,10 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
 private fun DownloadNavigationCard(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp).height(66.dp)
-  .clip(RoundedCornerShape(18.dp))
-  .background(MaterialTheme.colorScheme.onBackground.copy(alpha = .055f))
+  .meloXContentSurface(
+      shape = MeloXShapes.card,
+      surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .055f),
+  )
   .clickable(onClick = onClick)
   .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -770,7 +777,7 @@ private fun DownloadsSubpageHeader(title: String, onBack: () -> Unit) {
         Box(Modifier.size(34.dp).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
             MeloXActionIcon("‹", Modifier.size(20.dp), MaterialTheme.colorScheme.onBackground)
         }
-        Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(title, style = MeloXTypography.title2)
     }
 }
 
@@ -793,12 +800,9 @@ private fun MeloXLibraryLoginUnavailable(
             .statusBarsPadding()
             .padding(horizontal = 20.dp),
     ) {
-        Text(
-            "音乐库",
-            modifier = Modifier.padding(top = 46.dp),
-            fontSize = 34.sp,
-            lineHeight = 41.sp,
-            fontWeight = FontWeight.Bold,
+        MeloXIosTopBar(
+            title = "音乐库",
+            contentPadding = PaddingValues(horizontal = 0.dp),
         )
         Box(
             modifier = Modifier
@@ -819,22 +823,16 @@ private fun MeloXLibraryLoginUnavailable(
                     textAlign = TextAlign.Center,
                 )
                 if (onLogin != null) {
-                    Surface(
-                        modifier = Modifier
-                            .padding(top = 18.dp)
-                            .meloXLiquidButton(
-                                shape = RoundedCornerShape(18.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                                surfaceColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f),
-                            )
-                            .clickable(onClick = onLogin),
+                    MeloXGlassButton(
+                        onClick = onLogin,
+                        modifier = Modifier.padding(top = 18.dp),
+                        style = MeloXGlassButtonStyle.BorderedProminent,
                         shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.primary,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                     ) {
                         Text(
                             if (source == MusicSource.Netease) "登录网易云音乐" else "前往登录 ${source.displayName}",
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -852,7 +850,7 @@ private fun MeloXLibrarySegmentedPicker(
     modifier: Modifier = Modifier,
 ) {
     val pages = MeloXLibraryPage.entries.filter { it.isEnabled(source) }
-    val panelShape = RoundedCornerShape(16.dp)
+    val panelShape = MeloXShapes.compact
     val lensShape = RoundedCornerShape(15.dp)
     val panelBackdrop = rememberLayerBackdrop()
     val dark = isMeloXDarkTheme()
@@ -1115,6 +1113,10 @@ private fun MeloXLibraryPlaylistsPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .meloXContentSurface(
+                        shape = MeloXShapes.compact,
+                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+                    )
                     .clickable { onPlaylistClick(playlist) }
                     .padding(horizontal = 18.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -49,6 +49,9 @@ import com.lladlam.melox.core.network.MeloXPodcastProgram
 import com.lladlam.melox.core.network.NeteaseUniversalSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.meloXContentSurface
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.async
@@ -177,12 +180,7 @@ private fun PodcastHome(
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             item {
-                Text(
-                    if (subscriptionsOnly) "订阅播客" else "播客",
-                    fontSize = 32.sp,
-                    lineHeight = 38.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                MeloXIosTopBar(title = if (subscriptionsOnly) "订阅播客" else "播客")
             }
             if (subscriptions.isNotEmpty()) {
                 item { PodcastSectionTitle("我的订阅", "${subscriptions.size} 个") }
@@ -401,7 +399,17 @@ private fun PodcastStrip(values: List<MeloXPodcast>, onPodcast: (MeloXPodcast) -
 
 @Composable
 private fun PodcastCategoryTile(value: MeloXPodcastCategory, modifier: Modifier, onClick: () -> Unit) {
-    Row(modifier.height(72.dp).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.onBackground.copy(alpha = .055f)).clickable(onClick = onClick).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier
+            .height(72.dp)
+            .meloXContentSurface(
+                shape = MeloXShapes.card,
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .035f),
+            )
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         AsyncImage(value.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(13.dp)))
         Text(value.name, Modifier.padding(start = 10.dp), maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
     }

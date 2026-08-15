@@ -17,11 +17,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,10 +43,20 @@ import com.lladlam.melox.core.network.NeteaseUniversalSearchClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
+import com.lladlam.melox.ui.glass.MeloXGlassDialog
+import com.lladlam.melox.ui.glass.MeloXTypography
+import com.lladlam.melox.ui.glass.meloXContentSurface
 import kotlinx.coroutines.launch
 
 @Composable
-fun MeloXCloudMusicScreen(modifier: Modifier = Modifier) {
+fun MeloXCloudMusicScreen(
+    modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+) {
     val context = LocalContext.current
     val app = context.applicationContext
     val client = remember(app) {
@@ -92,22 +100,39 @@ fun MeloXCloudMusicScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { refresh() }
 
     pendingDelete?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("从音乐云盘删除？") },
-            text = { Text("将从网易云音乐账号中删除《${target.song.name}》。") },
-            confirmButton = {
-                TextButton(onClick = {
+        MeloXGlassDialog(
+            visible = true,
+            onDismiss = { pendingDelete = null },
+        ) {
+            Text("从音乐云盘删除？", style = MeloXTypography.title2)
+            Text(
+                "将从网易云音乐账号中删除《${target.song.name}》。",
+                modifier = Modifier.padding(top = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                MeloXGlassButton(
+                    onClick = { pendingDelete = null },
+                    modifier = Modifier.weight(1f),
+                    style = MeloXGlassButtonStyle.Plain,
+                ) { Text("取消") }
+                MeloXGlassButton(
+                    onClick = {
                     pendingDelete = null
                     scope.launch {
                         runCatching { client.deleteCloudSong(target.id) }
                             .onSuccess { values = values.filterNot { it.id == target.id } }
                             .onFailure { error = it.message ?: "云盘删除失败" }
                     }
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("取消") } },
-        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    style = MeloXGlassButtonStyle.Destructive,
+                ) { Text("删除") }
+            }
+        }
     }
 
     val displayed = remember(values, query) {
@@ -119,21 +144,40 @@ fun MeloXCloudMusicScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("音乐云盘", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(quota, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
+    Column(if (embedded) modifier.fillMaxWidth() else modifier.fillMaxSize()) {
+        if (embedded) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (uploading) "上传中…" else "上传",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(enabled = !uploading) { uploadLauncher.launch("audio/*") }.padding(10.dp),
+                )
+                Text("刷新", color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { scope.launch { refresh() } }.padding(10.dp))
             }
-            Text(
-                if (uploading) "上传中…" else "上传",
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(enabled = !uploading) { uploadLauncher.launch("audio/*") }.padding(10.dp),
-            )
-            Text("刷新", color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { scope.launch { refresh() } }.padding(10.dp))
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    MeloXIosTopBar(
+                        title = "音乐云盘",
+                        subtitle = quota,
+                        modifier = Modifier.padding(horizontal = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                    )
+                }
+                Text(
+                    if (uploading) "上传中…" else "上传",
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(enabled = !uploading) { uploadLauncher.launch("audio/*") }.padding(10.dp),
+                )
+                Text("刷新", color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { scope.launch { refresh() } }.padding(10.dp))
+            }
         }
         Box(
             Modifier.padding(horizontal = 18.dp).fillMaxWidth().meloXLiquidButton(
@@ -153,9 +197,16 @@ fun MeloXCloudMusicScreen(modifier: Modifier = Modifier) {
             ) {
                 items(displayed, key = { it.id }) { item ->
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable {
+                        Modifier
+                            .fillMaxWidth()
+                            .meloXContentSurface(
+                                shape = MeloXShapes.card,
+                                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .035f),
+                            )
+                            .clickable {
                             PlaybackCommands.playQueue(context, displayed.map(MeloXCloudSong::song), item.song.id)
-                        }.padding(8.dp),
+                        }
+                            .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AsyncImage(item.song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)))

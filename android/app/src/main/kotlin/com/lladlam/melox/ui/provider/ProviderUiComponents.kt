@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,6 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXGlassToggle
+import com.lladlam.melox.ui.glass.meloXContentSurface
 
 /**
  * Small provider-service controls used inside the canonical MeloX settings shell.
@@ -34,8 +36,10 @@ internal fun ProviderSimpleCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f))
+            .meloXContentSurface(
+                shape = MeloXShapes.card,
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+            )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
@@ -61,8 +65,10 @@ internal fun ProviderSettingToggle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f))
+            .meloXContentSurface(
+                shape = MeloXShapes.card,
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
+            )
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -75,7 +81,7 @@ internal fun ProviderSettingToggle(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 0.48f else 0.30f),
             )
         }
-        Switch(
+        MeloXGlassToggle(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,

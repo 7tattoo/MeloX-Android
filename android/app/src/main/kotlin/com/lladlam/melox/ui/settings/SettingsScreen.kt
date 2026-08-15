@@ -15,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,7 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,8 +77,15 @@ import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXGlassTextField
+import com.lladlam.melox.ui.glass.MeloXGlassToggle
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXTypography
+import com.lladlam.melox.ui.glass.MeloXIosGroupedList
+import com.lladlam.melox.ui.glass.MeloXIosListRow
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
 import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.Dispatchers
@@ -88,8 +95,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class SettingsRoute(val title: String) {
-    Playback("播放与音频"),
-    PlayerAppearance("播放器外观"),
+    Playback("播放"),
+    PlayerAppearance("外观"),
     Lyrics("歌词"),
     SystemPlayback("系统歌词显示"),
     SkylineLyrics("全屏天际歌词"),
@@ -97,7 +104,7 @@ private enum class SettingsRoute(val title: String) {
     ContentFeatures("功能模块"),
     Recognition("听歌识曲"),
     Messages("私信与站内分享"),
-    Content("发现内容"),
+    Content("内容"),
     Storage("存储管理"),
     TabLayout("页面与标签栏"),
     General("通用"),
@@ -115,28 +122,24 @@ private data class SettingsItem(
 private data class SettingsSection(val title: String, val items: List<SettingsItem>)
 
 private val SettingsSections = listOf(
-    SettingsSection("播放与声音", listOf(
-        SettingsItem(SettingsRoute.Playback, "音质、播放行为与自动混音", "♫", "高品质 无损 上一首 页面记忆 心动模式 交叉淡化"),
+    SettingsSection("应用", listOf(
+        SettingsItem(SettingsRoute.General, "主题、启动行为与链接处理", "⚙", "主题 浅色 深色 跟随系统 默认页面 剪贴板"),
         SettingsItem(SettingsRoute.PlayerAppearance, "背景、封面动画与屏幕常亮", "✦", "模糊 色彩 饱和度 封面 自动锁屏"),
+        SettingsItem(SettingsRoute.Content, "地区、歌单信息和发现内容", "▦", "华语 欧美 韩国 日本 播放量 内容"),
+        SettingsItem(SettingsRoute.Playback, "音质、播放行为与自动混音", "♫", "高品质 无损 上一首 页面记忆 心动模式 交叉淡化 播放"),
+        SettingsItem(SettingsRoute.Lyrics, "翻译、罗马音、逐字与歌词交互", "❞", "Apple Music EVA 文字PV 字体 YRC 翻译 罗马音 歌词"),
+        SettingsItem(SettingsRoute.Storage, "空间统计、下载与缓存清理", "▰", "下载 存储 缓存 清理 数据库"),
     )),
-    SettingsSection("歌词与显示", listOf(
-        SettingsItem(SettingsRoute.Lyrics, "翻译、罗马音、逐字与歌词交互", "❞", "Apple Music EVA 文字PV 字体 YRC 翻译 罗马音"),
+    SettingsSection("扩展", listOf(
+        SettingsItem(SettingsRoute.ContentFeatures, "播客、云盘、最近播放等模块", "☷", "播客 广播 云盘 最近播放 下载"),
+        SettingsItem(SettingsRoute.Recognition, "麦克风音频指纹与持续识别", "⌁", "听歌识曲 麦克风 指纹 Shazam 持续识别"),
+        SettingsItem(SettingsRoute.Messages, "联系人、会话历史与文字私信", "✉", "私信 联系人 会话 分享 网易云"),
+        SettingsItem(SettingsRoute.TabLayout, "首页、标签栏与音乐库页面", "▥", "首页 标签栏 排序 推荐 歌单 历史"),
         SettingsItem(SettingsRoute.SystemPlayback, "通知、锁屏和系统媒体信息", "▣", "控制中心 通知 锁屏 Media3"),
         SettingsItem(SettingsRoute.SkylineLyrics, "横屏布局与动态背景歌词", "▱", "横屏 字号 背景歌词"),
         SettingsItem(SettingsRoute.FloatingLyrics, "Android 悬浮歌词能力与权限", "▤", "画中画 悬浮窗 其他应用"),
     )),
-    SettingsSection("内容与存储", listOf(
-        SettingsItem(SettingsRoute.ContentFeatures, "播客、云盘、最近播放等模块", "☷", "播客 广播 云盘 最近播放 下载"),
-        SettingsItem(SettingsRoute.Recognition, "麦克风音频指纹与持续识别", "⌁", "听歌识曲 麦克风 指纹 Shazam 持续识别"),
-        SettingsItem(SettingsRoute.Messages, "联系人、会话历史与文字私信", "✉", "私信 联系人 会话 分享 网易云"),
-        SettingsItem(SettingsRoute.Content, "地区、歌单信息和发现内容", "▦", "华语 欧美 韩国 日本 播放量"),
-        SettingsItem(SettingsRoute.Storage, "空间统计与缓存清理", "▰", "缓存 存储 清理 数据库"),
-    )),
-    SettingsSection("界面与应用", listOf(
-        SettingsItem(SettingsRoute.TabLayout, "首页、标签栏与音乐库页面", "▥", "首页 标签栏 排序 推荐 歌单 历史"),
-        SettingsItem(SettingsRoute.General, "主题、启动行为与链接处理", "⚙", "主题 浅色 深色 跟随系统 默认页面 剪贴板"),
-    )),
-    SettingsSection("关于与开发", listOf(
+    SettingsSection("关于", listOf(
         SettingsItem(SettingsRoute.About, "版本、项目主页与开源信息", "ⓘ", "GitHub 更新 开源 许可"),
         SettingsItem(SettingsRoute.Developer, "播放器诊断与迁移状态", "⌘", "BeatNet 节拍 调试 日志"),
     )),
@@ -183,10 +186,12 @@ fun SettingsScreen(
             .padding(horizontal = 20.dp)
             .padding(top = 18.dp, bottom = MeloXBottomContentClearance),
     ) {
-        Text("设置", fontSize = 34.sp, lineHeight = 41.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(20.dp))
-        SettingsSearchField(search, { search = it })
-        Spacer(Modifier.height(22.dp))
+        MeloXIosTopBar(
+            title = "设置",
+            modifier = Modifier.padding(horizontal = 0.dp),
+            contentPadding = PaddingValues(horizontal = 0.dp),
+        )
+        Spacer(Modifier.height(26.dp))
 
         if (normalized.isBlank() || "网易云账号 登录 cookie 用户".contains(normalized)) {
             SettingsAccountCard(session = session, onLogin = onLogin)
@@ -247,96 +252,58 @@ private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit) 
 
 @Composable
 private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Unit) {
+    val accent = com.lladlam.melox.ui.glass.MeloXSystemColors.Red
     Text(
-        "网易云音乐账号",
+        "账号",
         modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
         fontSize = 13.sp,
         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
     )
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .meloXContentSurface(
-                shape = RoundedCornerShape(28.dp),
-                surfaceColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-            )
-            .clickable(enabled = !session.isLoggedIn, onClick = onLogin),
-        shape = RoundedCornerShape(28.dp), color = Color.Transparent,
-    ) {
+    MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surface) {
         when {
             session.isLoggedIn && session.profile != null -> {
                 val profile = session.profile!!
-                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = profile.avatarUrl,
-                        contentDescription = null,
-                        modifier = Modifier.size(58.dp).clip(CircleShape),
-                    )
-                    Spacer(Modifier.size(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(profile.nickname, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text(
-                            "用户 ID ${profile.userId} · 账号信息与同步",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f),
-                            fontSize = 13.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    MeloXActionIcon("›", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
-                }
+                MeloXIosListRow(
+                    title = profile.nickname,
+                    leading = { AsyncImage(model = profile.avatarUrl, contentDescription = null, modifier = Modifier.size(30.dp).clip(CircleShape)) },
+                    detail = "已登录",
+                    chevronTint = accent,
+                    onClick = onLogin,
+                    showTopSeparator = false,
+                )
             }
-            session.isLoggedIn && session.isRefreshing -> Row(
-                Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(Modifier.size(32.dp))
-                Spacer(Modifier.size(14.dp))
-                Text("正在读取账号信息")
-            }
-            else -> Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(58.dp), contentAlignment = Alignment.Center) {
-                    MeloXActionIcon("＋", Modifier.size(25.dp), MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.size(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("登录网易云音乐", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text("同步收藏、歌单与播放记录", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f))
-                }
-                MeloXActionIcon("›", Modifier.size(20.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
-            }
+            session.isLoggedIn && session.isRefreshing -> MeloXIosListRow(
+                title = "正在读取账号信息",
+                leading = { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = accent) },
+                showTopSeparator = false,
+            )
+            else -> MeloXIosListRow(
+                title = "登录网易云音乐",
+                leading = { MeloXSymbolIcon(MeloXSymbol.Person, Modifier.size(30.dp), accent, MeloXSymbolVariant.Fill) },
+                chevronTint = accent,
+                onClick = onLogin,
+                showTopSeparator = false,
+            )
         }
     }
 }
 
 @Composable
 private fun SettingsSectionCard(section: SettingsSection, onOpen: (SettingsRoute) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .meloXContentSurface(
-                shape = RoundedCornerShape(26.dp),
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.045f),
-            )
-            .padding(vertical = 5.dp),
-    ) {
+    val accent = com.lladlam.melox.ui.glass.MeloXSystemColors.Red
+    MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surface) {
         section.items.forEach { item ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(item.route) }
-                    .padding(horizontal = 16.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                    MeloXActionIcon(item.symbol, Modifier.size(20.dp), MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.size(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(item.route.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Text(item.subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f), maxLines = 2)
-                }
-                MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .28f))
-            }
+            MeloXIosListRow(
+                title = item.route.title,
+                leading = {
+                    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                        MeloXActionIcon(item.symbol, Modifier.size(22.dp), accent)
+                    }
+                },
+                chevronTint = accent,
+                onClick = { onOpen(item.route) },
+                showTopSeparator = item != section.items.first(),
+            )
         }
     }
 }
@@ -1695,7 +1662,7 @@ private fun SettingsToggleRow(
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 note?.let { Text(it, modifier = Modifier.padding(top = 3.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f)) }
             }
-            Switch(checked = value, onCheckedChange = {
+            MeloXGlassToggle(checked = value, onCheckedChange = {
                 value = it
                 MeloXSettingsPreferences.setBoolean(context, key, it)
             })
@@ -1717,7 +1684,7 @@ private fun SettingsExternalToggleRow(
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 note?.let { Text(it, modifier = Modifier.padding(top = 3.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f)) }
             }
-            Switch(checked = value, onCheckedChange = onValueChange)
+            MeloXGlassToggle(checked = value, onCheckedChange = onValueChange)
         }
     }
     Spacer(Modifier.height(10.dp))
@@ -1738,7 +1705,7 @@ private fun SettingsChoiceRow(title: String, selected: Boolean, onClick: () -> U
 private fun SettingsGlassGroup(content: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().meloXContentSurface(
-            shape = RoundedCornerShape(24.dp),
+            shape = MeloXShapes.largeCard,
             surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
         ),
     ) { content() }

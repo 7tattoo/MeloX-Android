@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -71,8 +72,18 @@ import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.account.MeloXAccountActivity
 import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXGlassCard
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXSystemColors
+import com.lladlam.melox.ui.glass.MeloXTypography
+import com.lladlam.melox.ui.glass.meloXContentSurface
+import com.lladlam.melox.ui.glass.meloXGlassSurface
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
 import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import kotlinx.coroutines.Dispatchers
@@ -398,8 +409,22 @@ private fun MeloXHomeLayout(
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 146.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
-                item { LargeTitle("首页") }
-                account?.let { item { HomeAccountCard(it) } }
+                item {
+                    MeloXIosTopBar(
+                        title = "首页",
+                        contentPadding = PaddingValues(horizontal = 0.dp),
+                        actions = {
+                            account?.let { HomeAccountButton(it) }
+                        },
+                    )
+                }
+                item {
+                    Text(
+                        text = "下午好",
+                        style = MeloXTypography.headline,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
+                    )
+                }
                 blocks.forEach { block ->
                     when (block) {
                         HomeBlock.QuickActions -> item { HomeQuickActions(activeAction, onQuickAction) }
@@ -446,33 +471,34 @@ private fun MeloXHomeLayout(
 }
 
 @Composable
-private fun HomeAccountCard(account: HomeAccountUi) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.onBackground.copy(alpha = .055f))
-            .then(if (account.onClick != null) Modifier.clickable(onClick = account.onClick) else Modifier)
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun HomeAccountButton(account: HomeAccountUi) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .meloXGlassSurface(
+                shape = CircleShape,
+                tint = MeloXSystemColors.Red.copy(alpha = 0.12f),
+                surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.18f),
+            )
+            .clickable(enabled = account.onClick != null, onClick = { account.onClick?.invoke() }),
+        contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            account.avatarUrl,
-            null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(27.dp)),
-        )
-        Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(account.name, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text(
-                account.subtitle,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f),
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (account.avatarUrl.isNullOrBlank()) {
+            MeloXSymbolIcon(
+                MeloXSymbol.Person,
+                Modifier.size(25.dp),
+                MeloXSystemColors.Red,
+                MeloXSymbolVariant.Fill,
+            )
+        } else {
+            AsyncImage(
+                account.avatarUrl,
+                null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
             )
         }
-        if (account.onClick != null) MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .55f))
     }
 }
 
@@ -662,23 +688,35 @@ private fun MeloXExploreLayout(
     onCollection: (DiscoveryCollection) -> Unit,
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 18.dp)) {
-        LargeTitle("发现", Modifier.padding(horizontal = 20.dp))
+        MeloXIosTopBar(
+            title = "发现",
+            // Explore is not inside a horizontally padded LazyColumn like
+            // Home, so give the large title the same 20dp safe inset.
+            contentPadding = PaddingValues(horizontal = 20.dp),
+        )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(categories) { item ->
-                Text(
-                    text = item.removeSuffix("歌单"),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (category == item) Accent else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
-                        .clickable { onCategory(item) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = if (category == item) Color.White else MaterialTheme.colorScheme.onBackground,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                MeloXGlassButton(
+                    onClick = { onCategory(item) },
+                    modifier = Modifier.height(38.dp),
+                    style = if (category == item) {
+                        com.lladlam.melox.ui.glass.MeloXGlassButtonStyle.BorderedProminent
+                    } else {
+                        com.lladlam.melox.ui.glass.MeloXGlassButtonStyle.Bordered
+                    },
+                    tint = if (category == item) Accent else Color.Unspecified,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text = item.removeSuffix("歌单"),
+                        color = if (category == item) Color.White else MaterialTheme.colorScheme.onBackground,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
             }
         }
         Box(modifier = Modifier.weight(1f)) {
@@ -699,9 +737,7 @@ private fun LargeTitle(text: String, modifier: Modifier = Modifier) = Text(
     modifier,
     // Match iOS largeTitle metrics instead of letting the CJK fallback
     // overpower the content below it.
-    fontSize = 34.sp,
-    lineHeight = 41.sp,
-    fontWeight = FontWeight.Bold,
+    style = MeloXTypography.largeTitle,
     color = MaterialTheme.colorScheme.onBackground,
 )
 
@@ -710,7 +746,7 @@ private fun SectionTitle(title: String, trailing: String) = Row(
     Modifier.fillMaxWidth(),
     horizontalArrangement = Arrangement.SpaceBetween,
 ) {
-    Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Text(title, style = MeloXTypography.title2)
     Text(trailing, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .42f), fontSize = 13.sp)
 }
 
@@ -739,7 +775,15 @@ private fun CollectionGrid(values: List<DiscoveryCollection>, onSelect: (Discove
 
 @Composable
 private fun CollectionCard(value: DiscoveryCollection, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick)) {
+    Column(
+        modifier
+            .meloXContentSurface(
+                shape = MeloXShapes.card,
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.035f),
+            )
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+    ) {
         val artworkShape = RoundedCornerShape(14.dp)
         // Keep the card visually complete while remote artwork is loading.
         // Without a stable surface, the fixed image slot becomes a blank hole
@@ -783,7 +827,15 @@ private fun compactCount(value: Long): String = when {
 private fun SongRow(song: DiscoveryTrack, onClick: () -> Unit) {
     val artworkShape = RoundedCornerShape(9.dp)
     Row(
-        Modifier.fillMaxWidth().height(58.dp).clickable(onClick = onClick),
+        Modifier
+            .fillMaxWidth()
+            .height(66.dp)
+            .meloXContentSurface(
+                shape = MeloXShapes.compact,
+                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

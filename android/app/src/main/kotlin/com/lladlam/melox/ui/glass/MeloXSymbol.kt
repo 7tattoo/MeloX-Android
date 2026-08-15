@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
@@ -27,6 +29,7 @@ enum class MeloXSymbol(
     Explore("safari", "explore"),
     Library("music.note.list", "library_music"),
     Settings("gearshape", "settings"),
+    Person("person.crop.circle", "account_circle"),
     Search("magnifyingglass", "search"),
     ChevronLeft("chevron.left", "chevron_left"),
     ChevronRight("chevron.right", "chevron_right"),
@@ -82,6 +85,11 @@ fun MeloXSymbolIcon(
     variant: MeloXSymbolVariant = MeloXSymbolVariant.Regular,
     iconSize: TextUnit = 24.sp,
 ) {
+    // Material Symbols uses a taller font box than SF Symbols. Rendering the
+    // glyph at a slightly smaller em size leaves a real optical inset inside
+    // callers' 18/20/24dp icon boxes, instead of clipping the gear and arrows
+    // at their ascender/descender edges.
+    val glyphSize = iconSize * 0.86f
     Text(
         text = symbol.materialLigature,
         modifier = modifier,
@@ -92,8 +100,11 @@ fun MeloXSymbolIcon(
             MeloXSymbolsFont
         },
         fontWeight = if (variant == MeloXSymbolVariant.Fill) FontWeight.Medium else FontWeight.Normal,
-        fontSize = iconSize,
+        fontSize = glyphSize,
         lineHeight = iconSize,
+        style = TextStyle(
+            platformStyle = PlatformTextStyle(includeFontPadding = false),
+        ),
         textAlign = TextAlign.Center,
         maxLines = 1,
     )

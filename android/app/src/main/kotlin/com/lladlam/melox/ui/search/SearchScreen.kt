@@ -79,6 +79,10 @@ import com.lladlam.melox.ui.collection.MeloXCollectionDetailActivity
 import com.lladlam.melox.ui.glass.MeloXGlassButton
 import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.MeloXGlassTextField
+import com.lladlam.melox.ui.glass.MeloXShapes
+import com.lladlam.melox.ui.glass.MeloXTypography
+import com.lladlam.melox.ui.glass.meloXContentSurface
+import com.lladlam.melox.ui.glass.MeloXIosTopBar
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
@@ -420,13 +424,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
             .statusBarsPadding()
             .padding(top = 26.dp),
     ) {
-        Text(
-            "搜索",
-            modifier = Modifier.padding(horizontal = 20.dp),
-            fontSize = 40.sp,
-            lineHeight = 46.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        MeloXIosTopBar(title = "搜索")
         Spacer(Modifier.height(16.dp))
         SearchField(query, { query = it }, source)
         if (query.isNotBlank()) {
@@ -571,7 +569,7 @@ private fun SearchScopes(
                     .height(44.dp)
                     .padding(horizontal = 0.dp),
                 style = MeloXGlassButtonStyle.Bordered,
-                shape = RoundedCornerShape(17.dp),
+                shape = MeloXShapes.capsule,
                 tint = if (item == kind) MeloXSystemColors.Blue.copy(alpha = .28f) else Color.Transparent,
                 surfaceColor = if (item == kind) MeloXSystemColors.Blue.copy(alpha = .16f) else MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
                 contentPadding = PaddingValues(horizontal = 15.dp),
@@ -656,7 +654,12 @@ private fun SearchCategoryCard(title: String, modifier: Modifier, onClick: () ->
         0 -> Color(0xFFE76F51); 1 -> Color(0xFF7B61FF); 2 -> Color(0xFF2A9D8F); 3 -> Color(0xFFE84A8A); else -> Color(0xFF3A86FF)
     }
     Box(
-        modifier.height(92.dp).clip(RoundedCornerShape(15.dp)).background(tint).clickable(onClick = onClick).padding(14.dp),
+        modifier
+            .height(96.dp)
+            .clip(MeloXShapes.compact)
+            .background(tint)
+            .clickable(onClick = onClick)
+            .padding(14.dp),
         contentAlignment = Alignment.BottomStart,
     ) { Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
 }
@@ -687,7 +690,14 @@ private fun ProviderSearchSongResults(
         } else {
             items(values, key = { "provider:${it.id.source.storageValue}:${it.id.value}" }) { track ->
                 Row(
-                    Modifier.fillMaxWidth().clickable { onPlay(track) }.padding(vertical = 9.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .meloXContentSurface(
+                            shape = MeloXShapes.compact,
+                            surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+                        )
+                        .clickable { onPlay(track) }
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     AsyncImage(track.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)))
@@ -716,7 +726,17 @@ private fun ProviderSearchMediaResults(
     if (values.isEmpty()) { SearchEmpty("没有找到内容"); return }
     LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
         items(values, key = ProviderSearchDestination::key) { item ->
-            Row(Modifier.fillMaxWidth().clickable { onOpen(item) }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .meloXContentSurface(
+                        shape = MeloXShapes.compact,
+                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+                    )
+                    .clickable { onOpen(item) }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 AsyncImage(
                     item.artworkUrl,
                     null,
@@ -745,7 +765,17 @@ private fun SearchSongResults(values: List<SearchSong>, onPlay: (SearchSong) -> 
     if (values.isEmpty()) { SearchEmpty("没有找到歌曲"); return }
     LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
         items(values, key = { it.id }) { song ->
-            Row(Modifier.fillMaxWidth().clickable { onPlay(song) }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .meloXContentSurface(
+                        shape = MeloXShapes.compact,
+                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+                    )
+                    .clickable { onPlay(song) }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 AsyncImage(song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -763,7 +793,17 @@ private fun SearchMediaResults(values: List<MeloXSearchMediaItem>, onOpen: (Melo
     if (values.isEmpty()) { SearchEmpty("没有找到内容"); return }
     LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = MeloXBottomContentClearance)) {
         items(values, key = { "${it.kind}-${it.id}" }) { item ->
-            Row(Modifier.fillMaxWidth().clickable { onOpen(item) }.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .meloXContentSurface(
+                        shape = MeloXShapes.compact,
+                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
+                    )
+                    .clickable { onOpen(item) }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 AsyncImage(item.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(54.dp).clip(if (item.kind == MeloXSearchKind.Artists || item.kind == MeloXSearchKind.Users) CircleShape else RoundedCornerShape(8.dp)))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -957,7 +997,7 @@ private fun SearchDetailHeader(title: String, onBack: () -> Unit) {
             MeloXSymbolIcon(MeloXSymbol.ChevronLeft, Modifier.fillMaxSize(), MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.width(12.dp))
-        Text(title, Modifier.weight(1f), fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, Modifier.weight(1f), style = MeloXTypography.title2, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -967,7 +1007,7 @@ private fun SearchPlayButton(title: String, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.height(44.dp).width(120.dp),
         style = MeloXGlassButtonStyle.BorderedProminent,
-        shape = RoundedCornerShape(22.dp),
+        shape = MeloXShapes.capsule,
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         Text(title, fontWeight = FontWeight.SemiBold, color = Color.White)

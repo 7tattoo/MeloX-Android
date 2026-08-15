@@ -27,6 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 
 /**
  * Floating iOS 26-style Action Sheet / Context Menu surface.
@@ -41,42 +44,70 @@ fun MeloXGlassSheet(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.97f),
-        exit = fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = 0.98f),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.18f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                )
-                .padding(horizontal = 18.dp)
-                .navigationBarsPadding(),
-            contentAlignment = Alignment.BottomCenter,
+    val dark = isMeloXDarkTheme()
+    val hasBackdrop = LocalMeloXBackdrop.current != null
+    // Regular pages deliberately do not expose a recursive RenderNode
+    // backdrop. In that safe mode the sheet still needs an opaque fallback;
+    // otherwise the page underneath remains readable through the modal and
+    // makes rows appear to overlap. When a backdrop is available, preserve
+    // the translucent sampled-glass treatment.
+    val sheetTint = when {
+        hasBackdrop && dark -> Color.White.copy(alpha = 0.08f)
+        hasBackdrop -> Color.White.copy(alpha = 0.34f)
+        dark -> Color.Black
+        else -> Color.White
+    }
+    val sheetSurface = when {
+        hasBackdrop && dark -> Color.Black.copy(alpha = 0.12f)
+        hasBackdrop -> Color.White.copy(alpha = 0.20f)
+        dark -> Color.Black
+        else -> Color.White
+    }
+    if (visible) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
-            Column(
-                modifier = modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 18.dp)
-                    .meloXGlassSurface(
-                        shape = RoundedCornerShape(30.dp),
-                        material = MeloXGlassMaterial.Regular,
-                        tint = Color.White.copy(alpha = 0.08f),
-                        surfaceColor = Color.Black.copy(alpha = 0.12f),
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    ),
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.97f),
             ) {
-                SheetGrabber()
-                content()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.18f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss,
+                        )
+                        .padding(horizontal = 18.dp)
+                        .navigationBarsPadding(),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Column(
+                        modifier = modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 18.dp)
+                            .meloXGlassSurface(
+                                shape = MeloXShapes.sheet,
+                                material = MeloXGlassMaterial.Regular,
+                                tint = sheetTint,
+                                surfaceColor = sheetSurface,
+                            )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                    ) {
+                        SheetGrabber()
+                        content()
+                    }
+                }
             }
         }
     }
@@ -90,41 +121,64 @@ fun MeloXGlassDialog(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.96f),
-        exit = fadeOut(spring(stiffness = 620f)) + scaleOut(targetScale = 0.98f),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.22f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
-            contentAlignment = Alignment.Center,
+    val dark = isMeloXDarkTheme()
+    val hasBackdrop = LocalMeloXBackdrop.current != null
+    val dialogTint = when {
+        hasBackdrop && dark -> Color.White.copy(alpha = 0.08f)
+        hasBackdrop -> Color.White.copy(alpha = 0.34f)
+        dark -> Color.Black
+        else -> Color.White
+    }
+    val dialogSurface = when {
+        hasBackdrop && dark -> Color.Black.copy(alpha = 0.12f)
+        hasBackdrop -> Color.White.copy(alpha = 0.20f)
+        dark -> Color.Black
+        else -> Color.White
+    }
+    if (visible) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
-            Column(
-                modifier = modifier
-                    .padding(horizontal = 28.dp)
-                    .fillMaxWidth()
-                    .widthIn(max = 360.dp)
-                    .meloXGlassSurface(
-                        shape = RoundedCornerShape(28.dp),
-                        material = MeloXGlassMaterial.Regular,
-                        tint = Color.White.copy(alpha = 0.08f),
-                        surfaceColor = Color.Black.copy(alpha = 0.12f),
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(spring(stiffness = 520f)) + scaleIn(initialScale = 0.96f),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.22f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        modifier = modifier
+                            .padding(horizontal = 28.dp)
+                            .fillMaxWidth()
+                            .widthIn(max = 360.dp)
+                            .meloXGlassSurface(
+                                shape = RoundedCornerShape(28.dp),
+                                material = MeloXGlassMaterial.Regular,
+                                tint = dialogTint,
+                                surfaceColor = dialogSurface,
+                            )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            )
+                            .padding(horizontal = 18.dp, vertical = 18.dp),
+                        content = content,
                     )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    )
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                content = content,
-            )
+                }
+            }
         }
     }
 }

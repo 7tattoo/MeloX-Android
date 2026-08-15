@@ -38,8 +38,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -92,10 +90,14 @@ import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import com.lladlam.melox.ui.glass.MeloXSystemColors
+import com.lladlam.melox.ui.glass.MeloXGlassDialog
+import com.lladlam.melox.ui.glass.MeloXGlassButton
+import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 import com.lladlam.melox.ui.glass.meloXLiquidBottomBar
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
+import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
@@ -104,6 +106,7 @@ import com.lladlam.melox.ui.provider.ProviderHomeScreen
 import com.lladlam.melox.ui.provider.ProviderLibraryScreen
 import com.lladlam.melox.ui.provider.ProviderSearchScreen
 import com.lladlam.melox.ui.provider.ProviderSettingsHub
+import com.lladlam.melox.ui.provider.ProviderServicesScreen
 import com.lladlam.melox.ui.search.SearchScreen
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
@@ -127,6 +130,7 @@ enum class AppTab(val title: String) {
     Explore("发现"),
     Library("音乐库"),
     Settings("设置"),
+    Services("音乐服务"),
     Search("搜索"),
 }
 
@@ -193,6 +197,10 @@ fun MeloXApp(
         }
     }
     val neteaseSession = rememberNeteaseSessionStore()
+    // Page glass samples a stable background layer. The page itself is
+    // recorded separately for the bottom chrome, so neither layer samples
+    // its own controls and HWUI never enters a recursive RenderNode graph.
+    val pageBackdrop = rememberLayerBackdrop()
     val bottomChromeBackdrop = rememberLayerBackdrop()
 
     LaunchedEffect(Unit) {
@@ -308,22 +316,27 @@ fun MeloXApp(
                 AppTab.Explore -> MeloXSettingsRuntime.exploreTabEnabled
                 AppTab.Library -> MeloXSettingsRuntime.libraryTabEnabled
                 AppTab.Settings -> true
+                AppTab.Services -> false
                 AppTab.Search -> false
             }
         }.let { if (AppTab.Settings in it) it else it + AppTab.Settings }
     LaunchedEffect(visibleRootTabs, selectedTab) {
-        if (selectedTab !in visibleRootTabs && selectedTab != AppTab.Search) {
+        if (selectedTab !in visibleRootTabs && selectedTab != AppTab.Search && selectedTab != AppTab.Services) {
             selectedTab = visibleRootTabs.first()
         }
     }
 
-    // Never let a subtree record itself while its descendants sample that same
-    // backdrop. HWUI recursively prepares such RenderNodes and can terminate
-    // the app on device with a native RenderThread stack overflow. Dedicated
-    // scenes (player and bottom chrome) provide sibling backdrops themselves;
-    // content-layer controls use their standard material fallback here.
-    CompositionLocalProvider(LocalMeloXBackdrop provides null) {
-      Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      // This is intentionally a small, stable source layer. It gives every
+      // page control the same optical backdrop without recording the control
+      // into the layer it samples.
+      Box(
+          modifier = Modifier
+              .fillMaxSize()
+              .background(MaterialTheme.colorScheme.background)
+              .layerBackdrop(pageBackdrop),
+      )
+      CompositionLocalProvider(LocalMeloXBackdrop provides pageBackdrop) {
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
             val sharedScope = this
             val fullPlayerVisible = playbackState.hasMedia &&
@@ -375,12 +388,26 @@ fun MeloXApp(
                                 loginReturnTab = AppTab.Settings
                                 showNeteaseLogin = true
                             },
+                            onOpenServices = { selectedTab = AppTab.Services },
+                        )
+                        AppTab.Services -> ProviderServicesScreen(
+                            currentSource = selectedSource,
+                            onSourceSelected = { source ->
+                                selectedSource = source
+                                MusicProviderSelectionStore.setSelectedSource(context, source)
+                            },
+                            neteaseSession = neteaseSession,
+                            onNeteaseLogin = {
+                                loginReturnTab = AppTab.Services
+                                showNeteaseLogin = true
+                            },
+                            onBack = { selectedTab = AppTab.Settings },
                         )
                     }
                 }
             }
 
-            CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
+            if (selectedTab != AppTab.Services) CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
                 MeloXBottomChrome(
                     selectedTab = selectedTab,
                     source = selectedSource,
@@ -470,82 +497,109 @@ fun MeloXApp(
             )
         }
         clipboardTarget?.let { target ->
-            AlertDialog(
-                onDismissRequest = onClipboardLinkConsumed,
-                title = { Text("打开剪贴板链接？") },
-                text = { Text(if (target is NeteaseClipboardTarget.Song) "检测到网易云歌曲，是否立即播放？" else "检测到网易云歌单，是否立即打开并播放？") },
-                dismissButton = { TextButton(onClick = onClipboardLinkConsumed) { Text("取消") } },
-                confirmButton = {
-                    TextButton(onClick = {
-                        onClipboardLinkConsumed()
-                        playerScope.launch {
-                            val client = NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
-                            val songs = withContext(Dispatchers.IO) {
-                                runCatching {
-                                    when (target) {
-                                        is NeteaseClipboardTarget.Song -> client.songDetailsBlocking(listOf(target.id))
-                                        is NeteaseClipboardTarget.Playlist -> client.playlistDetailBlocking(target.id).songs
-                                    }
-                                }.getOrDefault(emptyList())
-                            }
-                            songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) }
+            MeloXAppDialog(
+                title = "打开剪贴板链接？",
+                message = if (target is NeteaseClipboardTarget.Song) {
+                    "检测到网易云歌曲，是否立即播放？"
+                } else {
+                    "检测到网易云歌单，是否立即打开并播放？"
+                },
+                onDismiss = onClipboardLinkConsumed,
+                onConfirm = {
+                    onClipboardLinkConsumed()
+                    playerScope.launch {
+                        val client = NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
+                        val songs = withContext(Dispatchers.IO) {
+                            runCatching {
+                                when (target) {
+                                    is NeteaseClipboardTarget.Song -> client.songDetailsBlocking(listOf(target.id))
+                                    is NeteaseClipboardTarget.Playlist -> client.playlistDetailBlocking(target.id).songs
+                                }
+                            }.getOrDefault(emptyList())
                         }
-                    }) { Text("打开") }
+                        songs.firstOrNull()?.let { PlaybackCommands.playQueue(context, songs, it.id) }
+                    }
                 },
             )
         }
         if (onboardingPage >= 0) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text(if (onboardingPage == 0) "欢迎使用 MeloX" else "连接音乐服务") },
-                text = {
-                    Text(
-                        if (onboardingPage == 0) {
-                            "用 MeloX 的原生 Android 体验发现和播放音乐。MeloX 是非官方开源项目，与所支持的音乐平台及其关联公司不存在隶属、合作或授权关系。"
-                        } else {
-                            "默认使用网易云音乐；你可以稍后在设置中切换 QQ音乐或酷狗音乐。各平台登录态只保存在本机。"
-                        },
-                    )
+            MeloXAppDialog(
+                title = if (onboardingPage == 0) "欢迎使用 MeloX" else "连接音乐服务",
+                message = if (onboardingPage == 0) {
+                    "用 MeloX 的原生 Android 体验发现和播放音乐。MeloX 是非官方开源项目，与所支持的音乐平台及其关联公司不存在隶属、合作或授权关系。"
+                } else {
+                    "默认使用网易云音乐；你可以稍后在设置中切换 QQ音乐或酷狗音乐。各平台登录态只保存在本机。"
                 },
-                dismissButton = {
-                    TextButton(onClick = {
-                        if (onboardingPage == 0) {
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/lladlam/MeloX-Android"))) }
-                        } else {
-                            MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
-                            onboardingPage = -1
-                        }
-                    }) { Text(if (onboardingPage == 0) "项目与许可" else "稍后再说") }
+                dismissLabel = if (onboardingPage == 0) "项目与许可" else "稍后再说",
+                confirmLabel = if (onboardingPage == 0) "继续" else "登录网易云音乐",
+                onDismiss = {
+                    if (onboardingPage == 0) {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/lladlam/MeloX-Android"))) }
+                    } else {
+                        MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
+                        onboardingPage = -1
+                    }
                 },
-                confirmButton = {
-                    TextButton(onClick = {
-                        if (onboardingPage == 0) {
-                            onboardingPage = 1
-                        } else {
-                            MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
-                            onboardingPage = -1
-                            loginReturnTab = AppTab.Settings
-                            showNeteaseLogin = true
-                        }
-                    }) { Text(if (onboardingPage == 0) "继续" else "登录网易云音乐") }
+                onConfirm = {
+                    if (onboardingPage == 0) {
+                        onboardingPage = 1
+                    } else {
+                        MeloXSettingsPreferences.setBoolean(context, "onboarding_completed", true)
+                        onboardingPage = -1
+                        loginReturnTab = AppTab.Settings
+                        showNeteaseLogin = true
+                    }
                 },
             )
         }
         availableUpdate?.takeIf { onboardingPage < 0 }?.let { release ->
-            AlertDialog(
-                onDismissRequest = { availableUpdate = null },
-                title = { Text("发现 MeloX ${release.version}") },
-                text = { Text(release.name + release.notes.takeIf(String::isNotBlank)?.let { "\n\n${it.take(500)}" }.orEmpty()) },
-                dismissButton = { TextButton(onClick = { availableUpdate = null }) { Text("稍后") } },
-                confirmButton = {
-                    TextButton(onClick = {
-                        availableUpdate = null
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl ?: release.pageUrl))) }
-                    }) { Text(if (release.apkUrl != null) "下载 APK" else "查看发布") }
+            MeloXAppDialog(
+                title = "发现 MeloX ${release.version}",
+                message = release.name + release.notes.takeIf(String::isNotBlank)?.let { "\n\n${it.take(500)}" }.orEmpty(),
+                dismissLabel = "稍后",
+                confirmLabel = if (release.apkUrl != null) "下载 APK" else "查看发布",
+                onDismiss = { availableUpdate = null },
+                onConfirm = {
+                    availableUpdate = null
+                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl ?: release.pageUrl))) }
                 },
             )
         }
       }
+    }
+}
+
+@Composable
+private fun MeloXAppDialog(
+    title: String,
+    message: String,
+    dismissLabel: String = "取消",
+    confirmLabel: String = "确定",
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    MeloXGlassDialog(visible = true, onDismiss = onDismiss) {
+        Text(title, style = MaterialTheme.typography.titleLarge)
+        Text(
+            message,
+            modifier = Modifier.padding(top = 8.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.64f),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            MeloXGlassButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                style = MeloXGlassButtonStyle.Plain,
+            ) { Text(dismissLabel) }
+            MeloXGlassButton(
+                onClick = onConfirm,
+                modifier = Modifier.weight(1f),
+                style = MeloXGlassButtonStyle.BorderedProminent,
+            ) { Text(confirmLabel) }
+        }
     }
 }
 
@@ -587,6 +641,7 @@ private fun MeloXBottomChrome(
     miniPlayer: @Composable (compactProgress: Float) -> Unit,
 ) {
     val tabsBackdrop = rememberLayerBackdrop()
+    val dockScope = rememberCoroutineScope()
     val rawProgress by animateFloatAsState(
         targetValue = if (minimized) 1f else 0f,
         animationSpec = spring(
@@ -661,15 +716,17 @@ private fun MeloXBottomChrome(
             }
 
             val dark = isMeloXDarkTheme()
+            // Mei uses the app's red accent for the selected tab. Blue makes
+            // this chrome read as Material even when the glass effect is on.
             val selectionTint = if (dark) {
-                MeloXSystemColors.Blue.copy(alpha = 0.28f)
+                MeloXSystemColors.Red.copy(alpha = 0.30f)
             } else {
-                MeloXSystemColors.Blue.copy(alpha = 0.16f)
+                MeloXSystemColors.Red.copy(alpha = 0.16f)
             }
             val selectionBorder = if (dark) {
                 Color.White.copy(alpha = 0.42f)
             } else {
-                MeloXSystemColors.Blue.copy(alpha = 0.34f)
+                MeloXSystemColors.Red.copy(alpha = 0.34f)
             }
 
             BoxWithConstraints(
@@ -677,24 +734,7 @@ private fun MeloXBottomChrome(
                     .align(Alignment.BottomStart)
                     .offset(x = horizontalMargin, y = -3.dp)
                     .width(navWidth)
-                    .height(navHeight)
-                    .meloXLiquidBottomBar(
-                        shape = navShape,
-                        tint = bottomLiquidGlassTint(),
-                        surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.18f),
-                    )
-                    .pointerInput(progress, selectedTab) {
-                        detectTapGestures { tap ->
-                            if (progress < 0.56f) {
-                                val segmentWidth = size.width / primaryTabs.size.coerceAtLeast(1).toFloat()
-                                val index = (tap.x / segmentWidth).toInt()
-                                    .coerceIn(0, primaryTabs.lastIndex.coerceAtLeast(0))
-                                onSelect(primaryTabs[index].first)
-                            } else if (progress >= 0.68f) {
-                                onSelect(selectedTab)
-                            }
-                        }
-                    },
+                    .height(navHeight),
             ) {
                 val tabBarMaxWidthPx = constraints.maxWidth
                 val density = LocalDensity.current
@@ -704,7 +744,73 @@ private fun MeloXBottomChrome(
                 val tabCount = primaryTabs.size.coerceAtLeast(1)
                 val selectionSegmentPx = selectionTravelWidthPx / tabCount.toFloat()
                 val selectionWidth = (maxWidth - selectionEdgeInset * 2f) / tabCount.toFloat()
-                Box(Modifier.fillMaxSize()) {
+                val selectedIndex = primaryTabs.indexOfFirst { it.first == selectedTab }
+                val dampedDock = remember(tabCount) {
+                    PublicDampedDragAnimation(
+                        animationScope = dockScope,
+                        initialValue = selectedIndex.coerceAtLeast(0).toFloat(),
+                        valueRange = 0f..(tabCount - 1).toFloat(),
+                        visibilityThreshold = 0.001f,
+                        initialScale = 1f,
+                        pressedScale = 78f / 56f,
+                        onTap = { position ->
+                            if (progress < 0.56f) {
+                                val index = ((position.x - selectionEdgeInsetPx) / selectionSegmentPx)
+                                    .toInt()
+                                    .coerceIn(0, tabCount - 1)
+                                onSelect(primaryTabs[index].first)
+                            } else if (progress >= 0.68f) {
+                                onSelect(selectedTab)
+                            }
+                        },
+                        onDragStopped = {
+                            val target = targetValue.roundToInt().coerceIn(0, tabCount - 1)
+                            animateToValue(target.toFloat())
+                            onSelect(primaryTabs[target].first)
+                        },
+                        onDrag = { _, dragAmount ->
+                            updateValue(
+                                targetValue + dragAmount.x / selectionSegmentPx,
+                            )
+                        },
+                    )
+                }
+                LaunchedEffect(selectedIndex, progress) {
+                    if (progress < 0.56f && selectedIndex >= 0) {
+                        dampedDock.animateToValue(selectedIndex.toFloat())
+                    }
+                }
+                val dockHighlight = remember(dockScope, dampedDock, selectionSegmentPx) {
+                    com.lladlam.melox.ui.glass.publicdemo.PublicInteractiveHighlight(
+                        animationScope = dockScope,
+                        position = { size, _ ->
+                            Offset(
+                                selectionEdgeInsetPx + (dampedDock.value + 0.5f) * selectionSegmentPx,
+                                size.height / 2f,
+                            )
+                        },
+                    )
+                }
+                // Keep the backdrop panel and the moving optical element as
+                // siblings. The selection must not be a child of the panel's
+                // backdrop layer, otherwise the panel bounds clip its lift.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .then(dockHighlight.gestureModifier)
+                        .then(dampedDock.modifier),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .meloXLiquidBottomBar(
+                                shape = navShape,
+                                tint = bottomLiquidGlassTint(),
+                                surfaceColor = bottomGlassFallbackColor().copy(alpha = 0.18f),
+                                pressProgress = dampedDock.pressProgress,
+                            )
+                            .then(dockHighlight.modifier),
+                    ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -725,52 +831,10 @@ private fun MeloXBottomChrome(
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
                                 dark = dark,
+                                onClick = { onSelect(tab) },
                             )
                         }
                     }
-                    val selectedIndex = primaryTabs.indexOfFirst { it.first == selectedTab }
-                    val lensPosition by animateFloatAsState(
-                        targetValue = selectedIndex.coerceAtLeast(0).toFloat(),
-                        animationSpec = spring(
-                            dampingRatio = 1f,
-                            stiffness = 460f,
-                            visibilityThreshold = 0.001f,
-                        ),
-                        label = "melox-tab-selection-position",
-                    )
-                    val lensAlpha by animateFloatAsState(
-                        targetValue = if (selectedIndex >= 0 && progress < 0.56f) 1f else 0f,
-                        animationSpec = spring(dampingRatio = 0.86f, stiffness = 440f),
-                        label = "melox-tab-selection-alpha",
-                    )
-                    val lensVisibility = lensAlpha * expandedLayerAlpha
-                    Box(
-                        modifier = Modifier
-                            .width(selectionWidth)
-                            .fillMaxHeight()
-                            .offset {
-                                IntOffset(
-                                    x = (selectionEdgeInsetPx + lensPosition * selectionSegmentPx).roundToInt(),
-                                    y = 0,
-                                )
-                            }
-                            .padding(4.dp)
-                            .meloXLiquidTabSelection(
-                                shape = Capsule(),
-                                selected = lensVisibility > 0.001f,
-                                panelBackdrop = tabsBackdrop,
-                                tint = selectionTint.copy(
-                                    alpha = selectionTint.alpha * lensVisibility,
-                                ),
-                            )
-                            .border(
-                                width = if (dark) 0.9.dp else 0.8.dp,
-                                color = selectionBorder.copy(
-                                    alpha = selectionBorder.alpha * lensVisibility,
-                                ),
-                                shape = Capsule(),
-                            ),
-                    )
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -785,6 +849,7 @@ private fun MeloXBottomChrome(
                                 selected = selectedTab == tab,
                                 labelAlpha = labelAlpha,
                                 dark = dark,
+                                onClick = { onSelect(tab) },
                             )
                         }
                     }
@@ -802,12 +867,54 @@ private fun MeloXBottomChrome(
                                 color = if (selectedTab == AppTab.Search) {
                                     MaterialTheme.colorScheme.onSurface
                                 } else {
-                                    MeloXSystemColors.Blue
+                                    MeloXSystemColors.Red
                                 },
                                 selected = true,
                             )
                         }
                     }
+                    }
+
+                    val lensAlpha by animateFloatAsState(
+                        targetValue = if (selectedIndex >= 0 && progress < 0.56f) 1f else 0f,
+                        animationSpec = spring(dampingRatio = 0.86f, stiffness = 440f),
+                        label = "melox-tab-selection-alpha",
+                    )
+                    val lensVisibility = lensAlpha * expandedLayerAlpha
+                    Box(
+                        modifier = Modifier
+                            // This is a sibling overlay, not content inside
+                            // the panel backdrop. It can lift and stretch
+                            // beyond one tab without being clipped by Dock.
+                            .width(selectionWidth)
+                            .fillMaxHeight()
+                            .offset {
+                                IntOffset(
+                                    x = (selectionEdgeInsetPx + dampedDock.value * selectionSegmentPx).roundToInt(),
+                                    y = 0,
+                                )
+                            }
+                            .padding(4.dp)
+                            .meloXLiquidTabSelection(
+                                shape = Capsule(),
+                                selected = lensVisibility > 0.001f,
+                                panelBackdrop = tabsBackdrop,
+                                pressProgress = dampedDock.pressProgress,
+                                scaleX = dampedDock.scaleX,
+                                scaleY = dampedDock.scaleY,
+                                velocity = dampedDock.velocity,
+                                tint = selectionTint.copy(
+                                    alpha = selectionTint.alpha * lensVisibility,
+                                ),
+                            )
+                            .border(
+                                width = if (dark) 0.9.dp else 0.8.dp,
+                                color = selectionBorder.copy(
+                                    alpha = selectionBorder.alpha * lensVisibility,
+                                ),
+                                shape = Capsule(),
+                            ),
+                    )
                 }
             }
 
@@ -834,7 +941,7 @@ private fun MeloXBottomChrome(
                     glyph = RootGlyph.Search,
                     modifier = Modifier.size(lerpDp(28.dp, 27.dp, sizeStage)),
                     color = if (selectedTab == AppTab.Search) {
-                        MeloXSystemColors.Blue
+                        MeloXSystemColors.Red
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
@@ -868,10 +975,11 @@ private fun RowScope.RootTabButton(
     selected: Boolean,
     labelAlpha: Float,
     dark: Boolean,
+    onClick: () -> Unit,
 ) {
     val foreground by animateColorAsState(
         targetValue = if (selected) {
-            MeloXSystemColors.Blue
+            MeloXSystemColors.Red
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
         },
@@ -883,6 +991,12 @@ private fun RowScope.RootTabButton(
             .weight(1f)
             .fillMaxHeight()
             .padding(horizontal = 4.dp, vertical = 4.dp)
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
             .semantics {
                 contentDescription = title
                 role = Role.Tab
@@ -918,6 +1032,7 @@ private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Explore -> RootGlyph.Explore
     AppTab.Library -> RootGlyph.Library
     AppTab.Settings -> RootGlyph.Settings
+    AppTab.Services -> RootGlyph.Settings
     AppTab.Search -> RootGlyph.Search
 }
 

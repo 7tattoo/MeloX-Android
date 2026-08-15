@@ -11,8 +11,29 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.3.2-Dev"
+        versionCode = 6
+        versionName = "0.3.3-Dev"
+    }
+
+    // Release credentials are supplied from the command line or CI secrets;
+    // passwords and the external keystore are deliberately not committed.
+    val meloxReleaseSigning = signingConfigs.create("meloxRelease") {
+        val keystorePath = providers.gradleProperty("meloxReleaseStoreFile").orNull
+        val keystorePassword = providers.gradleProperty("meloxReleaseStorePassword").orNull
+        val keyAliasValue = providers.gradleProperty("meloxReleaseKeyAlias").orNull
+        val keyPasswordValue = providers.gradleProperty("meloxReleaseKeyPassword").orNull
+        if (keystorePath != null && keystorePassword != null && keyAliasValue != null && keyPasswordValue != null) {
+            storeFile = file(keystorePath)
+            storePassword = keystorePassword
+            keyAlias = keyAliasValue
+            keyPassword = keyPasswordValue
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = meloxReleaseSigning
+        }
     }
 
     buildFeatures {
@@ -54,6 +75,7 @@ dependencies {
     // LiquidBottomTabs examples while preserving MeloX's iOS geometry.
     implementation("io.github.kyant0:backdrop:2.0.0")
     implementation("io.github.kyant0:shapes:1.2.0")
+    implementation("io.github.kyant0:capsule:2.1.3")
 
     implementation("androidx.media3:media3-common:1.10.1")
     implementation("androidx.media3:media3-datasource:1.10.1")
