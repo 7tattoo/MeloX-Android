@@ -395,6 +395,7 @@ internal fun MeloXIOSNowPlayingScene(
             } else {
                 Modifier
                     .fillMaxWidth()
+                    .height(MeloXNowPlayingControlsHeight.dp)
                     .padding(horizontal = 32.dp)
             }
             Box(modifier = controlsSurface) {

@@ -52,7 +52,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource.Companion.UserInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -169,16 +168,7 @@ fun MeloXIOSNowPlayingSharedHost(
             enter = EnterTransition.None,
             exit = ExitTransition.None,
             boundsTransform = MeloXPlayerLinearBoundsTransform,
-            // The full-screen scene must never be remeasured to the capsule's
-            // animated bounds. RemeasureToBounds can leave the container stuck
-            // at a partial size in the top corner after an interrupted or
-            // hidden transition, which pushes the bottom controls to the top.
-            // scaleToBounds keeps the scene at full-screen layout size and only
-            // scales its visual output during the capsule<->screen animation.
-            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(
-                contentScale = ContentScale.FillBounds,
-                alignment = Alignment.Center,
-            ),
+            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
         )
     }
 
