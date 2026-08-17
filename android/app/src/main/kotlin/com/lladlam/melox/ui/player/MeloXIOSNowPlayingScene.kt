@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.lladlam.melox.ui.glass.meloXBackdropBlur
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
 import kotlinx.coroutines.delay
@@ -125,7 +127,10 @@ internal fun MeloXIOSNowPlayingScene(
         showsLyricsControls = true
         if (page == MeloXNowPlayingPage.Lyrics) lyricsControlsActivityGeneration += 1
     }
-    LaunchedEffect(page, showsLyricsControls, lyricsControlsActivityGeneration) {
+    // Treat every media item as fresh lyric-page activity.  Headset next/prev
+    // changes the track without necessarily changing the page, so omitting the
+    // media id left the controls permanently visible after a hardware skip.
+    LaunchedEffect(page, state.mediaId, showsLyricsControls, lyricsControlsActivityGeneration) {
         if (page != MeloXNowPlayingPage.Lyrics || !showsLyricsControls) return@LaunchedEffect
         delay(MeloXSettingsRuntime.lyricInterfaceAutoHideDelayMs.toLong())
         showsLyricsControls = false
@@ -362,11 +367,10 @@ internal fun MeloXIOSNowPlayingScene(
                         .clickable(enabled = !artworkVisible, onClick = onShowActions),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "•••",
+                    MeloXSymbolIcon(
+                        MeloXSymbol.Ellipsis,
+                        modifier = Modifier.size(22.dp),
                         color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
                     )
                 }
             }
@@ -388,29 +392,43 @@ internal fun MeloXIOSNowPlayingScene(
                 Modifier
                     .fillMaxWidth()
                     .height(MeloXNowPlayingControlsHeight.dp)
-                    .meloXBackdropBlur(
-                        shape = RectangleShape,
-                        blurRadius = 24.dp,
-                        surfaceColor = Color.Black.copy(alpha = .08f),
-                    )
-                    .padding(horizontal = 32.dp)
             } else {
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp)
             }
             Box(modifier = controlsSurface) {
-                MeloXNowPlayingCoreControls(
-                    state = state,
-                    page = page,
-                    onShowQuality = onShowQuality,
-                    onPageSelected = { destination ->
-                        setLyricsControlsVisible(true)
-                        onPageChanged(
-                            if (page == destination) MeloXNowPlayingPage.Artwork else destination,
-                        )
-                    },
-                )
+                if (page != MeloXNowPlayingPage.Artwork) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .meloXBackdropBlur(
+                                shape = RectangleShape,
+                                blurRadius = 24.dp,
+                                surfaceColor = Color.Black.copy(alpha = .08f),
+                            )
+                            // Consume blank-area taps so they cannot fall
+                            // through the lower lyric control surface.
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                    )
+                }
+                Box(Modifier.fillMaxSize().padding(horizontal = 32.dp)) {
+                    MeloXNowPlayingCoreControls(
+                        state = state,
+                        page = page,
+                        onShowQuality = onShowQuality,
+                        onPageSelected = { destination ->
+                            setLyricsControlsVisible(true)
+                            onPageChanged(
+                                if (page == destination) MeloXNowPlayingPage.Artwork else destination,
+                            )
+                        },
+                    )
+                }
             }
         }
     }
@@ -627,7 +645,7 @@ private fun LandscapeSongHeader(
             modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onShowActions),
             contentAlignment = Alignment.Center,
         ) {
-            MeloXActionIcon("•••", Modifier.size(20.dp), Color.White)
+            MeloXSymbolIcon(MeloXSymbol.Ellipsis, Modifier.size(22.dp), Color.White)
         }
     }
 }
@@ -724,12 +742,7 @@ private fun ArtworkDetailsWithoutArtwork(
                         .clickable(onClick = onShowActions),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "•••",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    MeloXSymbolIcon(MeloXSymbol.Ellipsis, Modifier.size(22.dp), Color.White)
                 }
             }
 

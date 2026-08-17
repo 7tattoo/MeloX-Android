@@ -1,7 +1,6 @@
 package com.lladlam.melox.ui.provider
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -27,8 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,13 +35,10 @@ import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
 import com.lladlam.melox.ui.account.AppleMusicLoginScreen
 import com.lladlam.melox.ui.glass.meloXContentSurface
-import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
 import com.lladlam.melox.ui.glass.MeloXGlassButton
 import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.MeloXGlassSheet
-import com.lladlam.melox.ui.glass.MeloXSymbol
-import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.settings.SettingsScreen
 
 private enum class ProviderAccountAction {
@@ -128,38 +120,13 @@ fun ProviderSettingsHub(
         return
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // One and only one settings renderer for every music source.
-        SettingsScreen(
-            session = neteaseSession,
-            onLogin = onNeteaseLogin,
-        )
-
-        // Source/account management is deliberately a compact overlay so the
-        // existing MeloX settings hierarchy, scroll state and visual design stay intact.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(top = 20.dp, end = 20.dp)
-                .size(56.dp)
-                .meloXLiquidButton(
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.055f),
-                    lensRadius = 12.dp,
-                    refractionHeight = 18.dp,
-                )
-                .clickable { onOpenServices() }
-                .semantics { contentDescription = "音乐服务：${currentSource.displayName}" },
-            contentAlignment = Alignment.Center,
-        ) {
-            MeloXSymbolIcon(
-                MeloXSymbol.MusicNote,
-                Modifier.size(27.dp),
-                MaterialTheme.colorScheme.onBackground,
-            )
-        }
-    }
+    // Music-service navigation belongs to the account row.  Keeping it there
+    // avoids a second floating control competing with the canonical Settings UI.
+    SettingsScreen(
+        session = neteaseSession,
+        onLogin = onNeteaseLogin,
+        onOpenServices = onOpenServices,
+    )
 
     if (showServiceDialog) {
         val currentAccount = remember(loginRevision, currentSource, showServiceDialog) {

@@ -209,8 +209,21 @@ private fun MeloXAppleMusicLyricsPanel(
     var anchorPositionMs by remember(mediaId) { mutableLongStateOf(state.positionMs) }
     var anchorRealtimeMs by remember(mediaId) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     val renderedPositionState = remember(mediaId) { mutableLongStateOf(state.positionMs) }
+    var holdTrackAtStart by remember(mediaId) { mutableStateOf(true) }
+
+    // A Bluetooth/headset skip can deliver the first UI state for the new item
+    // before its position callback arrives.  Do not let the previous track's
+    // progress keep the new lyric document focused in the middle of the list.
+    LaunchedEffect(mediaId) {
+        anchorPositionMs = 0L
+        anchorRealtimeMs = SystemClock.elapsedRealtime()
+        renderedPositionState.longValue = 0L
+        holdTrackAtStart = true
+        listState.scrollToItem(0)
+    }
 
     LaunchedEffect(state.positionMs, state.isPlaying, mediaId) {
+        if (holdTrackAtStart) return@LaunchedEffect
         anchorPositionMs = state.positionMs
         anchorRealtimeMs = SystemClock.elapsedRealtime()
         renderedPositionState.longValue = state.positionMs
@@ -223,6 +236,9 @@ private fun MeloXAppleMusicLyricsPanel(
         runCatching { MeloXProviderLyricsLoader.load(appContext, state) }
             .onSuccess { lyrics = it }
             .onFailure { errorMessage = it.message ?: "歌词加载失败" }
+        // A newly selected item always enters from its lyric start anchor.
+        // Subsequent seeks keep using the normal position callback above.
+        holdTrackAtStart = false
         isLoading = false
     }
 
@@ -241,7 +257,7 @@ private fun MeloXAppleMusicLyricsPanel(
         mutableIntStateOf(
             sourceHighlightedIndex(
                 lines,
-                state.positionMs + lineAdvanceMs,
+                lineAdvanceMs,
             ),
         )
     }
@@ -261,7 +277,6 @@ private fun MeloXAppleMusicLyricsPanel(
     }
     val interludes = remember(lines) { sourceLyricInterludes(lines) }
     val interludeByLyricIndex = remember(interludes) { interludes.associateBy { it.followingLyricIndex } }
-    val revealedInterludes = remember(document) { mutableStateMapOf<Long, Boolean>() }
     var activeInterludeIndex by remember(document) { mutableIntStateOf(-1) }
     LaunchedEffect(state.isPlaying, mediaId, document, hasSyllableSync, lineAdvanceMs, refreshRate) {
         var lastFrameNanos = 0L
@@ -282,7 +297,6 @@ private fun MeloXAppleMusicLyricsPanel(
             val nextInterlude = interludes.indexOfFirst { position >= it.startTimeMs && position < it.followingLyricTimeMs }
             if (nextInterlude != activeInterludeIndex) activeInterludeIndex = nextInterlude
             val activeInterlude = interludes.getOrNull(nextInterlude)
-            if (activeInterlude != null) revealedInterludes[activeInterlude.startTimeMs] = true
             val nextIndex = if (
                 MeloXSettingsRuntime.lyricInterludeCountdownEnabled &&
                 activeInterlude != null && position < activeInterlude.countdownEndTimeMs
@@ -434,8 +448,19 @@ private fun MeloXAppleMusicLyricsPanel(
         }
     }
 
-    LaunchedEffect(colorHighlightedIndex, document) {
-        if (colorHighlightedIndex in lines.indices) handOffFocusColor(colorHighlightedIndex)
+    LaunchedEffect(colorHighlightedIndex, activeInterludeIndex, document) {
+        if (activeInterludeIndex >= 0) {
+            // Do not merely mask the previous focus while an interlude is
+            // active. Clear its stored animation value so it cannot flash back
+            // for one frame when the wait ends.
+            coroutineScope {
+                focusProgress.forEach { progress ->
+                    if (progress.value != 0f) launch { progress.snapTo(0f) }
+                }
+            }
+        } else if (colorHighlightedIndex in lines.indices) {
+            handOffFocusColor(colorHighlightedIndex)
+        }
     }
 
     val scrollHideThresholdPx = with(density) { MeloXSettingsRuntime.lyricScrollHideThresholdDp.dp.toPx() }
@@ -507,10 +532,13 @@ private fun MeloXAppleMusicLyricsPanel(
             isBrowsingLyrics,
             document,
         ) {
-            val nextIndex = highlightedIndex
+            val sourceIndex = highlightedIndex
+            val nextIndex = sourceConcurrentLyricIndexes(lines, sourceIndex)
+                .firstOrNull()
+                ?: sourceIndex
             if (nextIndex !in lines.indices || viewportHeightPx <= 0 || isBrowsingLyrics) {
-                if (isBrowsingLyrics && nextIndex in lines.indices) {
-                    visualFocusIndex = nextIndex
+                if (isBrowsingLyrics && sourceIndex in lines.indices) {
+                    visualFocusIndex = sourceIndex
                 }
                 return@LaunchedEffect
             }
@@ -694,6 +722,9 @@ private fun MeloXAppleMusicLyricsPanel(
                 )
             }
             else -> {
+                val waitingInterlude = interludes.getOrNull(activeInterludeIndex)
+                val lyricsAreWaiting = waitingInterlude != null &&
+                    renderedPositionState.longValue < waitingInterlude.followingLyricTimeMs
                 val focusAnchorY = viewportHeightPx * focusPosition
                 val annotationHeightPx = annotationFontPx * 1.2f * 2f + annotationSpacingPx * 2f
                 val lyricStridePx = max(primaryHeightPx + annotationHeightPx + lineSpacingPx, 1f)
@@ -719,8 +750,12 @@ private fun MeloXAppleMusicLyricsPanel(
                         key = { index, line -> "${line.timeMs}:$index" },
                     ) { index, line ->
                         val interlude = interludeByLyricIndex[index]
+                        // Reserve the interlude's space as soon as the document
+                        // is laid out.  Inserting it only after playback reaches
+                        // the gap makes the countdown pop in and fight the lyric
+                        // scroll animation.
                         val showsInterlude = MeloXSettingsRuntime.lyricInterludeCountdownEnabled &&
-                            interlude != null && revealedInterludes[interlude.startTimeMs] == true
+                            interlude != null
                         val interludeHeightPx = if (showsInterlude) with(density) { 56.dp.toPx() } else 0f
                         val height = estimatedHeight(index) + interludeHeightPx
                         val visualOffset = currentMovementOffset(index)
@@ -732,8 +767,19 @@ private fun MeloXAppleMusicLyricsPanel(
                         } else {
                             abs(index - visualFocusIndex) * lyricStridePx
                         }
+                        val isConcurrentLine = sourceConcurrentLyricIndexes(
+                            lines = lines,
+                            highlightedIndex = visualFocusIndex,
+                        ).contains(index)
                         val fp = focusProgress[index].value.coerceIn(0f, 1f)
-                        val effectiveFocus = fp
+                        // Some LRC/YRC files deliberately provide two distinct
+                        // lines at virtually the same time.  Keep both readable
+                        // instead of promoting only the last binary-search hit.
+                        val effectiveFocus = when {
+                            lyricsAreWaiting -> 0f
+                            isConcurrentLine -> max(fp, 0.92f)
+                            else -> fp
+                        }
                         val distanceBlur = sourceDistanceBlurRadius(
                             distancePx = distance,
                             lyricStridePx = lyricStridePx,
@@ -770,6 +816,9 @@ private fun MeloXAppleMusicLyricsPanel(
                                 interlude = checkNotNull(interlude),
                                 playbackTimeProvider = { renderedPositionState.longValue },
                                 reduceMotion = MeloXSettingsRuntime.lyricReduceMotion,
+                                visualScale = scale,
+                                visualOffsetPx = visualOffset,
+                                rowAlpha = rowAlpha,
                                 modifier = Modifier.padding(bottom = 8.dp),
                             )
                         }
@@ -794,11 +843,10 @@ private fun MeloXAppleMusicLyricsPanel(
                             focusBlurDp = focusBlur,
                             renderingQuality = renderingQuality,
                             showTranslation = MeloXSettingsRuntime.showLyricTranslation &&
-                                !line.translation.isNullOrBlank() &&
-                                (MeloXSettingsRuntime.lyricTranslationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines || index == visualFocusIndex),
+                                !line.translation.isNullOrBlank(),
                             showRomanization = MeloXSettingsRuntime.showLyricRomanization &&
                                 !line.romanization.isNullOrBlank() &&
-                                (MeloXSettingsRuntime.lyricRomanizationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines || index == visualFocusIndex),
+                                (MeloXSettingsRuntime.lyricRomanizationDisplayMode == MeloXLyricAnnotationDisplayMode.AllLines || isConcurrentLine),
                             reserveTranslation = MeloXSettingsRuntime.showLyricTranslation && !line.translation.isNullOrBlank(),
                             reserveRomanization = MeloXSettingsRuntime.showLyricRomanization && !line.romanization.isNullOrBlank(),
                             onMeasured = { measured ->
@@ -1132,10 +1180,25 @@ private fun MeloXLyricInterludeCountdown(
     interlude: MeloXLyricInterlude,
     playbackTimeProvider: () -> Long,
     reduceMotion: Boolean,
+    visualScale: Float,
+    visualOffsetPx: Float,
+    rowAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
-    Canvas(modifier.fillMaxWidth(0.28f).height(48.dp)) {
+    Canvas(
+        modifier
+            .fillMaxWidth(0.28f)
+            .height(48.dp)
+            .graphicsLayer {
+                translationY = visualOffsetPx
+                scaleX = visualScale
+                scaleY = visualScale
+                alpha = rowAlpha
+                transformOrigin = TransformOrigin(0f, 0f)
+            },
+    ) {
         val now = playbackTimeProvider()
+        if (now < interlude.startTimeMs) return@Canvas
         val duration = (interlude.countdownEndTimeMs - interlude.startTimeMs).coerceAtLeast(1L)
         val elapsed = (now - interlude.startTimeMs).coerceIn(0L, duration)
         val remaining = interlude.countdownEndTimeMs - now
@@ -1315,12 +1378,17 @@ private fun MeloXGlyphLyricText(
                 focusProgress = timingEffectsStrength,
             )
             if (effectsStrength <= 0.0001f) {
-                drawText(layout, color = Color.White)
+                drawText(
+                    layout,
+                    color = Color.White.copy(alpha = MeloXSettingsRuntime.lyricInactiveOpacity),
+                )
                 return@Canvas
             }
 
-            val unplayedAlpha = 1f -
-                (1f - MeloXSettingsRuntime.lyricInactiveOpacity) * effectsStrength
+            // The unrevealed layer must remain at the ordinary unplayed lyric
+            // opacity. Interpolating it from fully white made the whole next
+            // line flash before the first syllable started revealing.
+            val unplayedAlpha = MeloXSettingsRuntime.lyricInactiveOpacity
 
             for (glyph in drawableGlyphs) {
                 val bounds = glyph.bounds
@@ -1788,6 +1856,20 @@ private fun sourceHighlightedIndex(lines: List<LyricLine>, playbackTimeMs: Long)
         if (sourceLineActivationTimeMs(lines[middle]) <= playbackTimeMs) lower = middle + 1 else upper = middle
     }
     return lower - 1
+}
+
+private fun sourceConcurrentLyricIndexes(
+    lines: List<LyricLine>,
+    highlightedIndex: Int,
+    toleranceMs: Long = 280L,
+): IntRange {
+    if (highlightedIndex !in lines.indices) return IntRange.EMPTY
+    val activation = sourceLineActivationTimeMs(lines[highlightedIndex])
+    var first = highlightedIndex
+    var last = highlightedIndex
+    while (first > 0 && activation - sourceLineActivationTimeMs(lines[first - 1]) <= toleranceMs) first--
+    while (last < lines.lastIndex && sourceLineActivationTimeMs(lines[last + 1]) - activation <= toleranceMs) last++
+    return first..last
 }
 
 private fun sourceFocusAnimationDurationMs(index: Int, lines: List<LyricLine>): Int {

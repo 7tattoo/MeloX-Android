@@ -11,8 +11,8 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.3.3-Dev"
+        versionCode = 7
+        versionName = "0.3.4-Dev"
     }
 
     // Release credentials are supplied from the command line or CI secrets;

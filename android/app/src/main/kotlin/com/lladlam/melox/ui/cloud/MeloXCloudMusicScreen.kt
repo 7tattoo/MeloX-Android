@@ -74,7 +74,21 @@ fun MeloXCloudMusicScreen(
     suspend fun refresh() {
         loading = true
         error = null
-        runCatching { client.cloudSongs() }
+        runCatching {
+            val first = client.cloudSongs()
+            if (!first.hasMore) first else {
+                var page = first
+                val all = first.values.toMutableList()
+                var offset = all.size
+                while (page.hasMore && offset < first.totalCount) {
+                    page = client.cloudSongs(offset = offset)
+                    if (page.values.isEmpty()) break
+                    all += page.values
+                    offset += page.values.size
+                }
+                first.copy(values = all.distinctBy(MeloXCloudSong::id), hasMore = page.hasMore)
+            }
+        }
             .onSuccess { page ->
                 values = page.values
                 quota = if (page.maxBytes > 0L) {
@@ -190,7 +204,16 @@ fun MeloXCloudMusicScreen(
         }
         when {
             loading && values.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            error != null && values.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(error.orEmpty(), color = MaterialTheme.colorScheme.error) }
+            error != null && values.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "重试",
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 12.dp).clickable { scope.launch { refresh() } },
+                    )
+                }
+            }
             else -> LazyColumn(
                 contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = MeloXBottomContentClearance),
                 verticalArrangement = Arrangement.spacedBy(8.dp),

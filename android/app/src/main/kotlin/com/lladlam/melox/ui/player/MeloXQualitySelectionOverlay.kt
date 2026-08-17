@@ -74,6 +74,8 @@ internal fun MeloXQualitySelectionOverlay(
     }
     val identity = remember(state.mediaId) { state.mediaId?.let(PlaybackTrackIdentity::decode) }
     val source = identity?.source ?: MusicSource.Netease
+    val foreground = MaterialTheme.colorScheme.onSurface
+    val secondaryForeground = foreground.copy(alpha = 0.62f)
     val songId = identity
         ?.takeIf { it.source == MusicSource.Netease }
         ?.value
@@ -131,7 +133,7 @@ internal fun MeloXQualitySelectionOverlay(
                     Column(Modifier.weight(1f)) {
                         Text(
                             "音质",
-                            color = Color.White,
+                            color = foreground,
                             fontSize = 21.sp,
                             fontWeight = FontWeight.Bold,
                         )
@@ -143,7 +145,7 @@ internal fun MeloXQualitySelectionOverlay(
                                 source != MusicSource.Netease -> "${source.displayName} · ${state.title.ifBlank { "正在播放" }}"
                                 else -> state.title.ifBlank { "正在播放" }
                             },
-                            color = Color.White.copy(alpha = 0.55f),
+                            color = secondaryForeground,
                             fontSize = 13.sp,
                             maxLines = 1,
                         )
@@ -151,7 +153,7 @@ internal fun MeloXQualitySelectionOverlay(
                     if (loading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
-                            color = Color.White.copy(alpha = 0.78f),
+                            color = foreground.copy(alpha = 0.78f),
                             strokeWidth = 2.dp,
                         )
                     }
@@ -179,7 +181,7 @@ internal fun MeloXQualitySelectionOverlay(
                                     Color.Transparent
                                 },
                                 surfaceColor = if (isSelected) {
-                                    Color.White.copy(alpha = 0.08f)
+                                    foreground.copy(alpha = 0.10f)
                                 } else {
                                     Color.Transparent
                                 },
@@ -201,12 +203,12 @@ internal fun MeloXQualitySelectionOverlay(
                         Text(
                             text = quality.title,
                             modifier = Modifier.weight(1f),
-                            color = Color.White.copy(alpha = if (supported) 0.94f else 0.30f),
+                            color = foreground.copy(alpha = if (supported) 0.94f else 0.30f),
                             fontSize = 17.sp,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         )
                         if (isSelected) {
-                            MeloXActionIcon("✓", Modifier.size(18.dp), Color.White)
+                            MeloXActionIcon("✓", Modifier.size(18.dp), foreground)
                         } else if (!supported) {
                             Text(
                                 when {
@@ -214,7 +216,7 @@ internal fun MeloXQualitySelectionOverlay(
                                     source == MusicSource.Netease -> "不可用"
                                     else -> "平台不提供"
                                 },
-                                color = Color.White.copy(alpha = 0.30f),
+                                color = foreground.copy(alpha = 0.30f),
                                 fontSize = 12.sp,
                             )
     }

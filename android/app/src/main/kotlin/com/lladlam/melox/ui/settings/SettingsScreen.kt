@@ -149,6 +149,7 @@ private val SettingsSections = listOf(
 fun SettingsScreen(
     session: NeteaseSessionStore,
     onLogin: () -> Unit,
+    onOpenServices: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var route by remember { mutableStateOf<SettingsRoute?>(null) }
@@ -194,7 +195,11 @@ fun SettingsScreen(
         Spacer(Modifier.height(26.dp))
 
         if (normalized.isBlank() || "网易云账号 登录 cookie 用户".contains(normalized)) {
-            SettingsAccountCard(session = session, onLogin = onLogin)
+            SettingsAccountCard(
+                session = session,
+                onLogin = onLogin,
+                onOpenServices = onOpenServices,
+            )
             Spacer(Modifier.height(24.dp))
         }
 
@@ -251,7 +256,11 @@ private fun SettingsSearchField(value: String, onValueChange: (String) -> Unit) 
 }
 
 @Composable
-private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Unit) {
+private fun SettingsAccountCard(
+    session: NeteaseSessionStore,
+    onLogin: () -> Unit,
+    onOpenServices: (() -> Unit)?,
+) {
     val accent = com.lladlam.melox.ui.glass.MeloXSystemColors.Red
     Text(
         "账号",
@@ -268,20 +277,21 @@ private fun SettingsAccountCard(session: NeteaseSessionStore, onLogin: () -> Uni
                     leading = { AsyncImage(model = profile.avatarUrl, contentDescription = null, modifier = Modifier.size(30.dp).clip(CircleShape)) },
                     detail = "已登录",
                     chevronTint = accent,
-                    onClick = onLogin,
+                    onClick = onOpenServices ?: onLogin,
                     showTopSeparator = false,
                 )
             }
             session.isLoggedIn && session.isRefreshing -> MeloXIosListRow(
                 title = "正在读取账号信息",
                 leading = { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = accent) },
+                onClick = onOpenServices,
                 showTopSeparator = false,
             )
             else -> MeloXIosListRow(
                 title = "登录网易云音乐",
                 leading = { MeloXSymbolIcon(MeloXSymbol.Person, Modifier.size(30.dp), accent, MeloXSymbolVariant.Fill) },
                 chevronTint = accent,
-                onClick = onLogin,
+                onClick = onOpenServices ?: onLogin,
                 showTopSeparator = false,
             )
         }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -28,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -119,6 +121,7 @@ internal fun MeloXProviderSongActionsOverlay(
     MeloXGlassSheet(
         visible = visible,
         onDismiss = onDismiss,
+        modifier = Modifier.fillMaxHeight(0.78f),
     ) {
         AnimatedContent(
                     targetState = page,
@@ -318,6 +321,7 @@ private fun ProviderActionHeader(
     state: MeloXPlaybackUiState,
     subtitle: String,
 ) {
+    val foreground = MaterialTheme.colorScheme.onSurface
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -331,7 +335,7 @@ private fun ProviderActionHeader(
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
                 state.title.ifBlank { "正在播放" },
-                color = Color.White,
+                color = foreground,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -339,14 +343,14 @@ private fun ProviderActionHeader(
             )
             Text(
                 state.artist.ifBlank { subtitle },
-                color = Color.White.copy(alpha = 0.58f),
+                color = foreground.copy(alpha = 0.58f),
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 subtitle,
-                color = Color.White.copy(alpha = 0.38f),
+                color = foreground.copy(alpha = 0.38f),
                 fontSize = 10.sp,
                 maxLines = 1,
             )
@@ -361,6 +365,7 @@ private fun ProviderActionItem(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val foreground = MaterialTheme.colorScheme.onSurface
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -372,13 +377,13 @@ private fun ProviderActionItem(
         val alpha = if (enabled) 1f else 0.38f
         MeloXActionIcon(
             token = symbol,
-            color = Color.White.copy(alpha = 0.82f),
+            color = foreground.copy(alpha = 0.82f),
             enabled = enabled,
             modifier = Modifier.size(22.dp).padding(horizontal = 1.dp),
         )
         Text(
             title,
-            color = Color.White.copy(alpha = 0.94f * alpha),
+            color = foreground.copy(alpha = 0.94f * alpha),
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

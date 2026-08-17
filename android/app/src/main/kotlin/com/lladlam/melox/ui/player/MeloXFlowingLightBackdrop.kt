@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -78,19 +80,22 @@ internal fun MeloXLyricsArtworkBackdrop(
     val artworkColorFilter = remember(saturation) {
         ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(saturation) })
     }
-    var rotations by remember { mutableStateOf(List(3) { 0f }) }
+    var rotations by remember(artworkUrl) { mutableStateOf(List(3) { 0f }) }
+    val latestIsPlaying by rememberUpdatedState(isPlaying)
+    val elapsedWhilePlayingMs = remember(artworkUrl) { mutableLongStateOf(0L) }
 
     // The source implementation invalidates its Canvas roughly every 42ms
     // (~24fps). Throttling here is intentional: three blurred planes at 60fps
     // make the lyric page visibly hotter without improving the slow motion.
-    LaunchedEffect(isPlaying, planeCount, artworkUrl, backgroundFrameRate) {
-        if (!isPlaying) {
-            rotations = List(3) { 0f }
-            awaitCancellation()
-        }
-        val startedAt = SystemClock.elapsedRealtime()
+    LaunchedEffect(planeCount, artworkUrl, backgroundFrameRate) {
+        var previousFrameAt = SystemClock.elapsedRealtime()
         while (true) {
-            val elapsed = (SystemClock.elapsedRealtime() - startedAt).toFloat()
+            val now = SystemClock.elapsedRealtime()
+            if (latestIsPlaying) {
+                elapsedWhilePlayingMs.longValue += now - previousFrameAt
+            }
+            previousFrameAt = now
+            val elapsed = elapsedWhilePlayingMs.longValue.toFloat()
             rotations = listOf(
                 -(elapsed % 120_000f) / 120_000f * 360f,
                 (elapsed % 90_000f) / 90_000f * 360f,

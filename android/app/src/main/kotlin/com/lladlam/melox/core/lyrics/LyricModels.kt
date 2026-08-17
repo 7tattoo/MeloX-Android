@@ -87,7 +87,10 @@ fun LyricsDocument.withPseudoTiming(): LyricsDocument {
 }
 
 object NeteaseLyricParser {
-    private const val ANNOTATION_TOLERANCE_MS = 750L
+    // Translation LRCs from different providers are often authored against a
+    // slightly different vocal onset than the primary YRC.  A 750ms window
+    // drops otherwise valid foreign-language annotations line by line.
+    private const val ANNOTATION_TOLERANCE_MS = 1_500L
     private val lrcTimestamp = Regex("\\[(\\d+):(\\d+(?:[.:]\\d+)?)\\]")
     private val yrcSyllableTiming = Regex("\\((\\d+),(\\d+),(\\d+)\\)")
 

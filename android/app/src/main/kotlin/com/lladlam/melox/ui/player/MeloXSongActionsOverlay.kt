@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -31,6 +32,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -207,6 +209,9 @@ fun MeloXSongActionsOverlay(
     MeloXGlassSheet(
         visible = visible,
         onDismiss = onDismiss,
+        // Keep the bottom-anchored action sheet below the song header instead
+        // of letting a long action list turn the glass into an almost full page.
+        modifier = Modifier.fillMaxHeight(0.78f),
     ) {
         AnimatedContent(
                     targetState = page,
@@ -568,10 +573,11 @@ fun MeloXSongActionsOverlay(
 
 @Composable
 private fun ActionHeader(song: SearchSong, title: String) {
-    Text(title, color = Color.White.copy(alpha = .58f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    val foreground = MaterialTheme.colorScheme.onSurface
+    Text(title, color = foreground.copy(alpha = .58f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     Text(
         song.name,
-        color = Color.White,
+        color = foreground,
         fontSize = 20.sp,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
@@ -582,6 +588,7 @@ private fun ActionHeader(song: SearchSong, title: String) {
 
 @Composable
 private fun ActionItem(title: String, symbol: String, onClick: () -> Unit) {
+    val foreground = MaterialTheme.colorScheme.onSurface
     Row(
         Modifier.fillMaxWidth().height(46.dp).clickable(onClick = onClick).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -591,10 +598,10 @@ private fun ActionItem(title: String, symbol: String, onClick: () -> Unit) {
             MeloXActionIcon(
                 token = symbol,
                 modifier = Modifier.size(20.dp),
-                color = Color.White.copy(alpha = 0.86f),
+                color = foreground.copy(alpha = 0.86f),
             )
         }
-        Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, color = foreground, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
     }
 }

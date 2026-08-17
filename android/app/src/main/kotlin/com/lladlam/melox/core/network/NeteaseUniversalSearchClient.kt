@@ -10,6 +10,7 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +107,15 @@ class NeteaseUniversalSearchClient(
     private val httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val syntheticDeviceId = randomHex(26).uppercase()
+    private val weapi by lazy { NeteaseAuthenticatedWeapi(cookieProvider, httpClient) }
+    private val cloudUploadClient by lazy {
+        httpClient.newBuilder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
+            .writeTimeout(300, TimeUnit.SECONDS)
+            .callTimeout(360, TimeUnit.SECONDS)
+            .build()
+    }
 
     suspend fun searchMedia(keywords: String, kind: MeloXSearchKind, limit: Int = 30): List<MeloXSearchMediaItem> = withContext(Dispatchers.IO) {
         if (kind == MeloXSearchKind.Songs) return@withContext emptyList()
@@ -169,6 +179,15 @@ class NeteaseUniversalSearchClient(
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }?.takeIf(String::isNotBlank) ?: "music.mp3"
         val extension = displayName.substringAfterLast('.', "mp3").lowercase().ifBlank { "mp3" }
+        val mimeType = resolver.getType(uri)?.takeIf { it.startsWith("audio/") }
+            ?: when (extension) {
+                "flac" -> "audio/flac"
+                "m4a", "mp4" -> "audio/mp4"
+                "aac" -> "audio/aac"
+                "wav" -> "audio/wav"
+                "ogg", "oga", "opus" -> "audio/ogg"
+                else -> "audio/mpeg"
+            }
         val stem = displayName.substringBeforeLast('.').filterNot(Char::isWhitespace).replace('.', '_').ifBlank { "music" }
         val temporary = java.io.File.createTempFile("melox-cloud-", ".$extension", context.cacheDir)
         try {
@@ -199,51 +218,124 @@ class NeteaseUniversalSearchClient(
             } finally {
                 runCatching { metadata.release() }
             }
+            val cloudFilename = cleanCloudMetadata(displayName, "music.$extension", 255)
+            val cloudTitle = cleanCloudMetadata(title, stem, 200)
+            val cloudArtist = cleanCloudMetadata(artist, "未知艺术家", 200)
+            val cloudAlbum = cleanCloudMetadata(album, "未知专辑", 200)
             val bitrate = 999_000
-            val check = eapi(
-                "/api/cloud/upload/check",
-                JSONObject().put("bitrate", bitrate.toString()).put("ext", "").put("length", temporary.length())
-                    .put("md5", md5).put("songId", "0").put("version", 1),
-            )
+            val check = try {
+                eapi(
+                    "/api/cloud/upload/check",
+                    JSONObject().put("bitrate", bitrate.toString()).put("ext", "").put("length", temporary.length())
+                        .put("md5", md5).put("songId", "0").put("version", 1),
+                )
+            } catch (error: IOException) {
+                throw IOException("云盘上传检查失败：${error.message}", error)
+            }
             val songId = check.optString("songId").toLongOrNull() ?: check.optLong("songId", 0L)
-            val metadataToken = eapi(
-                "/api/nos/token/alloc",
-                JSONObject().put("bucket", "").put("ext", extension).put("filename", stem).put("local", false)
-                    .put("nos_product", 3).put("type", "audio").put("md5", md5),
-            ).optJSONObject("result") ?: throw IOException("网易云未返回云盘资源令牌")
+            val tokenData = JSONObject()
+                .put("ext", extension).put("filename", stem).put("local", false)
+                .put("nos_product", 3).put("type", "audio").put("md5", md5)
+            val metadataToken = try {
+                eapi("/api/nos/token/alloc", JSONObject(tokenData.toString()).put("bucket", ""))
+                    .optJSONObject("result")
+                    ?: throw IOException("网易云未返回云盘资源令牌")
+            } catch (error: IOException) {
+                throw IOException("云盘资源令牌申请失败：${error.message}", error)
+            }
+            val resourceId = metadataToken.optString("resourceId")
+                .takeIf(String::isNotBlank)
+                ?: throw IOException("云盘资源令牌缺少 resourceId")
+            var transferResourceId: String? = null
             if (check.optBoolean("needUpload", false)) {
                 val bucket = "jd-musicrep-privatecloud-audio-public"
-                val uploadToken = eapi(
-                    "/api/nos/token/alloc",
-                    JSONObject().put("bucket", bucket).put("ext", extension).put("filename", stem).put("local", false)
-                        .put("nos_product", 3).put("type", "audio").put("md5", md5),
-                ).optJSONObject("result") ?: throw IOException("网易云未返回上传令牌")
+                // NOS transfer tokens are issued via WEAPI.  The EAPI token
+                // above is only for cloud metadata; using it for the upload
+                // host works intermittently and leaves most uploads rejected.
+                val uploadTokenRequest = JSONObject(tokenData.toString()).put("bucket", bucket)
+                val uploadTokenResponse = try {
+                    weapi.post("/api/nos/token/alloc", uploadTokenRequest)
+                } catch (_: IOException) {
+                    // Some accounts currently reject the WEAPI token route
+                    // with code 400. The native clients accept the equivalent
+                    // authenticated EAPI route as a compatibility fallback.
+                    eapi("/api/nos/token/alloc", uploadTokenRequest)
+                }
+                val uploadToken = uploadTokenResponse.optJSONObject("result")
+                    ?: throw IOException("网易云未返回 NOS 上传令牌")
                 val lbsRequest = Request.Builder().url("https://wanproxy.127.net/lbs?version=1.0&bucketname=$bucket").get().build()
-                val uploadHost = httpClient.newCall(lbsRequest).execute().use { response ->
+                val uploadHost = cloudUploadClient.newCall(lbsRequest).execute().use { response ->
                     if (!response.isSuccessful) throw IOException("云盘上传节点请求失败：HTTP ${response.code}")
                     val hosts = JSONObject(response.body.string()).optJSONArray("upload") ?: JSONArray()
                     hosts.optString(0).takeIf(String::isNotBlank) ?: throw IOException("网易云没有返回可用上传节点")
                 }
-                val objectKey = uploadToken.optString("objectKey")
-                val encodedKey = URLEncoder.encode(objectKey, Charsets.UTF_8.name()).replace("+", "%20")
+                val objectKey = uploadToken.optString("objectKey").takeIf(String::isNotBlank)
+                    ?: throw IOException("NOS 上传令牌缺少 objectKey")
+                val token = uploadToken.optString("token").takeIf(String::isNotBlank)
+                    ?: throw IOException("NOS 上传令牌缺少 token")
+                transferResourceId = uploadToken.optString("resourceId").takeIf(String::isNotBlank)
+                // Match the upstream NOS uploader exactly: object keys are
+                // path-like and only their slash separators are escaped.
+                val encodedKey = objectKey.replace("/", "%2F")
                 val uploadUrl = "${uploadHost.trimEnd('/')}/$bucket/$encodedKey?offset=0&complete=true&version=1.0"
+                val requestBody = temporary.asRequestBody(mimeType.toMediaType())
                 val uploadRequest = Request.Builder().url(uploadUrl)
-                    .header("x-nos-token", uploadToken.optString("token"))
+                    .header("x-nos-token", token)
                     .header("Content-MD5", md5)
-                    .post(temporary.asRequestBody("audio/mpeg".toMediaType()))
+                    .header("Content-Type", mimeType)
+                    .header("Content-Length", temporary.length().toString())
+                    .post(requestBody)
                     .build()
-                httpClient.newCall(uploadRequest).execute().use { response ->
-                    if (!response.isSuccessful) throw IOException("音频上传失败：HTTP ${response.code}")
+                cloudUploadClient.newCall(uploadRequest).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val detail = response.body.string().trim().take(500)
+                        throw IOException(
+                            "NOS 音频上传失败：HTTP ${response.code}" +
+                                detail.takeIf(String::isNotBlank)?.let { "，$it" }.orEmpty(),
+                        )
+                    }
                 }
             }
-            val info = eapi(
-                "/api/upload/cloud/info/v2",
-                JSONObject().put("md5", md5).put("songid", songId).put("filename", displayName)
-                    .put("song", title).put("album", album).put("artist", artist).put("bitrate", bitrate.toString())
-                    .put("resourceId", metadataToken.optString("resourceId")),
+            var info: JSONObject? = null
+            val infoFailures = mutableListOf<String>()
+            listOfNotNull(resourceId, transferResourceId)
+                .distinct()
+                .forEach { candidateResourceId ->
+                    if (info == null) {
+                        val payload = JSONObject()
+                            .put("md5", md5)
+                            .put("songid", songId)
+                            .put("filename", cloudFilename)
+                            .put("song", cloudTitle)
+                            .put("album", cloudAlbum)
+                            .put("artist", cloudArtist)
+                            .put("bitrate", bitrate.toString())
+                            .put("resourceId", candidateResourceId)
+                        info = runCatching {
+                            eapi("/api/upload/cloud/info/v2", payload)
+                        }.onFailure { error ->
+                            infoFailures += "EAPI ${error.message.orEmpty()}"
+                        }.getOrNull()
+                        if (info == null) {
+                            info = runCatching {
+                                weapi.post("/api/upload/cloud/info/v2", payload)
+                            }.onFailure { error ->
+                                infoFailures += "WEAPI ${error.message.orEmpty()}"
+                            }.getOrNull()
+                        }
+                    }
+                }
+            val submittedInfo = info ?: throw IOException(
+                "云盘歌曲信息提交失败：" +
+                    infoFailures.distinct().joinToString("；").ifBlank { "网易云拒绝了歌曲元数据" },
             )
-            val publishedSongId = info.optString("songId").toLongOrNull() ?: info.optLong("songId", songId)
-            eapi("/api/cloud/pub/v2", JSONObject().put("songid", publishedSongId))
+            val publishedSongId = submittedInfo.optString("songId").toLongOrNull()
+                ?: submittedInfo.optLong("songId", songId)
+            try {
+                eapi("/api/cloud/pub/v2", JSONObject().put("songid", publishedSongId))
+            } catch (error: IOException) {
+                throw IOException("云盘歌曲发布失败：${error.message}", error)
+            }
         } finally {
             runCatching { temporary.delete() }
         }
@@ -256,6 +348,7 @@ class NeteaseUniversalSearchClient(
     }
 
     suspend fun cloudSongs(limit: Int = 200, offset: Int = 0): MeloXCloudPage = withContext(Dispatchers.IO) {
+        if (!NeteaseSessionStore.containsMusicU(cookieProvider())) throw IOException("请先登录网易云音乐")
         val response = eapi(
             "/api/v1/cloud/get",
             JSONObject().put("limit", limit.coerceIn(1, 200)).put("offset", offset.coerceAtLeast(0)),
@@ -571,6 +664,13 @@ class NeteaseUniversalSearchClient(
     }.sorted().joinToString("; ") { key -> "${enc(key)}=${enc(values.optString(key))}" }
 
     private fun enc(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+    private fun cleanCloudMetadata(value: String, fallback: String, maxLength: Int): String =
+        value
+            .replace(Regex("[\\u0000-\\u001F\\u007F]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(maxLength)
+            .ifBlank { fallback }
     private fun secure(url: String?): String? = url?.let { if (it.startsWith("http://", true)) "https://${it.substringAfter("://")}" else it }
     private fun randomHex(n: Int): String { val b = ByteArray(n); SecureRandom().nextBytes(b); return b.joinToString("") { "%02x".format(it) } }
     private fun randomDigits(n: Int) = buildString(n) { repeat(n) { append(('0'.code + SecureRandom().nextInt(10)).toChar()) } }
