@@ -217,6 +217,16 @@ class MeloXPlaybackService : MediaSessionService() {
         }
         if (reactiveAnalysisMediaId == item.mediaId || reactiveAnalysisJob?.isActive == true) return
         val songId = item.mediaId.toLongOrNull() ?: return
+        // Long-form content (podcasts, mixes) must not trigger a background
+        // full-track MediaCodec decode of a live HTTP stream. Decoding while
+        // ExoPlayer is streaming the same source drains bandwidth and CPU,
+        // which surfaces as intermittent audio dropouts that recover after the
+        // player buffer refills. Skip anything over a normal song length.
+        val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L
+        if (duration > MAX_AUDIO_REACTIVE_ANALYSIS_DURATION_MS) {
+            reactiveAnalysisMediaId = item.mediaId
+            return
+        }
         reactiveAnalysisMediaId = item.mediaId
         reactiveAnalysisJob = serviceScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -906,6 +916,10 @@ class MeloXPlaybackService : MediaSessionService() {
         const val AUTOMIX_ENVELOPE_INTERVAL_MS = 20L
         const val AUTOMIX_FAILURE_COOLDOWN_MS = 30_000L
         const val ANALYSIS_FALLBACK_GUARD_MS = 1_200L
+        // Twelve minutes keeps beat analysis for normal songs while skipping
+        // podcasts and long mixes, whose full-track decode competes with the
+        // live stream and causes audible dropouts.
+        const val MAX_AUDIO_REACTIVE_ANALYSIS_DURATION_MS = 12 * 60 * 1000L
         const val SLEEP_TIMER_END_KEY = "playback_sleep_timer_end_epoch_ms"
         const val SYSTEM_ORIGINAL_TITLE_KEY = "melox.system.original_title"
         const val SYSTEM_ORIGINAL_ARTIST_KEY = "melox.system.original_artist"
