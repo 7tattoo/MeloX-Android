@@ -78,6 +78,7 @@ import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.MeloXGlassMaterial
 import com.lladlam.melox.ui.glass.meloXGlassSurface
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.settings.MeloXPlayerBackgroundMode
 import com.lladlam.melox.playback.PlaybackCommands
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
@@ -100,7 +101,15 @@ fun MeloXIOSNowPlayingV2(
             .background(if (drawBackdrop) Color.Black else Color.Transparent),
     ) {
         if (drawBackdrop) {
-            if (MeloXSettingsRuntime.flowingBackdropEnabled) {
+            if (
+                page == MeloXNowPlayingPage.Lyrics &&
+                MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.AppleLyrics
+            ) {
+                MeloXLyricsArtworkBackdrop(
+                    artworkUrl = state.artworkUrl,
+                    isPlaying = state.isPlaying,
+                )
+            } else if (MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.FlowingLight) {
                 MeloXFlowingLightBackdrop(artworkUrl = state.artworkUrl, isPlaying = state.isPlaying)
             } else {
                 MeloXBlurredArtworkBackdrop(state.artworkUrl)

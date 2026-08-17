@@ -3,6 +3,7 @@ package com.lladlam.melox.core.music.provider
 import android.content.Context
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
 
@@ -51,6 +52,15 @@ class ProviderAccountManager(
                 accountId = session.userId.takeIf { it > 0L }?.toString(),
             )
         }
+
+        MusicSource.AppleMusic -> {
+            val session = AppleMusicSessionStore.read(appContext)
+            AccountState(
+                source = source,
+                loggedIn = session.isConfigured,
+                accountId = session.storefront.uppercase(),
+            )
+        }
     }
 
     fun allStates(): List<AccountState> = MusicSource.entries.map(::state)
@@ -67,6 +77,7 @@ class ProviderAccountManager(
 
             MusicSource.QQMusic -> QQMusicSessionStore.clear(appContext, clearWebCookies = true)
             MusicSource.Kugou -> KugouSessionStore.clearLogin(appContext)
+            MusicSource.AppleMusic -> AppleMusicSessionStore.clear(appContext)
         }
     }
 

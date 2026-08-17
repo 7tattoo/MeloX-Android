@@ -10,6 +10,7 @@ enum class MeloXThemeMode { System, Light, Dark }
 enum class MeloXLyricAnnotationDisplayMode { FocusedLine, AllLines }
 enum class MeloXLyricsStyle { AppleMusic, Eva, TextPV }
 enum class MeloXLyricsRenderingQuality { Low, Balanced, High }
+enum class MeloXPlayerBackgroundMode { FlowingLight, AppleLyrics, BlurredArtwork }
 enum class MeloXTextPVStyle {
     BlueBold, KineticSplit, BluePlane, CyberGrunge, Geometric, RainCity,
     CyberpunkHUD, EmotionCinema, HystericNight, SpiderWeb, StaggeredText,
@@ -53,7 +54,11 @@ object MeloXSettingsRuntime {
         internal set
     var flowingBackdropEnabled by mutableStateOf(true)
         internal set
+    var playerBackgroundMode by mutableStateOf(MeloXPlayerBackgroundMode.FlowingLight)
+        internal set
     var artworkMotionEnabled by mutableStateOf(true)
+        internal set
+    var playerBackgroundIsolationEnabled by mutableStateOf(true)
         internal set
     var keepScreenOn by mutableStateOf(false)
         internal set
@@ -82,6 +87,8 @@ object MeloXSettingsRuntime {
     var lyricAdvanceAppliesToWordByWord by mutableStateOf(false)
         internal set
     var lyricRefreshRate by mutableStateOf(60)
+        internal set
+    var lyricBackgroundFrameRate by mutableStateOf(24)
         internal set
     var lyricRenderingQuality by mutableStateOf(MeloXLyricsRenderingQuality.Balanced)
         internal set
@@ -283,8 +290,18 @@ object MeloXSettingsRuntime {
         listeningHistoryEnabled = MeloXSettingsPreferences.boolean(app, "feature_history", true)
         downloadsEnabled = MeloXSettingsPreferences.boolean(app, "feature_downloads", true)
         cloudMusicEnabled = MeloXSettingsPreferences.boolean(app, "feature_cloud_music", true)
-        flowingBackdropEnabled = MeloXSettingsPreferences.boolean(app, "player_flowing_backdrop", true)
+        val legacyFlowingBackdropEnabled = MeloXSettingsPreferences.boolean(app, "player_flowing_backdrop", true)
+        playerBackgroundMode = MeloXSettingsPreferences.string(app, "player_background_mode", "")
+            .takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { MeloXPlayerBackgroundMode.valueOf(value) }.getOrNull() }
+            ?: if (legacyFlowingBackdropEnabled) {
+                MeloXPlayerBackgroundMode.FlowingLight
+            } else {
+                MeloXPlayerBackgroundMode.BlurredArtwork
+            }
+        flowingBackdropEnabled = playerBackgroundMode != MeloXPlayerBackgroundMode.BlurredArtwork
         artworkMotionEnabled = MeloXSettingsPreferences.boolean(app, "player_artwork_motion", true)
+        playerBackgroundIsolationEnabled = MeloXSettingsPreferences.boolean(app, "player_background_isolation", true)
         keepScreenOn = MeloXSettingsPreferences.boolean(app, "player_keep_screen_on", false)
         screenAwakeMode = runCatching {
             MeloXScreenAwakeMode.valueOf(
@@ -308,6 +325,8 @@ object MeloXSettingsRuntime {
         lyricAdvanceAppliesToWordByWord = MeloXSettingsPreferences.boolean(app, "lyrics_advance_word_by_word", false)
         lyricRefreshRate = MeloXSettingsPreferences.int(app, "lyrics_refresh_rate", 60)
             .takeIf { it in setOf(30, 60, 90, 120) } ?: 60
+        lyricBackgroundFrameRate = MeloXSettingsPreferences.int(app, "lyrics_background_frame_rate", 24)
+            .takeIf { it in setOf(15, 24, 30, 45, 60) } ?: 24
         lyricRenderingQuality = runCatching {
             MeloXLyricsRenderingQuality.valueOf(
                 MeloXSettingsPreferences.string(
@@ -483,6 +502,7 @@ object MeloXSettingsPreferences {
             "feature_cloud_music" -> MeloXSettingsRuntime.cloudMusicEnabled = value
             "player_flowing_backdrop" -> MeloXSettingsRuntime.flowingBackdropEnabled = value
             "player_artwork_motion" -> MeloXSettingsRuntime.artworkMotionEnabled = value
+            "player_background_isolation" -> MeloXSettingsRuntime.playerBackgroundIsolationEnabled = value
             "player_keep_screen_on" -> MeloXSettingsRuntime.keepScreenOn = value
             "lyrics_translation" -> MeloXSettingsRuntime.showLyricTranslation = value
             "lyrics_romanization" -> MeloXSettingsRuntime.showLyricRomanization = value
@@ -531,6 +551,8 @@ object MeloXSettingsPreferences {
             "lyrics_follow_delay_ms" -> MeloXSettingsRuntime.lyricFollowDelayMs = value.coerceIn(1_000, 8_000)
             "lyrics_refresh_rate" -> MeloXSettingsRuntime.lyricRefreshRate =
                 value.takeIf { it in setOf(30, 60, 90, 120) } ?: 60
+            "lyrics_background_frame_rate" -> MeloXSettingsRuntime.lyricBackgroundFrameRate =
+                value.takeIf { it in setOf(15, 24, 30, 45, 60) } ?: 24
             "lyrics_long_tone_threshold_ms" -> MeloXSettingsRuntime.lyricLongToneThresholdMs = value.coerceIn(300, 1_500)
             "lyrics_interface_auto_hide_ms" -> MeloXSettingsRuntime.lyricInterfaceAutoHideDelayMs = value.coerceIn(3_000, 15_000)
             "lyrics_scroll_hide_threshold_dp" -> MeloXSettingsRuntime.lyricScrollHideThresholdDp = value.coerceIn(40, 240)
@@ -616,6 +638,13 @@ object MeloXSettingsPreferences {
             "lyrics_style" -> MeloXSettingsRuntime.lyricsStyle = runCatching {
                 MeloXLyricsStyle.valueOf(value)
             }.getOrDefault(MeloXLyricsStyle.AppleMusic)
+            "player_background_mode" -> {
+                MeloXSettingsRuntime.playerBackgroundMode = runCatching {
+                    MeloXPlayerBackgroundMode.valueOf(value)
+                }.getOrDefault(MeloXPlayerBackgroundMode.FlowingLight)
+                MeloXSettingsRuntime.flowingBackdropEnabled =
+                    MeloXSettingsRuntime.playerBackgroundMode != MeloXPlayerBackgroundMode.BlurredArtwork
+            }
             "lyrics_text_pv_style" -> {
                 MeloXSettingsRuntime.textPVStyle = runCatching {
                     MeloXTextPVStyle.valueOf(value)

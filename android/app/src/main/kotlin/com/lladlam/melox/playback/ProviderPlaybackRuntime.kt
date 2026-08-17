@@ -5,6 +5,7 @@ import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.MusicProviderRegistry
+import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
 
@@ -38,6 +39,9 @@ object ProviderPlaybackRuntime {
             MusicSource.QQMusic -> QQMusicSessionStore.read(context).cookie
             MusicSource.Kugou -> KugouSessionStore.read(context).let { session ->
                 listOf(session.userId, session.token, session.vipToken, session.dfid).joinToString("|")
+            }
+            MusicSource.AppleMusic -> AppleMusicSessionStore.read(context).let { session ->
+                listOf(session.developerToken, session.musicUserToken, session.storefront).joinToString("|")
             }
         }
     }

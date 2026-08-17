@@ -7,8 +7,12 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
+import java.text.BreakIterator
+import java.util.Locale
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -675,7 +679,13 @@ private fun MeloXAppleMusicLyricsPanel(
                     fontSize = 15.sp,
                 )
             }
-            document == null || lines.isEmpty() -> {
+            document != null && lines.isEmpty() -> {
+                MeloXLyricInstrumentalWave(
+                    reduceMotion = MeloXSettingsRuntime.lyricReduceMotion,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            document == null -> {
                 Text(
                     text = "暂无歌词",
                     modifier = Modifier.align(Alignment.Center),
@@ -837,6 +847,47 @@ private fun MeloXAppleMusicLyricsPanel(
     }
 }
 
+/** Three staggered instrumental bars, matching the report's 750ms wave entry. */
+@Composable
+private fun MeloXLyricInstrumentalWave(
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val phases = listOf(0, 1, 2).map { index ->
+        animateFloatAsState(
+            targetValue = 1f,
+            animationSpec = if (reduceMotion) {
+                tween(1)
+            } else {
+                tween(
+                    durationMillis = 750,
+                    delayMillis = index * 50,
+                    easing = CubicBezierEasing(.4f, 0f, 1f, 1f),
+                )
+            },
+            label = "lyrics-instrumental-wave-$index",
+        ).value
+    }
+    Canvas(modifier.fillMaxWidth().height(46.dp)) {
+        val barWidth = 7.dp.toPx()
+        val gap = 9.dp.toPx()
+        val totalWidth = barWidth * 3f + gap * 2f
+        val startX = (size.width - totalWidth) / 2f
+        phases.forEachIndexed { index, phase ->
+            val barHeight = 20.dp.toPx() + index * 7.dp.toPx()
+            drawRoundRect(
+                color = Color.White.copy(alpha = phase.coerceIn(0f, 1f)),
+                topLeft = Offset(
+                    startX + index * (barWidth + gap),
+                    (size.height - barHeight) / 2f,
+                ),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f),
+            )
+        }
+    }
+}
+
 @Composable
 private fun MeloXUpstreamLyricLine(
     line: LyricLine,
@@ -905,6 +956,9 @@ private fun MeloXUpstreamLyricLine(
                 playbackTimeProvider = playbackTimeProvider,
                 supportsTimedLyrics = supportsTimedLyrics,
                 fontScale = fontScale,
+                // MeloX iOS sends pseudo-timed LRC through this same
+                // renderer. Only genuine long tones expand; ordinary glyphs
+                // merely reveal and lift according to the selected mode.
                 reduceMotion = reduceMotion,
                 timingEffectsStrength = focusProgress,
                 renderingQuality = renderingQuality,
@@ -954,7 +1008,7 @@ private fun MeloXRubyLyricText(
             playbackTimeProvider = playbackTimeProvider,
             supportsTimedLyrics = supportsTimedLyrics,
             fontScale = fontScale,
-            reduceMotion = false,
+            reduceMotion = true,
             timingEffectsStrength = 1f,
             renderingQuality = renderingQuality,
             modifier = modifier,
@@ -1016,14 +1070,24 @@ private data class MeloXGlyphVisual(
 )
 
 private data class MeloXGlyphTiming(
+    val textOffset: Int,
     val start: Float,
     val end: Float,
     val liftStart: Float,
     val liftEnd: Float,
     val syllableStart: Float,
-    val syllableDuration: Float,
+    val syllableEnd: Float,
     val characterIndex: Int,
     val characterCount: Int,
+    val wordStart: Float,
+    val wordEnd: Float,
+    val wordCharacterIndex: Int,
+    val wordCharacterCount: Int,
+    val usesWordTimingForLongTone: Boolean,
+    val longToneStart: Float,
+    val longToneDuration: Float,
+    val longToneCharacterIndex: Int,
+    val longToneCharacterCount: Int,
     val isLongTone: Boolean,
     val expansionAmount: Float,
     val glowAmount: Float,
@@ -1390,43 +1454,83 @@ private fun sourceGlyphTimings(
             val offset = startIndex + local
             val start = syllable.startTimeMs + characterDuration * local
             val end = if (local == count - 1) max(syllable.endTimeMs.toFloat(), start) else start + characterDuration
-            val duration = max(end - start, 0f)
-            val char = line.text[offset]
-            val longToneDuration = if (longToneDetectionMode == MeloXLyricsGroupingMode.Word) {
-                syllableDuration
-            } else {
-                duration
-            }
-            val longTone = longToneDuration >= longToneThresholdMs && !char.isWhitespace()
-            val liftStart = if (liftMode == MeloXLyricsGroupingMode.Word) syllable.startTimeMs.toFloat() else start
-            val liftBaseEnd = if (liftMode == MeloXLyricsGroupingMode.Word) syllable.endTimeMs.toFloat() else end
-            val liftEnd = liftBaseEnd + UpstreamLyrics.LIFT_CONTINUATION_MS
-            val expansionAmount = if (longTone) {
-                .7f + .3f * sourceSmootherStep(
-                    (syllableDuration - UpstreamLyrics.LONG_TONE_THRESHOLD_MS) /
-                        (2800f - UpstreamLyrics.LONG_TONE_THRESHOLD_MS),
-                )
-            } else 0f
-            val glowAmount = if (longTone) .32f + .38f * sourceSmootherStep(
-                (syllableDuration - UpstreamLyrics.LONG_TONE_THRESHOLD_MS) /
-                    (2800f - UpstreamLyrics.LONG_TONE_THRESHOLD_MS),
-            ) else 0f
             result[offset] = MeloXGlyphTiming(
+                textOffset = offset,
                 start = start,
                 end = end,
-                liftStart = liftStart,
-                liftEnd = liftEnd,
+                liftStart = start,
+                liftEnd = end + UpstreamLyrics.LIFT_CONTINUATION_MS,
                 syllableStart = syllable.startTimeMs.toFloat(),
-                syllableDuration = syllableDuration,
+                syllableEnd = syllable.endTimeMs.toFloat(),
                 characterIndex = local,
                 characterCount = count,
-                isLongTone = longTone,
-                expansionAmount = expansionAmount,
-                glowAmount = glowAmount,
+                wordStart = start,
+                wordEnd = end,
+                wordCharacterIndex = 0,
+                wordCharacterCount = 1,
+                usesWordTimingForLongTone = false,
+                longToneStart = syllable.startTimeMs.toFloat(),
+                longToneDuration = syllableDuration,
+                longToneCharacterIndex = local,
+                longToneCharacterCount = count,
+                isLongTone = false,
+                expansionAmount = 0f,
+                glowAmount = 0f,
             )
         }
     }
-    return result
+
+    // Match TimedLyricTextBuilder: highlights preserve individual character
+    // timings, while a word block supplies the optional shared lift clock.
+    sourceWordBlocks(line.text).forEach { block ->
+        val timedOffsets = (block.start until block.end).filter { offset ->
+            result.getOrNull(offset) != null && !line.text[offset].isWhitespace()
+        }
+        val wordStart = timedOffsets.minOfOrNull { result[it]!!.start } ?: return@forEach
+        val wordEnd = timedOffsets.maxOfOrNull { result[it]!!.end } ?: return@forEach
+        val positions = timedOffsets.withIndex().associate { it.value to it.index }
+        val usesWordTimingForLongTone = timedOffsets.size > 1 && timedOffsets.all { offset ->
+            line.text[offset].isAsciiLatinLetter()
+        }
+        for (offset in block.start until block.end) {
+            result[offset] = result.getOrNull(offset)?.copy(
+                wordStart = wordStart,
+                wordEnd = wordEnd,
+                wordCharacterIndex = positions[offset] ?: max(timedOffsets.size - 1, 0),
+                wordCharacterCount = max(timedOffsets.size, 1),
+                usesWordTimingForLongTone = usesWordTimingForLongTone,
+            )
+        }
+    }
+
+    return result.map { timing ->
+        timing?.let {
+            val liftStart = if (liftMode == MeloXLyricsGroupingMode.Word) it.wordStart else it.start
+            val liftEnd = if (liftMode == MeloXLyricsGroupingMode.Word) it.wordEnd else it.end
+            val usesWordGroup = it.usesWordTimingForLongTone ||
+                longToneDetectionMode == MeloXLyricsGroupingMode.Word
+            val toneStart = if (usesWordGroup) it.wordStart else it.syllableStart
+            val toneEnd = if (usesWordGroup) it.wordEnd else it.syllableEnd
+            val toneDuration = max(toneEnd - toneStart, 0f)
+            val toneIndex = if (usesWordGroup) it.wordCharacterIndex else it.characterIndex
+            val toneCount = if (usesWordGroup) it.wordCharacterCount else it.characterCount
+            val longTone = !line.text[it.textOffset].isWhitespace() && toneDuration >= longToneThresholdMs
+            val emphasisProgress = sourceSmootherStep(
+                (toneDuration - longToneThresholdMs) / (2800f - longToneThresholdMs),
+            )
+            it.copy(
+                liftStart = liftStart,
+                liftEnd = liftEnd + UpstreamLyrics.LIFT_CONTINUATION_MS,
+                longToneStart = toneStart,
+                longToneDuration = toneDuration,
+                longToneCharacterIndex = toneIndex,
+                longToneCharacterCount = toneCount,
+                isLongTone = longTone,
+                expansionAmount = if (longTone) .7f + .3f * emphasisProgress else 0f,
+                glowAmount = if (longTone) .32f + .38f * emphasisProgress else 0f,
+            )
+        }
+    }
 }
 
 private fun sourceGlyphVisual(
@@ -1457,18 +1561,23 @@ private fun sourceGlyphVisual(
         min(max(UpstreamLyrics.FONT_SIZE_SP * fontScale * .1f, 1.5f), 6f) * density
     val envelope = if (timing.isLongTone) sourceLongToneEnvelope(
         playbackTimeMs.toFloat(),
-        timing.syllableStart,
-        timing.syllableDuration,
-        timing.characterIndex,
-        timing.characterCount,
+        timing.longToneStart,
+        timing.longToneDuration,
+        characterIndex = timing.longToneCharacterIndex,
+        characterCount = timing.longToneCharacterCount,
     ) else 0f
-    val scale = if (reduceMotion) 1f else
+    val longToneScale = if (reduceMotion) 1f else
         1f + (UpstreamLyrics.LONG_TONE_MAX_SCALE - 1f) * envelope * timing.expansionAmount *
             MeloXSettingsRuntime.lyricLongToneStrength
+    val scale = longToneScale
     val glow = if (reduceMotion || !MeloXSettingsRuntime.lyricGlowEnabled ||
         (MeloXSettingsRuntime.lyricGlowLongTonesOnly && !timing.isLongTone)
     ) 0f else {
-        if (timing.isLongTone) envelope * timing.glowAmount else reveal * .22f
+        if (timing.isLongTone) envelope * timing.glowAmount else sourceOrdinaryGlowStrength(
+            playbackTimeMs = playbackTimeMs.toFloat(),
+            endMs = timing.end,
+            rawProgress = raw,
+        )
     }
     return MeloXGlyphVisual(
         reveal = reveal,
@@ -1477,6 +1586,63 @@ private fun sourceGlyphVisual(
         glow = glow,
     )
 }
+
+private fun sourceOrdinaryGlowStrength(
+    playbackTimeMs: Float,
+    endMs: Float,
+    rawProgress: Float,
+): Float {
+    if (playbackTimeMs <= endMs) {
+        val attack = sourceSmootherStep(rawProgress / .24f)
+        val breath = .82f + .18f * kotlin.math.sin(Math.PI.toFloat() * rawProgress)
+        return attack * breath * .55f
+    }
+    val tail = ((playbackTimeMs - endMs) / UpstreamLyrics.GLOW_TAIL_MS).coerceIn(0f, 1f)
+    return (1f - sourceSmootherStep(tail)) * .82f * .55f
+}
+
+private data class SourceTextBlock(val start: Int, val end: Int)
+
+private fun sourceWordBlocks(text: String): List<SourceTextBlock> {
+    if (text.isEmpty()) return emptyList()
+    val tokens = mutableListOf<SourceTextBlock>()
+    var phraseStart = -1
+    for (index in 0..text.length) {
+        val isWhitespace = index == text.length || text[index].isWhitespace()
+        if (!isWhitespace && phraseStart < 0) phraseStart = index
+        if (isWhitespace && phraseStart >= 0) {
+            val phraseEnd = index
+            val iterator = BreakIterator.getWordInstance(Locale.ROOT).apply {
+                setText(text.substring(phraseStart, phraseEnd))
+            }
+            var tokenStart = iterator.first()
+            var tokenEnd = iterator.next()
+            var foundWord = false
+            while (tokenEnd != BreakIterator.DONE) {
+                val token = text.substring(phraseStart + tokenStart, phraseStart + tokenEnd)
+                if (token.any { it.isLetterOrDigit() }) {
+                    tokens += SourceTextBlock(phraseStart + tokenStart, phraseStart + tokenEnd)
+                    foundWord = true
+                }
+                tokenStart = tokenEnd
+                tokenEnd = iterator.next()
+            }
+            if (!foundWord) tokens += SourceTextBlock(phraseStart, phraseEnd)
+            phraseStart = -1
+        }
+    }
+    if (tokens.isEmpty()) return listOf(SourceTextBlock(0, text.length))
+    val sorted = tokens.sortedBy { it.start }
+    return buildList {
+        sorted.forEachIndexed { index, token ->
+            val start = if (index == 0) 0 else sorted[index - 1].end
+            val end = if (index + 1 < sorted.size) sorted[index + 1].start else text.length
+            if (start < end) add(SourceTextBlock(start, end))
+        }
+    }
+}
+
+private fun Char.isAsciiLatinLetter(): Boolean = this in 'A'..'Z' || this in 'a'..'z'
 
 private fun sourceTimingEffectsStrength(
     line: LyricLine,

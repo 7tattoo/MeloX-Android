@@ -1,6 +1,10 @@
 package com.lladlam.melox.ui.player
 
 import android.graphics.Bitmap
+import android.os.SystemClock
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,6 +18,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -55,6 +61,89 @@ internal fun MeloXBlurredArtworkBackdrop(
 }
 
 /**
+ * Three slow artwork planes based on Apple Music's lyric background: 120s,
+ * 90s and 70s linear rotations. Low quality deliberately keeps one plane to
+ * avoid turning a lyric view into three full-screen blur passes.
+ */
+@Composable
+internal fun MeloXLyricsArtworkBackdrop(
+    artworkUrl: String?,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val quality = MeloXSettingsRuntime.lyricRenderingQuality
+    val planeCount = if (quality == MeloXLyricsRenderingQuality.Low) 1 else 3
+    val backgroundFrameRate = MeloXSettingsRuntime.lyricBackgroundFrameRate.coerceIn(15, 60)
+    val saturation = if (MeloXSettingsRuntime.lyricReduceMotion) 3.5f else 2.5f
+    val artworkColorFilter = remember(saturation) {
+        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(saturation) })
+    }
+    var rotations by remember { mutableStateOf(List(3) { 0f }) }
+
+    // The source implementation invalidates its Canvas roughly every 42ms
+    // (~24fps). Throttling here is intentional: three blurred planes at 60fps
+    // make the lyric page visibly hotter without improving the slow motion.
+    LaunchedEffect(isPlaying, planeCount, artworkUrl, backgroundFrameRate) {
+        if (!isPlaying) {
+            rotations = List(3) { 0f }
+            awaitCancellation()
+        }
+        val startedAt = SystemClock.elapsedRealtime()
+        while (true) {
+            val elapsed = (SystemClock.elapsedRealtime() - startedAt).toFloat()
+            rotations = listOf(
+                -(elapsed % 120_000f) / 120_000f * 360f,
+                (elapsed % 90_000f) / 90_000f * 360f,
+                (elapsed % 70_000f) / 70_000f * 360f,
+            )
+            delay((1_000L / backgroundFrameRate.toLong()).coerceAtLeast(1L))
+        }
+    }
+
+    androidx.compose.foundation.layout.Box(modifier.fillMaxSize()) {
+        // The source fades the old and new cover over about one second. Keep
+        // the crossfade outside the plane loop so a track change only creates
+        // one extra three-plane pass during the transition.
+        Crossfade(
+            targetState = artworkUrl,
+            animationSpec = tween(
+                durationMillis = 1_000,
+                easing = CubicBezierEasing(0f, 0f, .3f, 1f),
+            ),
+            label = "lyrics-artwork-crossfade",
+        ) { coverUrl ->
+            repeat(planeCount) { index ->
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = artworkColorFilter,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = 1.34f
+                            scaleY = 1.34f
+                            rotationZ = rotations[index]
+                            translationX = (index - 1) * 34f
+                            translationY = (1 - index) * 22f
+                            alpha = if (index == 0) .48f else .28f
+                        }
+                        .blur(if (quality == MeloXLyricsRenderingQuality.High) 30.dp else 24.dp),
+                )
+            }
+        }
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(Color.Black.copy(alpha = .34f))
+            drawRect(
+                brush = Brush.verticalGradient(
+                    listOf(Color.Transparent, Color.Black.copy(alpha = .52f)),
+                ),
+            )
+        }
+    }
+}
+
+/**
  * Android renderer for MeloX's artwork-driven Flowing Light background.
  * Palette extraction is identical in shape to ArtworkAccentColorProvider:
  * 160px downsample -> 3x3 cell averages. Android has no SwiftUI MeshGradient
@@ -71,6 +160,7 @@ internal fun MeloXFlowingLightBackdrop(
     val context = LocalContext.current
     var targetPalette by remember { mutableStateOf(ArtworkDynamicPalette.Fallback) }
     val renderingQuality = MeloXSettingsRuntime.lyricRenderingQuality
+    val backgroundFrameRate = MeloXSettingsRuntime.lyricBackgroundFrameRate.coerceIn(15, 60)
     val meshWidth = when (renderingQuality) {
         MeloXLyricsRenderingQuality.Low -> 24
         MeloXLyricsRenderingQuality.Balanced -> 32
@@ -87,11 +177,12 @@ internal fun MeloXFlowingLightBackdrop(
         targetPalette = ArtworkDynamicPaletteProvider.paletteFor(context, artworkUrl)
     }
 
-    LaunchedEffect(isPlaying, artworkUrl, mediaId, renderingQuality, meshBitmaps, targetPalette) {
+    LaunchedEffect(isPlaying, artworkUrl, mediaId, renderingQuality, backgroundFrameRate, meshBitmaps, targetPalette) {
+        val requestedFrameDelayMs = (1_000L / backgroundFrameRate.toLong()).coerceAtLeast(1L)
         val frameDelayMs = when (renderingQuality) {
-            MeloXLyricsRenderingQuality.Low -> 50L
-            MeloXLyricsRenderingQuality.Balanced -> 33L
-            MeloXLyricsRenderingQuality.High -> 16L
+            MeloXLyricsRenderingQuality.Low -> requestedFrameDelayMs.coerceAtLeast(50L)
+            MeloXLyricsRenderingQuality.Balanced -> requestedFrameDelayMs.coerceAtLeast(33L)
+            MeloXLyricsRenderingQuality.High -> requestedFrameDelayMs.coerceAtLeast(16L)
         }
         var phase = 0f
         var energy = .18f

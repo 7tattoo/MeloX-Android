@@ -31,9 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +85,7 @@ import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.MeloXIosTopBar
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSearchBackMorphIcon
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.glass.MeloXSystemColors
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
@@ -504,14 +505,15 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
 
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit, source: MusicSource) {
+    var focused by remember { mutableStateOf(false) }
     MeloXGlassTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier
             .padding(horizontal = 20.dp),
         leadingContent = {
-            MeloXSymbolIcon(
-                symbol = MeloXSymbol.Search,
+            MeloXSearchBackMorphIcon(
+                focused = focused,
                 modifier = Modifier.size(21.dp),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f),
             )
@@ -549,6 +551,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, source: 
         ),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = {}),
+        onFocusChanged = { focused = it },
     )
 }
 

@@ -40,6 +40,7 @@ import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
+import com.lladlam.melox.ui.account.AppleMusicLoginScreen
 import com.lladlam.melox.ui.glass.MeloXGlassButton
 import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
@@ -67,6 +68,7 @@ fun ProviderServicesScreen(
     }
     var showQQLogin by remember(currentSource) { mutableStateOf(false) }
     var showKugouLogin by remember(currentSource) { mutableStateOf(false) }
+    var showAppleMusicLogin by remember(currentSource) { mutableStateOf(false) }
     var loginRevision by remember(currentSource) { mutableStateOf(0) }
     var pendingAction by remember { mutableStateOf<Pair<MusicSource, ServicesAccountAction>?>(null) }
     var unifiedEnabled by remember { mutableStateOf(MusicProviderSelectionStore.unifiedEnabled(context)) }
@@ -85,6 +87,13 @@ fun ProviderServicesScreen(
         KugouLoginScreen(
             onDismiss = { showKugouLogin = false },
             onLoggedIn = { showKugouLogin = false; loginRevision++ },
+        )
+        return
+    }
+    if (showAppleMusicLogin && currentSource == MusicSource.AppleMusic) {
+        AppleMusicLoginScreen(
+            onDismiss = { showAppleMusicLogin = false },
+            onLoggedIn = { showAppleMusicLogin = false; loginRevision++ },
         )
         return
     }
@@ -118,7 +127,7 @@ fun ProviderServicesScreen(
 
         ServicesSectionLabel("音乐源")
         MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surface) {
-            MusicSource.entries.forEachIndexed { index, source ->
+            MusicProviderSelectionStore.visibleSources().forEachIndexed { index, source ->
                 val account = accountManager.state(source)
                 MeloXIosListRow(
                     title = source.displayName,
@@ -161,6 +170,7 @@ fun ProviderServicesScreen(
                             MusicSource.Netease -> onNeteaseLogin()
                             MusicSource.QQMusic -> showQQLogin = true
                             MusicSource.Kugou -> showKugouLogin = true
+                            MusicSource.AppleMusic -> showAppleMusicLogin = true
                         }
                     }
                 },
@@ -202,7 +212,7 @@ fun ProviderServicesScreen(
                 showTopSeparator = false,
             )
             if (unifiedEnabled) {
-                MusicSource.entries.forEach { source ->
+                MusicProviderSelectionStore.visibleSources().forEach { source ->
                     val account = accountManager.state(source)
                     MeloXIosListRow(
                         title = source.displayName,
@@ -241,6 +251,7 @@ fun ProviderServicesScreen(
                                 MusicSource.Netease -> onNeteaseLogin()
                                 MusicSource.QQMusic -> showQQLogin = true
                                 MusicSource.Kugou -> showKugouLogin = true
+                                MusicSource.AppleMusic -> showAppleMusicLogin = true
                             }
                         }
                     },

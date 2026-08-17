@@ -785,6 +785,27 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
     SettingsToggleRow(context, "封面播放动效", "player_artwork_motion", true)
     LyricsStringChoiceSetting(
         context,
+        "播放器背景",
+        "player_background_mode",
+        MeloXSettingsRuntime.playerBackgroundMode.name,
+        MeloXPlayerBackgroundMode.entries.map { it.name },
+    ) {
+        when (MeloXPlayerBackgroundMode.valueOf(it)) {
+            MeloXPlayerBackgroundMode.FlowingLight -> "取色流动光影（原版）"
+            MeloXPlayerBackgroundMode.AppleLyrics -> "Apple 三层歌词背景"
+            MeloXPlayerBackgroundMode.BlurredArtwork -> "静态模糊封面"
+        }
+    }
+    SettingsInfoCard("背景说明", "取色流动光影会从专辑封面提取颜色生成动态背景；Apple 三层歌词背景只在歌词页使用三张旋转专辑图。")
+    SettingsToggleRow(
+        context,
+        "播放器背景隔离",
+        "player_background_isolation",
+        true,
+        "开启后播放器独立覆盖首页；关闭后恢复原始透明背景，可能透出下层页面。",
+    )
+    LyricsStringChoiceSetting(
+        context,
         "屏幕常亮范围",
         "player_screen_awake_mode",
         MeloXScreenAwakeMode.Disabled.name,
@@ -924,6 +945,14 @@ private fun LyricsSettings(context: android.content.Context) {
     }
     SettingsToggleRow(context, "提前量同时应用于逐字高亮", "lyrics_advance_word_by_word", false)
     LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120)) { "$it FPS" }
+    LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
+        when (value) {
+            15 -> "15 FPS · 省电"
+            24 -> "24 FPS · 推荐"
+            30 -> "30 FPS · 均衡"
+            else -> "$value FPS · 流畅"
+        }
+    }
     LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000)) { "${it / 1_000f} 秒" }
     LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f)) { "${(it * 100).toInt()}%" }
     LyricsStringChoiceSetting(

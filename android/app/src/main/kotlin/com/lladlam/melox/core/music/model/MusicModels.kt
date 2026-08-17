@@ -7,7 +7,8 @@ enum class MusicSource(
 ) {
     Netease("netease", "网易云音乐"),
     QQMusic("qq_music", "QQ音乐"),
-    Kugou("kugou", "酷狗音乐");
+    Kugou("kugou", "酷狗音乐"),
+    AppleMusic("apple_music", "Apple Music");
 
     companion object {
         fun fromStorageValue(value: String?): MusicSource =
@@ -97,6 +98,12 @@ sealed interface ProviderTrackMetadata {
         val hash: String,
         val albumAudioId: Long? = null,
         val albumId: String? = null,
+    ) : ProviderTrackMetadata
+
+    data class AppleMusic(
+        val catalogId: String,
+        val storefront: String,
+        val previewUrl: String? = null,
     ) : ProviderTrackMetadata
 }
 

@@ -16,6 +16,8 @@ import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicResourceId
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
+import com.lladlam.melox.core.provider.applemusic.AppleMusicSdkBridge
+import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import java.util.concurrent.Executor
 
 /** Queue entry point for QQ/Kugou and future mixed-provider results. */
@@ -29,6 +31,21 @@ object ProviderPlaybackCommands {
     ) {
         if (tracks.isEmpty()) return
         val appContext = context.applicationContext
+        if (tracks.all { it.id.source == MusicSource.AppleMusic }) {
+            val session = AppleMusicSessionStore.read(appContext)
+            val startIndex = tracks.indexOfFirst { it.id == selectedTrackId }.coerceAtLeast(0)
+            if (AppleMusicSdkBridge.playCatalogQueue(
+                    context = appContext,
+                    session = session,
+                    catalogIds = tracks.map { it.id.value },
+                    startIndex = startIndex,
+                )
+            ) {
+                return
+            }
+            onFailure?.invoke(IllegalStateException("Apple Music 官方 DRM SDK 未安装或授权未完成"))
+            return
+        }
         ProviderPlaybackRuntime.initialize(appContext)
         val neteaseQuality = MusicQualityPreferences.read(appContext)
         MusicQualityRuntime.selected = neteaseQuality

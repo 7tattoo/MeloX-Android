@@ -92,9 +92,26 @@ object MusicExperiences {
         ),
     )
 
+    val appleMusic = MusicExperience(
+        source = MusicSource.AppleMusic,
+        homeSections = listOf(
+            HomeSectionKind.Recommendations,
+            HomeSectionKind.Playlists,
+            HomeSectionKind.NewSongs,
+        ),
+        providerNativeCapabilities = setOf(
+            MusicCapability.HomeRecommendations,
+            MusicCapability.Library,
+            MusicCapability.Playlists,
+            MusicCapability.Albums,
+            MusicCapability.Artists,
+        ),
+    )
+
     fun forSource(source: MusicSource): MusicExperience = when (source) {
         MusicSource.Netease -> netease
         MusicSource.QQMusic -> qqMusic
         MusicSource.Kugou -> kugou
+        MusicSource.AppleMusic -> appleMusic
     }
 }

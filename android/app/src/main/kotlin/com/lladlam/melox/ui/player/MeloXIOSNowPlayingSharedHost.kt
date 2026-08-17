@@ -61,6 +61,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.settings.MeloXPlayerBackgroundMode
 import com.lladlam.melox.ui.settings.MeloXScreenAwakeMode
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.core.network.MeloXSearchKind
@@ -143,8 +144,16 @@ fun MeloXIOSNowPlayingSharedHost(
         if (visibility == EnterExitState.Visible) 1f else 0f
     }
 
-    val backdropAlpha = smoothStep(expansionProgress, 0.08f, 0.58f)
-    val fullPlayerAlpha = smoothStep(expansionProgress, 0.46f, 0.90f)
+    // Let the shared artwork establish the transition first. The background
+    // and scene then take over on the same master timeline, which prevents a
+    // black first frame from winning the z-order over MiniPlay.
+    val backdropAlpha = smoothStep(expansionProgress, 0.18f, 0.72f)
+    val isolationAlpha = if (MeloXSettingsRuntime.playerBackgroundIsolationEnabled) {
+        smoothStep(expansionProgress, 0.34f, 0.82f)
+    } else {
+        0f
+    }
+    val fullPlayerAlpha = smoothStep(expansionProgress, 0.44f, 0.88f)
     val collapseProgress = (1f - expansionProgress).coerceIn(0f, 1f)
     val latestCollapseProgress = rememberUpdatedState(collapseProgress)
     val latestPage = rememberUpdatedState(page)
@@ -288,18 +297,38 @@ fun MeloXIOSNowPlayingSharedHost(
                         onDragStarted = { beginCollapseDrag() },
                         onDragStopped = { velocity -> settleFromCurrent(velocity) },
                     ),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .layerBackdrop(playerControlBackdrop)
-                        .graphicsLayer { alpha = backdropAlpha },
                 ) {
-                    if (MeloXSettingsRuntime.flowingBackdropEnabled) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // Keep the opaque fallback inside the shared
+                            // surface. Putting it on the sharedBounds node
+                            // makes the black fallback itself participate in
+                            // the capsule-to-screen transform, which exposes
+                            // four dark corners during expansion.
+                            .then(
+                                if (isolationAlpha > 0f) {
+                                    Modifier.background(Color.Black.copy(alpha = isolationAlpha))
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .layerBackdrop(playerControlBackdrop)
+                            .graphicsLayer { alpha = backdropAlpha },
+                ) {
+                    if (
+                        page == MeloXNowPlayingPage.Lyrics &&
+                        MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.AppleLyrics
+                    ) {
+                        MeloXLyricsArtworkBackdrop(
+                            artworkUrl = state.artworkUrl,
+                            isPlaying = state.isPlaying && expansionProgress > 0.72f,
+                        )
+                    } else if (MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.FlowingLight) {
                         MeloXFlowingLightBackdrop(
                             mediaId = state.mediaId,
                             artworkUrl = state.artworkUrl,
-                            isPlaying = state.isPlaying,
+                            isPlaying = state.isPlaying && expansionProgress > 0.72f,
                         )
                     } else {
                         MeloXBlurredArtworkBackdrop(state.artworkUrl)
@@ -465,7 +494,8 @@ private fun SharedArtworkDestination(
                 sharedContentState = artworkSharedState,
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = MeloXPlayerLinearBoundsTransform,
-                zIndexInOverlay = 3f,
+                renderInOverlayDuringTransition = true,
+                zIndexInOverlay = 4f,
             )
         }
 

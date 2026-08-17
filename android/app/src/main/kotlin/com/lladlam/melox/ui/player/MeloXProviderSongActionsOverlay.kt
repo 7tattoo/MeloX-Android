@@ -396,6 +396,7 @@ private fun shareProviderSong(
         MusicSource.QQMusic -> "https://y.qq.com/n/ryqq/songDetail/${identity.value}"
         MusicSource.Kugou,
         MusicSource.Netease -> null
+        MusicSource.AppleMusic -> "https://music.apple.com/song/${identity.value}"
     }
     val text = buildString {
         append(state.title.ifBlank { "正在播放" })

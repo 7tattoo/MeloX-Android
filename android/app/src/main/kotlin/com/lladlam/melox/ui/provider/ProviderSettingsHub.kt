@@ -38,6 +38,7 @@ import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
+import com.lladlam.melox.ui.account.AppleMusicLoginScreen
 import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
@@ -82,6 +83,7 @@ fun ProviderSettingsHub(
     var showServiceDialog by remember { mutableStateOf(false) }
     var showQQLogin by remember(currentSource) { mutableStateOf(false) }
     var showKugouLogin by remember(currentSource) { mutableStateOf(false) }
+    var showAppleMusicLogin by remember(currentSource) { mutableStateOf(false) }
     var loginRevision by remember(currentSource) { mutableStateOf(0) }
     var pendingAccountAction by remember { mutableStateOf<PendingProviderAccountAction?>(null) }
 
@@ -115,6 +117,13 @@ fun ProviderSettingsHub(
                 showKugouLogin = false
                 loginRevision += 1
             },
+        )
+        return
+    }
+    if (showAppleMusicLogin && currentSource == MusicSource.AppleMusic) {
+        AppleMusicLoginScreen(
+            onDismiss = { showAppleMusicLogin = false },
+            onLoggedIn = { showAppleMusicLogin = false; loginRevision++ },
         )
         return
     }
@@ -177,7 +186,7 @@ fun ProviderSettingsHub(
                     )
                     Spacer(Modifier.height(14.dp))
 
-                    MusicSource.entries.forEach { source ->
+                    MusicProviderSelectionStore.visibleSources().forEach { source ->
                         ProviderSourceSelectionRow(
                             source = source,
                             selected = source == currentSource,
@@ -213,6 +222,7 @@ fun ProviderSettingsHub(
                                     MusicSource.Netease -> onNeteaseLogin()
                                     MusicSource.QQMusic -> showQQLogin = true
                                     MusicSource.Kugou -> showKugouLogin = true
+                                    MusicSource.AppleMusic -> showAppleMusicLogin = true
                                 }
                             }
                         },
@@ -226,6 +236,7 @@ fun ProviderSettingsHub(
                                 MusicSource.Netease -> "清除当前网易云登录态后重新登录"
                                 MusicSource.QQMusic -> "只清除 QQ音乐登录态后重新打开登录页"
                                 MusicSource.Kugou -> "保留 MID / GUID，只清除用户登录态后重新扫码"
+                                MusicSource.AppleMusic -> "重新配置 Developer Token / Music User Token"
                             },
                             onClick = {
                                 showServiceDialog = false
@@ -269,7 +280,7 @@ fun ProviderSettingsHub(
 
                     if (unifiedEnabled) {
                         Spacer(Modifier.height(8.dp))
-                        MusicSource.entries.forEach { source ->
+                        MusicProviderSelectionStore.visibleSources().forEach { source ->
                             val account = accountManager.state(source)
                             ProviderSettingToggle(
                                 title = source.displayName,
@@ -350,6 +361,7 @@ fun ProviderSettingsHub(
                                 MusicSource.Netease -> onNeteaseLogin()
                                 MusicSource.QQMusic -> showQQLogin = true
                                 MusicSource.Kugou -> showKugouLogin = true
+                                MusicSource.AppleMusic -> showAppleMusicLogin = true
                             }
                         }
                     },

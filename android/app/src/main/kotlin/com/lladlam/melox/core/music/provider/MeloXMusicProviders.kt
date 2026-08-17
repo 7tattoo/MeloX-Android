@@ -2,6 +2,8 @@ package com.lladlam.melox.core.music.provider
 
 import android.content.Context
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.provider.applemusic.AppleMusicApiClient
+import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouProvider
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.netease.NeteaseProvider
@@ -28,6 +30,10 @@ object MeloXMusicProviders {
                 ),
                 KugouProvider(
                     sessionProvider = { KugouSessionStore.read(appContext) },
+                    httpClient = httpClient,
+                ),
+                AppleMusicApiClient(
+                    sessionProvider = { AppleMusicSessionStore.read(appContext) },
                     httpClient = httpClient,
                 ),
             ),

@@ -58,6 +58,14 @@ kotlin {
 }
 
 dependencies {
+    // Optional official Apple MusicKit for Android AARs. Download them from
+    // Apple Developer and place only these two files in app/libs/:
+    // musickitauth-release-*.aar and mediaplayback-release-*.aar.
+    // The app remains catalog-capable when the optional files are absent.
+    implementation(fileTree("libs") {
+        include("musickitauth-release-*.aar", "mediaplayback-release-*.aar")
+    })
+
     val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
     implementation(composeBom)
 

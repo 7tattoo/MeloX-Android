@@ -658,8 +658,8 @@ private fun MeloXBottomChrome(
     val shrinkStage = smoothStep(progress, 0.25f, 0.82f)
     val dropStage = smoothStep(progress, 0.78f, 1.00f)
 
-    val navHeight = lerpDp(58.dp, 52.dp, sizeStage)
-    val searchSize = lerpDp(56.dp, 52.dp, sizeStage)
+    val navHeight = lerpDp(64.dp, 48.dp, sizeStage)
+    val searchSize = lerpDp(64.dp, 48.dp, sizeStage)
     val expandedChromeHeight = if (hasMedia) 121.dp else 64.dp
     val chromeHeight = lerpDp(expandedChromeHeight, 58.dp, dropStage)
     val labelAlpha = 1f - labelStage
@@ -670,18 +670,20 @@ private fun MeloXBottomChrome(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(bottom = 5.dp),
+            // Mei keeps the 64dp navigation capsule 8dp above the gesture
+            // inset, giving the dock the same breathing room as iOS.
+            .padding(bottom = 8.dp),
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chromeHeight),
         ) {
-            val horizontalMargin = 16.dp
-            val compactSize = 52.dp
+            val horizontalMargin = 12.dp
+            val compactSize = 48.dp
             val expandedGap = 8.dp
-            val compactGap = 6.dp
-            val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 56.dp
+            val compactGap = 8.dp
+            val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 64.dp
             val navWidth = lerpDp(expandedNavWidth, compactSize, shrinkStage)
             val navShape = Capsule()
             val primaryTabs = listOf(
@@ -707,7 +709,7 @@ private fun MeloXBottomChrome(
                         .align(Alignment.BottomStart)
                         .offset(
                             x = miniWrapperX,
-                            y = -3.dp - miniLift,
+                            y = -miniLift,
                         )
                         .width(miniWrapperWidth),
                 ) {
@@ -732,7 +734,7 @@ private fun MeloXBottomChrome(
             BoxWithConstraints(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .offset(x = horizontalMargin, y = -3.dp)
+                    .offset(x = horizontalMargin, y = 0.dp)
                     .width(navWidth)
                     .height(navHeight),
             ) {
@@ -921,7 +923,7 @@ private fun MeloXBottomChrome(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .offset(x = -horizontalMargin, y = -3.dp)
+                    .offset(x = -horizontalMargin, y = 0.dp)
                     .size(searchSize)
                     .meloXLiquidButton(
                         shape = Capsule(),

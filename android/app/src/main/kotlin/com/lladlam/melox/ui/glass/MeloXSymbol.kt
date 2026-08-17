@@ -2,8 +2,16 @@ package com.lladlam.melox.ui.glass
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +116,54 @@ fun MeloXSymbolIcon(
         textAlign = TextAlign.Center,
         maxLines = 1,
     )
+}
+
+/**
+ * Apple Music-style search affordance: the magnifier and back arrow share one
+ * 300ms path-like transition instead of abruptly replacing the glyph.
+ */
+@Composable
+fun MeloXSearchBackMorphIcon(
+    focused: Boolean,
+    modifier: Modifier = Modifier,
+    color: Color,
+    contentDescription: String? = null,
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (focused) 1f else 0f,
+        animationSpec = tween(300, easing = LinearOutSlowInEasing),
+        label = "search-back-morph",
+    )
+    Canvas(modifier) {
+        val strokeWidth = size.minDimension * 0.095f
+        val magnifierAlpha = (1f - progress).coerceIn(0f, 1f)
+        val arrowAlpha = progress.coerceIn(0f, 1f)
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        if (magnifierAlpha > 0f) {
+            drawCircle(
+                color = color.copy(alpha = color.alpha * magnifierAlpha),
+                radius = size.minDimension * 0.22f,
+                center = androidx.compose.ui.geometry.Offset(
+                    size.width * 0.40f,
+                    size.height * 0.40f,
+                ),
+                style = stroke,
+            )
+            drawLine(
+                color = color.copy(alpha = color.alpha * magnifierAlpha),
+                start = androidx.compose.ui.geometry.Offset(size.width * 0.56f, size.height * 0.56f),
+                end = androidx.compose.ui.geometry.Offset(size.width * 0.80f, size.height * 0.80f),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+        if (arrowAlpha > 0f) {
+            val arrowColor = color.copy(alpha = color.alpha * arrowAlpha)
+            drawLine(arrowColor, Offset(size.width * 0.78f, size.height * 0.50f), Offset(size.width * 0.22f, size.height * 0.50f), strokeWidth, StrokeCap.Round)
+            drawLine(arrowColor, Offset(size.width * 0.22f, size.height * 0.50f), Offset(size.width * 0.46f, size.height * 0.27f), strokeWidth, StrokeCap.Round)
+            drawLine(arrowColor, Offset(size.width * 0.22f, size.height * 0.50f), Offset(size.width * 0.46f, size.height * 0.73f), strokeWidth, StrokeCap.Round)
+        }
+    }
 }
 
 @Composable

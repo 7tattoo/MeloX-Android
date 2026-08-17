@@ -16,10 +16,17 @@ object MusicProviderSelectionStore {
     private const val KeyAutomaticFallback = "automatic_source_fallback"
     private const val KeyUnifiedSources = "unified_sources"
 
+    /** Apple Music remains an internal integration, but is not exposed until
+     * the official credentials/DRM SDK are available. */
+    fun visibleSources(): List<MusicSource> =
+        MusicSource.entries.filterNot { it == MusicSource.AppleMusic }
+
     fun selectedSource(context: Context): MusicSource {
         val preferences = context.applicationContext
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
         return MusicSource.fromStorageValue(preferences.getString(KeySelectedSource, null))
+            .takeUnless { it == MusicSource.AppleMusic }
+            ?: MusicSource.Netease
     }
 
     fun setSelectedSource(context: Context, source: MusicSource) {
@@ -71,9 +78,10 @@ object MusicProviderSelectionStore {
             .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
         val raw = preferences.getStringSet(KeyUnifiedSources, null)
         val parsed = raw?.mapNotNullTo(linkedSetOf()) { value ->
-            MusicSource.entries.firstOrNull { it.storageValue == value }
+            visibleSources().firstOrNull { it.storageValue == value }
         }.orEmpty()
-        return parsed.ifEmpty { linkedSetOf(selectedSource(context)) }
+        return parsed.filterTo(linkedSetOf()) { it != MusicSource.AppleMusic }
+            .ifEmpty { linkedSetOf(selectedSource(context)) }
     }
 
     fun setUnifiedSources(context: Context, sources: Set<MusicSource>) {

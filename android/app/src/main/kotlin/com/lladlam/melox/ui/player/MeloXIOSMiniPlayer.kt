@@ -7,6 +7,10 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -128,19 +133,27 @@ fun MeloXIOSMiniPlayer(
         Box(
             modifier = sharedContainerModifier
                 .fillMaxWidth()
-                .height(50.dp)
-                .graphicsLayer { alpha = miniSurfaceAlpha }
-                // Mei's MiniPlayer is a real GlassSurface: the artwork behind
-                // it is sampled, blurred and refracted instead of being hidden
-                // under an opaque rounded rectangle.
-                .meloXLiquidButton(
-                    shape = Capsule(),
-                    blurRadius = 2.dp,
-                    lensRadius = 28.dp,
-                    refractionHeight = 16.dp,
-                    surfaceColor = Color.White.copy(alpha = 0.06f),
-                ),
-        )
+                .height(50.dp),
+        ) {
+            // Keep the glass surface out of the shared-bounds node itself.
+            // When a capsule-shaped draw modifier is resized to the full
+            // player, its fallback/lens can briefly become a dark giant pill.
+            // The shared node remains a transparent geometry shell while the
+            // actual MiniPlay glass fades before the full-screen scene owns the
+            // surface.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = miniSurfaceAlpha }
+                    .meloXLiquidButton(
+                        shape = Capsule(),
+                        blurRadius = 2.dp,
+                        lensRadius = 28.dp,
+                        refractionHeight = 16.dp,
+                        surfaceColor = Color.White.copy(alpha = 0.06f),
+                    ),
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -180,7 +193,8 @@ fun MeloXIOSMiniPlayer(
                                 ),
                                 animatedVisibilityScope = animatedVisibilityScope,
                                 boundsTransform = MeloXPlayerLinearBoundsTransform,
-                                zIndexInOverlay = 3f,
+                                renderInOverlayDuringTransition = true,
+                                zIndexInOverlay = 4f,
                             )
                         }
                     } else {
@@ -230,6 +244,15 @@ fun MeloXIOSMiniPlayer(
                 }
             }
 
+            MiniDancingBars(
+                isPlaying = state.isPlaying,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = miniChromeAlpha * 0.72f),
+                modifier = Modifier
+                    .width(17.dp)
+                    .height(20.dp)
+                    .graphicsLayer { alpha = miniChromeAlpha },
+            )
+
             Box(
                 modifier = Modifier
                     .width(controlStageWidth)
@@ -257,6 +280,41 @@ fun MeloXIOSMiniPlayer(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MiniDancingBars(
+    isPlaying: Boolean,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val transition = if (isPlaying) {
+        rememberInfiniteTransition(label = "mini-dancing-bars")
+    } else null
+    val bars = listOf(.52f, .78f, .38f, .66f).mapIndexed { index, base ->
+        transition?.animateFloat(
+            initialValue = base * .58f,
+            targetValue = base,
+            animationSpec = infiniteRepeatable(
+                animation = tween(270 + index * 23),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "mini-dancing-bar-$index",
+        )?.value ?: base * .62f
+    }
+    Canvas(modifier) {
+        val gap = size.width * .12f
+        val barWidth = (size.width - gap * 3f) / 4f
+        bars.forEachIndexed { index, heightFraction ->
+            val barHeight = size.height * heightFraction.coerceIn(.12f, 1f)
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(index * (barWidth + gap), (size.height - barHeight) / 2f),
+                size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f),
+            )
         }
     }
 }

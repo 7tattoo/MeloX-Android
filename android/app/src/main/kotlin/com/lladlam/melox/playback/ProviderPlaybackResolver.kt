@@ -131,6 +131,11 @@ class ProviderPlaybackResolver(
             albumAudioId = uri.getQueryParameter(KugouAlbumAudioIdQuery)?.toLongOrNull(),
             albumId = uri.getQueryParameter(KugouAlbumIdQuery)?.takeIf(String::isNotBlank),
         )
+        MusicSource.AppleMusic -> ProviderTrackMetadata.AppleMusic(
+            catalogId = id.value,
+            storefront = uri.getQueryParameter(AppleStorefrontQuery).orEmpty().ifBlank { "us" },
+            previewUrl = uri.getQueryParameter(ApplePreviewUrlQuery)?.takeIf(String::isNotBlank),
+        )
     }
 
     companion object {
@@ -142,6 +147,8 @@ class ProviderPlaybackResolver(
         private const val QQNumericIdQuery = "qqNumericId"
         private const val KugouAlbumAudioIdQuery = "kgAlbumAudioId"
         private const val KugouAlbumIdQuery = "kgAlbumId"
+        private const val AppleStorefrontQuery = "appleStorefront"
+        private const val ApplePreviewUrlQuery = "applePreviewUrl"
 
         fun isProviderTrackUri(uri: Uri): Boolean =
             uri.scheme == MeloXScheme && uri.host == ProviderTrackHost
@@ -171,6 +178,12 @@ class ProviderPlaybackResolver(
                         }
                         metadata.albumId?.takeIf(String::isNotBlank)?.let {
                             appendQueryParameter(KugouAlbumIdQuery, it)
+                        }
+                    }
+                    is ProviderTrackMetadata.AppleMusic -> {
+                        appendQueryParameter(AppleStorefrontQuery, metadata.storefront)
+                        metadata.previewUrl?.takeIf(String::isNotBlank)?.let {
+                            appendQueryParameter(ApplePreviewUrlQuery, it)
                         }
                     }
                     else -> Unit

@@ -1113,12 +1113,9 @@ private fun MeloXLibraryPlaylistsPage(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .meloXContentSurface(
-                        shape = MeloXShapes.compact,
-                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-                    )
+                    .height(66.dp)
                     .clickable { onPlaylistClick(playlist) }
-                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                    .padding(start = 18.dp, end = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -1128,6 +1125,12 @@ private fun MeloXLibraryPlaylistsPage(
                             key = playlistArtworkSharedKey(playlist.id),
                         ),
                         animatedVisibilityScope = animatedVisibilityScope,
+                        // The cover itself must stay in the shared overlay for
+                        // the row -> detail flight. The detail screen clips
+                        // its settled cover; only the transition uses this
+                        // elevated layer.
+                        renderInOverlayDuringTransition = true,
+                        zIndexInOverlay = 1f,
                     )
                 }
 
@@ -1136,12 +1139,12 @@ private fun MeloXLibraryPlaylistsPage(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = sharedArtworkModifier
-                        .size(54.dp)
-                        .clip(RoundedCornerShape(7.dp)),
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(6.dp)),
                 )
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Text(
                         playlist.name,
@@ -1155,10 +1158,10 @@ private fun MeloXLibraryPlaylistsPage(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.48f),
                     )
                 }
-                Text(
+                MeloXActionIcon(
                     "›",
-                    fontSize = 24.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.24f),
+                    Modifier.size(18.dp),
+                    MaterialTheme.colorScheme.onBackground.copy(alpha = 0.40f),
                 )
             }
             MeloXInsetDivider(leading = 84.dp)
@@ -1657,6 +1660,8 @@ private fun MeloXStandardPlaylistHero(
                         key = playlistArtworkSharedKey(playlist.id),
                     ),
                     animatedVisibilityScope = animatedVisibilityScope,
+                    renderInOverlayDuringTransition = true,
+                    zIndexInOverlay = 1f,
                 )
             }
 
