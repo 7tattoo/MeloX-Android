@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.ColorUtils
-import androidx.palette.graphics.Palette
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -17,12 +16,13 @@ import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
- * Enhanced palette extraction using AndroidX Palette library.
- * Provides richer, more vibrant colors compared to manual pixel sampling.
- * Uses OkHttp for network fetching (same pattern as ArtworkDynamicPalette).
+ * Enhanced palette extraction with saturation boost and hue shifting.
+ * Provides richer, more vibrant colors compared to basic pixel sampling.
+ * No external Palette library dependency - pure pixel analysis.
  */
 internal object PaletteDynamicPaletteProvider {
     private const val TARGET_SIZE = 200
+    private const val GRID = 3
     private val cache = ConcurrentHashMap<String, ArtworkDynamicPalette>()
     private val http = OkHttpClient()
 
@@ -122,40 +122,63 @@ internal object PaletteDynamicPaletteProvider {
     }
 
     private fun extractPalette(bitmap: Bitmap): ArtworkDynamicPalette {
-        val palette = Palette.from(bitmap)
-            .maximumColorCount(24)
-            .generate()
+        val width = bitmap.width
+        val height = bitmap.height
+        val cellWidth = width / GRID
+        val cellHeight = height / GRID
 
-        val vibrant = palette.vibrantSwatch
-        val darkVibrant = palette.darkVibrantSwatch
-        val lightVibrant = palette.lightVibrantSwatch
-        val dominant = palette.dominantSwatch
-
-        val seedSwatch = vibrant ?: dominant
-        val seedColor = if (seedSwatch != null) {
-            Color(seedSwatch.rgb)
-        } else {
-            Color(0xFF1A237E)
+        val cellColors = mutableListOf<Color>()
+        for (row in 0 until GRID) {
+            for (column in 0 until GRID) {
+                val left = column * cellWidth
+                val top = row * cellHeight
+                val right = if (column == GRID - 1) width else (column + 1) * cellWidth
+                val bottom = if (row == GRID - 1) height else (row + 1) * cellHeight
+                cellColors.add(averageColor(bitmap, left, top, right, bottom))
+            }
         }
 
-        var c1 = vibrant?.rgb?.let { Color(it) } ?: seedColor.boostSaturation(1.5f)
-        var c2 = darkVibrant?.rgb?.let { Color(it) } ?: c1.darken(0.4f)
-        var c3 = lightVibrant?.rgb?.let { Color(it) } ?: c1.lighten(0.3f)
+        val average = averageColor(bitmap, 0, 0, width, height)
 
-        if (c1.isGrayscale()) c1 = c1.boostSaturation(3.0f).forceHueIfGray()
-        if (c2.isGrayscale()) c2 = c2.boostSaturation(2.0f).forceHueIfGray()
+        val enhanced = cellColors.map { color ->
+            var c = color
+            if (c.isGrayscale()) c = c.boostSaturation(3.0f).forceHueIfGray()
+            c.boostSaturation(1.3f)
+        }
 
-        c1 = c1.boostSaturation(1.3f)
-        c2 = c2.boostSaturation(1.3f)
-        c3 = c3.boostSaturation(1.3f).lighten(0.1f)
-
+        val seedColor = enhanced.firstOrNull { !it.isGrayscale() } ?: average
+        val c1 = enhanced.getOrElse(0) { seedColor }
+        val c2 = enhanced.getOrElse(1) { seedColor.darken(0.4f) }
+        val c3 = enhanced.getOrElse(2) { seedColor.lighten(0.3f) }
         val c4 = c1.shiftHue(40f).lighten(0.1f)
 
-        val colors = listOf(c1, c2, c3, c4)
-
         return ArtworkDynamicPalette(
-            cells = colors + colors + listOf(seedColor.darken(0.3f)),
-            average = seedColor,
+            cells = listOf(c1, c2, c3, c4, c1, c2, c3, c4, average),
+            average = average,
+        )
+    }
+
+    private fun averageColor(bitmap: Bitmap, left: Int, top: Int, right: Int, bottom: Int): Color {
+        var red = 0L; var green = 0L; var blue = 0L; var count = 0L
+        var y = top
+        while (y < bottom) {
+            var x = left
+            while (x < right) {
+                val pixel = bitmap.getPixel(x, y)
+                red += (pixel shr 16) and 0xFF
+                green += (pixel shr 8) and 0xFF
+                blue += pixel and 0xFF
+                count += 1
+                x += 2
+            }
+            y += 2
+        }
+        if (count == 0L) return Color(0xFF5B4B45)
+        return Color(
+            red = (red.toFloat() / count / 255f).coerceIn(0f, 1f),
+            green = (green.toFloat() / count / 255f).coerceIn(0f, 1f),
+            blue = (blue.toFloat() / count / 255f).coerceIn(0f, 1f),
+            alpha = 1f,
         )
     }
 
