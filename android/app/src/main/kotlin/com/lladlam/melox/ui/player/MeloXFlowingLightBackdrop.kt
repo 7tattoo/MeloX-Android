@@ -179,7 +179,7 @@ internal fun MeloXFlowingLightBackdrop(
     var meshImage by remember(meshImages) { mutableStateOf(meshImages.first()) }
 
     LaunchedEffect(artworkUrl) {
-        targetPalette = PaletteDynamicPaletteProvider.paletteFor(context, artworkUrl)
+        targetPalette = ArtworkDynamicPaletteProvider.paletteFor(context, artworkUrl)
     }
 
     LaunchedEffect(isPlaying, artworkUrl, mediaId, renderingQuality, backgroundFrameRate, meshBitmaps, targetPalette) {
