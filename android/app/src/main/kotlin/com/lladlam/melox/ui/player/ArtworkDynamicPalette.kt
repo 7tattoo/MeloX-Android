@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -154,7 +155,7 @@ internal object ArtworkDynamicPaletteProvider {
         val height = bitmap.height
         val cellWidth = width / GRID
         val cellHeight = height / GRID
-        val cells = buildList(GRID * GRID) {
+        val rawCells = buildList(GRID * GRID) {
             for (row in 0 until GRID) {
                 for (column in 0 until GRID) {
                     val left = column * cellWidth
@@ -165,10 +166,19 @@ internal object ArtworkDynamicPaletteProvider {
                 }
             }
         }
+        val cells = rawCells.map { it.boostSaturation(1.2f) }
         return ArtworkDynamicPalette(
             cells = cells,
-            average = averageColor(bitmap, 0, 0, width, height),
+            average = averageColor(bitmap, 0, 0, width, height).boostSaturation(1.1f),
         )
+    }
+
+    private fun Color.boostSaturation(multiplier: Float): Color {
+        val hsl = FloatArray(3)
+        androidx.core.graphics.ColorUtils.colorToHSL(this.toArgb(), hsl)
+        if (hsl[1] < 0.08f) return this
+        hsl[1] = (hsl[1] * multiplier).coerceIn(0f, 1f)
+        return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
     }
 
     private fun averageColor(
