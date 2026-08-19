@@ -8,7 +8,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.rememberTransition
@@ -101,6 +100,8 @@ import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
+import com.lladlam.melox.ui.player.playerAutomaticFractionSpec
+import com.lladlam.melox.ui.player.playerGestureSettleSpec
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.provider.ProviderExploreScreen
 import com.lladlam.melox.ui.provider.ProviderHomeScreen
@@ -1082,17 +1083,6 @@ private fun RootGlyphIcon(
         variant = if (selected) MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
     )
 }
-
-private fun playerAutomaticFractionSpec() = tween<Float>(
-    durationMillis = 460,
-    easing = FastOutSlowInEasing,
-)
-
-private fun playerGestureSettleSpec() = spring<Float>(
-    dampingRatio = 1.0f,
-    stiffness = 420f,
-    visibilityThreshold = 0.001f,
-)
 
 private fun smoothStep(value: Float, start: Float, end: Float): Float {
     if (end <= start) return if (value >= end) 1f else 0f
