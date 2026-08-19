@@ -9,11 +9,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -139,59 +140,63 @@ internal fun MeloXIOSNowPlayingScene(
         showsLyricsControls = false
     }
 
-    val artworkAlpha by animateFloatAsState(
-        targetValue = if (artworkVisible) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    // Consolidate the page cross-fade into a single Transition so the five
+    // page states share one spring timeline instead of ten independent
+    // animate*AsState coroutines running in parallel.
+    val pageTransition = updateTransition(
+        targetState = page,
+        label = "scene-page-transition",
+    )
+
+    val artworkAlpha by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-artwork-details-alpha",
-    )
-    val artworkOffset by animateDpAsState(
-        targetValue = if (artworkVisible) 0.dp else (-300).dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    ) { if (it == MeloXNowPlayingPage.Artwork) 1f else 0f }
+
+    val artworkOffset by pageTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-artwork-details-offset",
-    )
+    ) { if (it == MeloXNowPlayingPage.Artwork) 0.dp else (-300).dp }
 
-    val lyricsAlpha by animateFloatAsState(
-        targetValue = if (lyricsVisible) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    val lyricsAlpha by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-lyrics-alpha",
-    )
-    val lyricsOffset by animateDpAsState(
-        targetValue = if (page == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    ) { if (it == MeloXNowPlayingPage.Lyrics) 1f else 0f }
+
+    val lyricsOffset by pageTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-lyrics-offset",
-    )
-    val lyricsScale by animateFloatAsState(
-        targetValue = if (page == MeloXNowPlayingPage.Queue) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    ) { if (it == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp }
+
+    val lyricsScale by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-lyrics-scale",
-    )
+    ) { if (it == MeloXNowPlayingPage.Queue) 0.92f else 1f }
 
-    val queueAlpha by animateFloatAsState(
-        targetValue = if (queueVisible) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    val queueAlpha by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-queue-alpha",
-    )
-    val queueOffset by animateDpAsState(
-        targetValue = if (page == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-        label = "scene-queue-offset",
-    )
-    val queueScale by animateFloatAsState(
-        targetValue = if (page == MeloXNowPlayingPage.Lyrics) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-        label = "scene-queue-scale",
-    )
+    ) { if (it == MeloXNowPlayingPage.Queue) 1f else 0f }
 
-    val headerAlpha by animateFloatAsState(
-        targetValue = if (artworkVisible) 0f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    val queueOffset by pageTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
+        label = "scene-queue-offset",
+    ) { if (it == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp }
+
+    val queueScale by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
+        label = "scene-queue-scale",
+    ) { if (it == MeloXNowPlayingPage.Lyrics) 0.92f else 1f }
+
+    val headerAlpha by pageTransition.animateFloat(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-song-header-alpha",
-    )
-    val headerOffset by animateDpAsState(
-        targetValue = if (artworkVisible) 40.dp else 0.dp,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+    ) { if (it == MeloXNowPlayingPage.Artwork) 0f else 1f }
+
+    val headerOffset by pageTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.7f, stiffness = 300f) },
         label = "scene-song-header-offset",
-    )
+    ) { if (it == MeloXNowPlayingPage.Artwork) 40.dp else 0.dp }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
