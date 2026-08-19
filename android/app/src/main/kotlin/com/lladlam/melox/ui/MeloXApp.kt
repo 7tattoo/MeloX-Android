@@ -585,6 +585,10 @@ fun MeloXApp(
                 },
             )
         }
+
+        if (BuildConfig.DEBUG) {
+            MeloXPerformanceOverlay(modifier = Modifier.zIndex(999f))
+        }
       }
     }
 }

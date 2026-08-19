@@ -69,8 +69,11 @@ fun MeloXIOSMiniPlayer(
     // the full-player destination. The source fades as real composited content,
     // rather than only lowering text/icon colors, so the reverse transition is
     // equally visible when returning to the mini player.
-    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.10f, 0.58f)
-    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.02f, 0.48f)
+    // Fade the mini chrome out later while expanding and back in earlier
+    // while collapsing, so the return transition overlaps with full-player
+    // content and does not black out.
+    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.28f, 0.62f)
+    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.05f, 0.45f)
 
     val compact = compactProgress.coerceIn(0f, 1f)
     val artworkSize = lerpDp(40.dp, 30.dp, compact)

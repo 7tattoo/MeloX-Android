@@ -137,14 +137,16 @@ fun MeloXIOSNowPlayingSharedHost(
 
     // Let the shared artwork establish the transition first. The background
     // and scene then take over on the same master timeline, which prevents a
-    // black first frame from winning the z-order over MiniPlay.
+    // Keep full-player content visible longer during collapse and bring the
+    // mini chrome in earlier, so the reverse transition does not black out
+    // between the full content disappearing and the mini chrome appearing.
     val backdropAlpha = smoothStep(expansionProgress, 0.18f, 0.72f)
     val isolationAlpha = if (MeloXSettingsRuntime.playerBackgroundIsolationEnabled) {
         smoothStep(expansionProgress, 0.34f, 0.82f)
     } else {
         0f
     }
-    val fullPlayerAlpha = smoothStep(expansionProgress, 0.44f, 0.88f)
+    val fullPlayerAlpha = smoothStep(expansionProgress, 0.28f, 0.72f)
     val collapseProgress = (1f - expansionProgress).coerceIn(0f, 1f)
     val latestCollapseProgress = rememberUpdatedState(collapseProgress)
     val latestPage = rememberUpdatedState(page)
