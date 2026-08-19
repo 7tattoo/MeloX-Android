@@ -423,7 +423,7 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
 }
 
 @Composable
-fun rememberMeloXPlaybackUiState(): MeloXPlaybackUiState {
+fun rememberMeloXPlaybackUiState(transitionActive: Boolean = false): MeloXPlaybackUiState {
     val context = LocalContext.current.applicationContext
     val state = remember(context) { MeloXPlaybackUiState(context) }
 
@@ -453,10 +453,12 @@ fun rememberMeloXPlaybackUiState(): MeloXPlaybackUiState {
         }
     }
 
-    LaunchedEffect(state.isPlaying, state.mediaId) {
+    LaunchedEffect(state.isPlaying, state.mediaId, transitionActive) {
         while (true) {
-            state.refreshProgress()
-            delay(if (state.isPlaying) 500L else 1_000L)
+            if (!transitionActive) {
+                state.refreshProgress()
+            }
+            delay(if (transitionActive) 300L else if (state.isPlaying) 500L else 1_000L)
         }
     }
 

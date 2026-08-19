@@ -246,6 +246,7 @@ fun MeloXIOSMiniPlayer(
 
             MiniDancingBars(
                 isPlaying = state.isPlaying,
+                visible = miniChromeAlpha > 0.05f,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = miniChromeAlpha * 0.72f),
                 modifier = Modifier
                     .width(17.dp)
@@ -287,10 +288,11 @@ fun MeloXIOSMiniPlayer(
 @Composable
 private fun MiniDancingBars(
     isPlaying: Boolean,
+    visible: Boolean,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val transition = if (isPlaying) {
+    val transition = if (isPlaying && visible) {
         rememberInfiniteTransition(label = "mini-dancing-bars")
     } else null
     val bars = listOf(.52f, .78f, .38f, .66f).mapIndexed { index, base ->

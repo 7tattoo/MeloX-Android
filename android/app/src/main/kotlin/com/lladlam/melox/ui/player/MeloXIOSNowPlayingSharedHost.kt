@@ -298,80 +298,88 @@ fun MeloXIOSNowPlayingSharedHost(
                         onDragStopped = { velocity -> settleFromCurrent(velocity) },
                     ),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            // Keep the opaque fallback inside the shared
-                            // surface. Putting it on the sharedBounds node
-                            // makes the black fallback itself participate in
-                            // the capsule-to-screen transform, which exposes
-                            // four dark corners during expansion.
-                            .then(
-                                if (isolationAlpha > 0f) {
-                                    Modifier.background(Color.Black.copy(alpha = isolationAlpha))
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .layerBackdrop(playerControlBackdrop)
-                            .graphicsLayer { alpha = backdropAlpha },
-                ) {
-                    if (
-                        page == MeloXNowPlayingPage.Lyrics &&
-                        MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.AppleLyrics
-                    ) {
-                        MeloXLyricsArtworkBackdrop(
-                            artworkUrl = state.artworkUrl,
-                            isPlaying = state.isPlaying && expansionProgress > 0.72f,
-                        )
-                    } else if (MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.FlowingLight) {
-                        MeloXFlowingLightBackdrop(
-                            mediaId = state.mediaId,
-                            artworkUrl = state.artworkUrl,
-                            isPlaying = state.isPlaying && expansionProgress > 0.72f,
-                        )
-                    } else {
-                        MeloXBlurredArtworkBackdrop(state.artworkUrl)
-                    }
-                }
+                    // Defer the heavy full-player subtree until the transition
+                    // is underway. The shell still morphs via sharedBounds,
+                    // but lyrics/controls/backdrop are not composed/measured
+                    // on the first few frames where RemeasureToBounds is most
+                    // expensive.
+                    val contentReady = expansionProgress > 0.10f
+                    if (contentReady) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Keep the opaque fallback inside the shared
+                                // surface. Putting it on the sharedBounds node
+                                // makes the black fallback itself participate in
+                                // the capsule-to-screen transform, which exposes
+                                // four dark corners during expansion.
+                                .then(
+                                    if (isolationAlpha > 0f) {
+                                        Modifier.background(Color.Black.copy(alpha = isolationAlpha))
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                                .layerBackdrop(playerControlBackdrop)
+                                .graphicsLayer { alpha = backdropAlpha },
+                        ) {
+                            if (
+                                page == MeloXNowPlayingPage.Lyrics &&
+                                MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.AppleLyrics
+                            ) {
+                                MeloXLyricsArtworkBackdrop(
+                                    artworkUrl = state.artworkUrl,
+                                    isPlaying = state.isPlaying && expansionProgress > 0.72f,
+                                )
+                            } else if (MeloXSettingsRuntime.playerBackgroundMode == MeloXPlayerBackgroundMode.FlowingLight) {
+                                MeloXFlowingLightGpuBackdrop(
+                                    artworkUrl = state.artworkUrl,
+                                    isPlaying = state.isPlaying && expansionProgress > 0.72f,
+                                    mediaId = state.mediaId,
+                                )
+                            } else {
+                                MeloXBlurredArtworkBackdrop(state.artworkUrl)
+                            }
+                        }
 
-                CompositionLocalProvider(LocalMeloXBackdrop provides playerControlBackdrop) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { alpha = fullPlayerAlpha },
-                    ) {
-                        MeloXIOSNowPlayingScene(
-                            state = state,
-                            page = page,
-                            transitionSourcePage = transitionSourcePage,
-                            onDismiss = onDismiss,
-                            onPageChanged = { destination ->
-                                showLandscapeSkyline = false
-                                if (destination != page) {
-                                    transitionSourcePage = page
-                                    page = destination
-                                    if (rememberPlayerPage) {
-                                        MeloXSettingsPreferences.setString(context, "playback_last_page", destination.name)
-                                    }
-                                }
-                            },
-                            onShowActions = {
-                                showQuality = false
-                                showActions = true
-                            },
-                            onShowQuality = {
-                                showActions = false
-                                showQuality = true
-                            },
-                            showLandscapeSkyline = showLandscapeSkyline,
-                            onShowLandscapeSkyline = { showLandscapeSkyline = true },
-                            onHideLandscapeSkyline = { showLandscapeSkyline = false },
-                            onLyricsInterfaceHiddenChange = { lyricsInterfaceHidden = it },
-                            grabberDragModifier = alternateGrabberDragModifier,
-                        )
+                        CompositionLocalProvider(LocalMeloXBackdrop provides playerControlBackdrop) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = fullPlayerAlpha },
+                            ) {
+                                MeloXIOSNowPlayingScene(
+                                    state = state,
+                                    page = page,
+                                    transitionSourcePage = transitionSourcePage,
+                                    onDismiss = onDismiss,
+                                    onPageChanged = { destination ->
+                                        showLandscapeSkyline = false
+                                        if (destination != page) {
+                                            transitionSourcePage = page
+                                            page = destination
+                                            if (rememberPlayerPage) {
+                                                MeloXSettingsPreferences.setString(context, "playback_last_page", destination.name)
+                                            }
+                                        }
+                                    },
+                                    onShowActions = {
+                                        showQuality = false
+                                        showActions = true
+                                    },
+                                    onShowQuality = {
+                                        showActions = false
+                                        showQuality = true
+                                    },
+                                    showLandscapeSkyline = showLandscapeSkyline,
+                                    onShowLandscapeSkyline = { showLandscapeSkyline = true },
+                                    onHideLandscapeSkyline = { showLandscapeSkyline = false },
+                                    onLyricsInterfaceHiddenChange = { lyricsInterfaceHidden = it },
+                                    grabberDragModifier = alternateGrabberDragModifier,
+                                )
+                            }
+                        }
                     }
-                }
             }
 
             SharedArtworkDestination(

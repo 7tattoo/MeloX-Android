@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -164,8 +165,11 @@ fun MeloXApp(
     }
     var availableUpdate by remember { mutableStateOf<MeloXRelease?>(null) }
     var heartModeLaunchAttempted by remember { mutableStateOf(false) }
-    val playbackState = rememberMeloXPlaybackUiState()
     val playerTransitionState = remember { SeekableTransitionState(false) }
+    val transitionActive by remember {
+        derivedStateOf { playerTransitionState.currentState != playerTransitionState.targetState }
+    }
+    val playbackState = rememberMeloXPlaybackUiState(transitionActive)
     val playerTransition = rememberTransition(
         transitionState = playerTransitionState,
         label = "melox-player-transition",
