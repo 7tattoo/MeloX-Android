@@ -109,7 +109,7 @@ fun MeloXIOSMiniPlayer(
                     enter = EnterTransition.None,
                     exit = ExitTransition.None,
                     boundsTransform = MeloXPlayerLinearBoundsTransform,
-                    resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                    resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                 )
             }
         } else {
