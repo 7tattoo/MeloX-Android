@@ -9,9 +9,9 @@ import androidx.compose.animation.core.tween
 // seekable transition that makes different children advance by different
 // apparent amounts. Use one child timeline and animate only the master
 // SeekableTransitionState fraction when the gesture is released.
-// Slow enough that the mini→full morph is readable and the reverse
-// collapse does not feel like a snap.
-internal const val MeloXPlayerTransitionDurationMillis = 1200
+// Slower than the original 460ms so the morph is readable, but not so
+// slow that it feels sluggish.
+internal const val MeloXPlayerTransitionDurationMillis = 750
 
 internal val MeloXPlayerLinearBoundsTransform = BoundsTransform { _, _ ->
     tween(
