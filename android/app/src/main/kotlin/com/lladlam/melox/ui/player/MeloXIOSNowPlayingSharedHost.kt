@@ -304,7 +304,7 @@ fun MeloXIOSNowPlayingSharedHost(
                     // but lyrics/controls/backdrop are not composed/measured
                     // on the first few frames where the transition is most
                     // expensive.
-                    val contentReady = expansionProgress > 0.10f
+                    val contentReady = expansionProgress > 0.25f
                     if (contentReady) {
                         Box(
                             modifier = Modifier

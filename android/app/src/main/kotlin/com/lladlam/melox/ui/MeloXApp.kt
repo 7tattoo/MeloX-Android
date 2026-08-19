@@ -439,8 +439,11 @@ fun MeloXApp(
                     visibleRootTabs = visibleRootTabs,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     miniPlayer = { compactProgress ->
+                        // Keep the mini player always composed so the
+                        // SharedTransitionScope always has a live source
+                        // for the reverse collapse transition.
                         playerTransition.AnimatedVisibility(
-                            visible = { value -> !value },
+                            visible = { true },
                             enter = EnterTransition.None,
                             exit = ExitTransition.None,
                         ) {
