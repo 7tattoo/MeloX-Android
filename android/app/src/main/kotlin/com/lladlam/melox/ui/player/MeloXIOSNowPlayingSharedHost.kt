@@ -300,7 +300,7 @@ fun MeloXIOSNowPlayingSharedHost(
                     // Defer the heavy full-player subtree until the transition
                     // is underway. The shell still morphs via sharedBounds,
                     // but lyrics/controls/backdrop are not composed/measured
-                    // on the first few frames where RemeasureToBounds is most
+                    // on the first few frames where the transition is most
                     // expensive.
                     val contentReady = expansionProgress > 0.10f
                     if (contentReady) {
