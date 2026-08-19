@@ -12,7 +12,11 @@ import java.util.Locale
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -159,6 +163,7 @@ fun MeloXIOSLyricsPanel(
     onInterfaceInteraction: () -> Unit = {},
     onInterfaceVisibilityChange: (Boolean) -> Unit = {},
     allowAutomaticSkyline: Boolean = true,
+    active: Boolean = true,
 ) {
     val configuration = LocalConfiguration.current
     if (allowAutomaticSkyline && configuration.screenWidthDp > configuration.screenHeightDp && MeloXSettingsRuntime.skylineEnabled) {
@@ -172,6 +177,7 @@ fun MeloXIOSLyricsPanel(
             isInterfaceHidden,
             onInterfaceInteraction,
             onInterfaceVisibilityChange,
+            active,
         )
         MeloXLyricsStyle.Eva -> MeloXEvaLyricsPanel(state, modifier, onInterfaceInteraction)
         MeloXLyricsStyle.TextPV -> MeloXTextPVLyricsPanel(state, modifier, onInterfaceInteraction)
@@ -186,10 +192,12 @@ private fun MeloXAppleMusicLyricsPanel(
     isInterfaceHidden: Boolean = false,
     onInterfaceInteraction: () -> Unit = {},
     onInterfaceVisibilityChange: (Boolean) -> Unit = {},
+    active: Boolean = true,
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
     val haptics = LocalHapticFeedback.current
+    val activeState = rememberUpdatedState(active)
     // MeloX iOS prepares two future lines before they enter the mask. Keep an
     // equivalent two-line cache window so Compose has already measured and
     // raster-prepared the next row when its blurred edge first becomes visible.
@@ -282,6 +290,10 @@ private fun MeloXAppleMusicLyricsPanel(
         var lastFrameNanos = 0L
         val minimumFrameNanos = 1_000_000_000L / refreshRate.coerceIn(30, 120)
         while (true) {
+            if (!activeState.value) {
+                delay(200L)
+                continue
+            }
             if (state.isPlaying) {
                 val frameNanos = withFrameNanos { it }
                 if (lastFrameNanos != 0L && frameNanos - lastFrameNanos < minimumFrameNanos) continue
@@ -901,21 +913,35 @@ private fun MeloXLyricInstrumentalWave(
     reduceMotion: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val phases = listOf(0, 1, 2).map { index ->
-        animateFloatAsState(
-            targetValue = 1f,
-            animationSpec = if (reduceMotion) {
-                tween(1)
-            } else {
-                tween(
-                    durationMillis = 750,
-                    delayMillis = index * 50,
-                    easing = CubicBezierEasing(.4f, 0f, 1f, 1f),
-                )
-            },
-            label = "lyrics-instrumental-wave-$index",
-        ).value
-    }
+    val infiniteTransition = rememberInfiniteTransition(label = "instrumental-wave")
+    val phase0 by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, easing = CubicBezierEasing(.4f, 0f, 1f, 1f)),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "instrumental-wave-0",
+    )
+    val phase1 by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, delayMillis = 50, easing = CubicBezierEasing(.4f, 0f, 1f, 1f)),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "instrumental-wave-1",
+    )
+    val phase2 by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750, delayMillis = 100, easing = CubicBezierEasing(.4f, 0f, 1f, 1f)),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "instrumental-wave-2",
+    )
+    val phases = listOf(phase0, phase1, phase2)
     Canvas(modifier.fillMaxWidth().height(46.dp)) {
         val barWidth = 7.dp.toPx()
         val gap = 9.dp.toPx()
@@ -1637,7 +1663,18 @@ private fun sourceGlyphVisual(
     val longToneScale = if (reduceMotion) 1f else
         1f + (UpstreamLyrics.LONG_TONE_MAX_SCALE - 1f) * envelope * timing.expansionAmount *
             MeloXSettingsRuntime.lyricLongToneStrength
-    val scale = longToneScale
+    // Word bounce: 1.0→1.2→1.0 when a word first becomes active (Apple Music style)
+    val bounceScale = if (reduceMotion || timing.isLongTone || !MeloXSettingsRuntime.lyricWordBounceEnabled) 1f else {
+        val bounceProgress = raw.coerceIn(0f, 1f)
+        if (bounceProgress > 0f && bounceProgress < 0.5f) {
+            1f + 0.2f * (bounceProgress / 0.5f)
+        } else if (bounceProgress >= 0.5f && bounceProgress < 1f) {
+            1.2f - 0.2f * ((bounceProgress - 0.5f) / 0.5f)
+        } else {
+            1f
+        }
+    }
+    val scale = longToneScale * bounceScale
     val glow = if (reduceMotion || !MeloXSettingsRuntime.lyricGlowEnabled ||
         (MeloXSettingsRuntime.lyricGlowLongTonesOnly && !timing.isLongTone)
     ) 0f else {

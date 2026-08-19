@@ -158,6 +158,8 @@ fun MeloXIOSNowPlayingSharedHost(
     val latestCollapseProgress = rememberUpdatedState(collapseProgress)
     val latestPage = rememberUpdatedState(page)
     val cornerRadius = (24f + 8f * smoothStep(collapseProgress, 0f, 1f)).dp
+    val lyricsActive = page == MeloXNowPlayingPage.Lyrics && expansionProgress > 0.88f
+    val glassSamplingActive = expansionProgress > 0.88f
 
     val sharedContainerModifier = with(sharedTransitionScope) {
         Modifier.sharedBounds(
@@ -283,7 +285,13 @@ fun MeloXIOSNowPlayingSharedHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .layerBackdrop(actionsBackdrop),
+                .then(
+                    if (glassSamplingActive) {
+                        Modifier.layerBackdrop(actionsBackdrop)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             Box(
                 modifier = sharedContainerModifier
@@ -320,7 +328,13 @@ fun MeloXIOSNowPlayingSharedHost(
                                         Modifier
                                     },
                                 )
-                                .layerBackdrop(playerControlBackdrop)
+                                .then(
+                                    if (glassSamplingActive) {
+                                        Modifier.layerBackdrop(playerControlBackdrop)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
                                 .graphicsLayer { alpha = backdropAlpha },
                         ) {
                             if (
@@ -376,6 +390,7 @@ fun MeloXIOSNowPlayingSharedHost(
                                     onHideLandscapeSkyline = { showLandscapeSkyline = false },
                                     onLyricsInterfaceHiddenChange = { lyricsInterfaceHidden = it },
                                     grabberDragModifier = alternateGrabberDragModifier,
+                                    lyricsActive = lyricsActive,
                                 )
                             }
                         }

@@ -170,16 +170,21 @@ class MeloXPlaybackService : MediaSessionService() {
             val active = player
             if (active != null) {
                 active.currentMediaItem?.mediaId?.toLongOrNull()?.let { current -> if (current == historySongId) historyPositionMs = active.currentPosition.coerceAtLeast(0L) }
+                val uiTransitionActive = MeloXPlayerTransitionState.isActive
                 runCatching {
                     maybeRunAutoMix(active)
-                    maybeUpdateSystemLyrics(active)
-                    updateAudioReactiveVisuals(active)
+                    if (!uiTransitionActive) {
+                        maybeUpdateSystemLyrics(active)
+                        updateAudioReactiveVisuals(active)
+                    }
                     val now = SystemClock.elapsedRealtime()
                     if (now - lastMaintenanceRealtimeMs >= PLAYBACK_MAINTENANCE_INTERVAL_MS) {
                         lastMaintenanceRealtimeMs = now
-                        applyLocalArtworkMetadata(active)
+                        if (!uiTransitionActive) {
+                            applyLocalArtworkMetadata(active)
+                            maybePrepareAutoplay(active)
+                        }
                         PlaybackCommands.prioritizeManualQueue(active)
-                        maybePrepareAutoplay(active)
                         enforceSleepTimer(active)
                         equalizerController.applySettings()
                     }

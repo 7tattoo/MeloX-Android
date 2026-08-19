@@ -12,6 +12,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,6 +88,7 @@ internal fun MeloXIOSNowPlayingScene(
     onHideLandscapeSkyline: () -> Unit = {},
     onLyricsInterfaceHiddenChange: (Boolean) -> Unit = {},
     grabberDragModifier: Modifier = Modifier,
+    lyricsActive: Boolean = true,
 ) {
     val configuration = LocalConfiguration.current
     if (configuration.screenWidthDp > configuration.screenHeightDp) {
@@ -101,6 +103,7 @@ internal fun MeloXIOSNowPlayingScene(
             onShowSkyline = onShowLandscapeSkyline,
             onHideSkyline = onHideLandscapeSkyline,
             grabberDragModifier = grabberDragModifier,
+            lyricsActive = lyricsActive,
         )
         return
     }
@@ -138,99 +141,55 @@ internal fun MeloXIOSNowPlayingScene(
 
     val artworkAlpha by animateFloatAsState(
         targetValue = if (artworkVisible) 1f else 0f,
-        animationSpec = if (artworkVisible) {
-            tween(durationMillis = 220, delayMillis = 70, easing = FastOutSlowInEasing)
-        } else {
-            tween(durationMillis = 240, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-artwork-details-alpha",
     )
     val artworkOffset by animateDpAsState(
         targetValue = if (artworkVisible) 0.dp else (-300).dp,
-        animationSpec = if (artworkVisible) {
-            tween(durationMillis = 220, delayMillis = 70, easing = FastOutSlowInEasing)
-        } else {
-            tween(durationMillis = 240, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-artwork-details-offset",
     )
 
     val lyricsAlpha by animateFloatAsState(
         targetValue = if (lyricsVisible) 1f else 0f,
-        animationSpec = when {
-            directLyricsQueue -> tween(440, easing = FastOutSlowInEasing)
-            lyricsVisible -> tween(340, delayMillis = 110, easing = FastOutSlowInEasing)
-            transitionSourcePage == MeloXNowPlayingPage.Lyrics -> tween(240, easing = FastOutSlowInEasing)
-            else -> tween(120)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-lyrics-alpha",
     )
     val lyricsOffset by animateDpAsState(
         targetValue = if (page == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp,
-        animationSpec = when {
-            directLyricsQueue -> tween(440, easing = FastOutSlowInEasing)
-            lyricsVisible -> tween(340, delayMillis = 110, easing = FastOutSlowInEasing)
-            transitionSourcePage == MeloXNowPlayingPage.Lyrics -> tween(240, easing = FastOutSlowInEasing)
-            else -> tween(120)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-lyrics-offset",
     )
     val lyricsScale by animateFloatAsState(
         targetValue = if (page == MeloXNowPlayingPage.Queue) 0.92f else 1f,
-        animationSpec = if (directLyricsQueue) {
-            tween(440, easing = FastOutSlowInEasing)
-        } else {
-            tween(240, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-lyrics-scale",
     )
 
     val queueAlpha by animateFloatAsState(
         targetValue = if (queueVisible) 1f else 0f,
-        animationSpec = when {
-            directLyricsQueue -> tween(440, easing = FastOutSlowInEasing)
-            queueVisible -> tween(340, delayMillis = 110, easing = FastOutSlowInEasing)
-            transitionSourcePage == MeloXNowPlayingPage.Queue -> tween(240, easing = FastOutSlowInEasing)
-            else -> tween(120)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-queue-alpha",
     )
     val queueOffset by animateDpAsState(
         targetValue = if (page == MeloXNowPlayingPage.Artwork) 400.dp else 0.dp,
-        animationSpec = when {
-            directLyricsQueue -> tween(440, easing = FastOutSlowInEasing)
-            queueVisible -> tween(340, delayMillis = 110, easing = FastOutSlowInEasing)
-            transitionSourcePage == MeloXNowPlayingPage.Queue -> tween(240, easing = FastOutSlowInEasing)
-            else -> tween(120)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-queue-offset",
     )
     val queueScale by animateFloatAsState(
         targetValue = if (page == MeloXNowPlayingPage.Lyrics) 0.92f else 1f,
-        animationSpec = if (directLyricsQueue) {
-            tween(440, easing = FastOutSlowInEasing)
-        } else {
-            tween(240, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-queue-scale",
     )
 
     val headerAlpha by animateFloatAsState(
         targetValue = if (artworkVisible) 0f else 1f,
-        animationSpec = if (artworkVisible) {
-            tween(240, easing = FastOutSlowInEasing)
-        } else {
-            tween(400, delayMillis = 80, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-song-header-alpha",
     )
     val headerOffset by animateDpAsState(
         targetValue = if (artworkVisible) 40.dp else 0.dp,
-        animationSpec = if (artworkVisible) {
-            tween(240, easing = FastOutSlowInEasing)
-        } else {
-            tween(400, delayMillis = 80, easing = FastOutSlowInEasing)
-        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
         label = "scene-song-header-offset",
     )
 
@@ -285,6 +244,7 @@ internal fun MeloXIOSNowPlayingScene(
                     isInterfaceHidden = !showsLyricsControls,
                     onInterfaceInteraction = { setLyricsControlsVisible(true) },
                     onInterfaceVisibilityChange = { setLyricsControlsVisible(it) },
+                    active = lyricsActive,
                 )
             }
 
@@ -446,6 +406,7 @@ private fun MeloXIOSLandscapeNowPlayingScene(
     onShowSkyline: () -> Unit,
     onHideSkyline: () -> Unit,
     grabberDragModifier: Modifier,
+    lyricsActive: Boolean = true,
 ) {
     var showsLyricsControls by remember(state.mediaId) { mutableStateOf(true) }
     var activityGeneration by remember(state.mediaId) { mutableIntStateOf(0) }
@@ -550,6 +511,7 @@ private fun MeloXIOSLandscapeNowPlayingScene(
                                     if (it) activityGeneration += 1
                                 },
                                 allowAutomaticSkyline = true,
+                                active = lyricsActive,
                             )
                             LandscapeLyricsPageSelector(
                                 visible = showsLyricsControls,

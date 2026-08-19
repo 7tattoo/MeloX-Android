@@ -118,6 +118,7 @@ import com.lladlam.melox.core.network.NeteaseClipboardTarget
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.update.MeloXRelease
 import com.lladlam.melox.core.update.MeloXUpdateClient
+import com.lladlam.melox.playback.MeloXPlayerTransitionState
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackRuntime
 import kotlinx.coroutines.launch
@@ -168,6 +169,9 @@ fun MeloXApp(
     val playerTransitionState = remember { SeekableTransitionState(false) }
     val transitionActive by remember {
         derivedStateOf { playerTransitionState.currentState != playerTransitionState.targetState }
+    }
+    LaunchedEffect(transitionActive) {
+        MeloXPlayerTransitionState.isActive = transitionActive
     }
     val playbackState = rememberMeloXPlaybackUiState(transitionActive)
     val playerTransition = rememberTransition(
