@@ -2,15 +2,12 @@ package com.lladlam.melox.ui.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -78,6 +75,7 @@ fun MeloXIOSNowPlayingSharedHost(
     onNavigateSearch: (String, MeloXSearchKind) -> Unit = { _, _ -> },
     onSeekCollapse: suspend (Float) -> Unit,
     onSettleCollapse: suspend (Boolean) -> Unit,
+    expansionProgress: Float,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
@@ -137,13 +135,6 @@ fun MeloXIOSNowPlayingSharedHost(
     val playerControlBackdrop = rememberLayerBackdrop()
     val actionsBackdrop = rememberLayerBackdrop()
 
-    val expansionProgress by animatedVisibilityScope.transition.animateFloat(
-        transitionSpec = { meloXPlayerLinearFloatSpec() },
-        label = "full-player-expansion-progress",
-    ) { visibility ->
-        if (visibility == EnterExitState.Visible) 1f else 0f
-    }
-
     // Let the shared artwork establish the transition first. The background
     // and scene then take over on the same master timeline, which prevents a
     // black first frame from winning the z-order over MiniPlay.
@@ -170,7 +161,7 @@ fun MeloXIOSNowPlayingSharedHost(
             enter = EnterTransition.None,
             exit = ExitTransition.None,
             boundsTransform = MeloXPlayerLinearBoundsTransform,
-            resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
         )
     }
 

@@ -178,6 +178,16 @@ fun MeloXApp(
         transitionState = playerTransitionState,
         label = "melox-player-transition",
     )
+    val expansionProgress by remember(playerTransitionState) {
+        derivedStateOf {
+            when {
+                playerTransitionState.currentState && playerTransitionState.targetState -> 1f
+                !playerTransitionState.currentState && !playerTransitionState.targetState -> 0f
+                playerTransitionState.targetState -> playerTransitionState.fraction
+                else -> 1f - playerTransitionState.fraction
+            }
+        }
+    }
     val playerScope = rememberCoroutineScope()
     val clipboardTarget = remember(clipboardLinkRequest, selectedSource) {
         if (selectedSource == MusicSource.Netease) {
@@ -440,6 +450,7 @@ fun MeloXApp(
                                 dynamicGlassEnabled = true,
                                 sharedTransitionScope = sharedScope,
                                 animatedVisibilityScope = this,
+                                expansionProgress = expansionProgress,
                             )
                         }
                     },
@@ -486,6 +497,7 @@ fun MeloXApp(
                                 animationSpec = playerGestureSettleSpec(),
                             )
                         },
+                        expansionProgress = expansionProgress,
                         sharedTransitionScope = sharedScope,
                         animatedVisibilityScope = fullPlayerAnimatedVisibilityScope,
                     )

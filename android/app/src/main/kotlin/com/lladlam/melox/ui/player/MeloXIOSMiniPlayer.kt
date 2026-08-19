@@ -1,7 +1,6 @@
 package com.lladlam.melox.ui.player
 
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -60,22 +59,11 @@ fun MeloXIOSMiniPlayer(
     dynamicGlassEnabled: Boolean = true,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    expansionProgress: Float = 0f,
 ) {
     if (!state.hasMedia) return
 
     var accumulatedDrag by remember(state.mediaId) { mutableFloatStateOf(0f) }
-
-    val expansionProgress = if (animatedVisibilityScope != null) {
-        val value by animatedVisibilityScope.transition.animateFloat(
-            transitionSpec = { meloXPlayerLinearFloatSpec() },
-            label = "mini-player-expansion-progress",
-        ) { visibility ->
-            if (visibility == EnterExitState.Visible) 0f else 1f
-        }
-        value
-    } else {
-        0f
-    }
 
     // All source chrome is driven by the same reversible expansion progress as
     // the full-player destination. The source fades as real composited content,
@@ -118,7 +106,7 @@ fun MeloXIOSMiniPlayer(
                     enter = EnterTransition.None,
                     exit = ExitTransition.None,
                     boundsTransform = MeloXPlayerLinearBoundsTransform,
-                    resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+                    resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
                 )
             }
         } else {
