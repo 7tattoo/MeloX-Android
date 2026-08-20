@@ -1,4 +1,4 @@
-name: Android Release
+name: Android Release Source Verification
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - "android-v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,25 +22,20 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
+      - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.5.0"
 
-      - name: Build installable APK
+      - name: Verify tag matches Android version
+        shell: bash
+        run: |
+          expected="${GITHUB_REF_NAME#android-v}"
+          actual="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' android/app/build.gradle.kts | head -1)"
+          test "$actual" = "$expected"
+
+      - name: Test, lint and build release source
         working-directory: android
-        run: gradle :app:assembleDebug --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --max-workers=2 --stacktrace
 
-      - name: Rename APK
-        run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk "MeloX-Android-${GITHUB_REF_NAME}.apk"
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "MeloX-Android-${GITHUB_REF_NAME}.apk#MeloX Android APK" \
-            --title "MeloX Android ${GITHUB_REF_NAME#android-v}" \
-            --generate-notes \
-            --prerelease
+      # Official APKs are signed locally with the external MeloX JKS, verified
+      # with apksigner, and uploaded explicitly. This workflow intentionally
+      # never publishes a debug-signed or unsigned replacement asset.

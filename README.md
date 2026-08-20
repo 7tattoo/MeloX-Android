@@ -2,7 +2,7 @@
 
 [![Android](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml/badge.svg)](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.4--Dev-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.4-Dev)
+[![Version](https://img.shields.io/badge/version-0.4.0--Beta-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.0-Beta)
 
 <p align="center">
   <img src="android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="128" alt="MeloX Android icon" />
@@ -17,12 +17,13 @@
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
 
-## 当前版本：0.3.4-Dev
+## 当前版本：0.4.0-Beta
 
-`0.3.4-Dev` 集中修复歌词焦点与逐字过渡、长间奏等待、切歌定位、底部模糊触控和云盘上传流程，并完善多音乐源设置与自适应弹层。
+`0.4.0-Beta` 完成一轮以 Mei Android 与 MeloX iOS 为参照的业务、界面和性能收敛：补齐歌单写操作、本地音乐导出与分类、集合批量下载、十段均衡器和通知歌词配置；新增自适应页面、完整高层玻璃组件、Classic 播放器和 18 套独立 TextPV 风格；同时治理后台轮询、歌词逐帧重组、网络/媒体缓存、包体和 Release 优化。
 
-- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/0.3.4-Dev)
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.0-Beta)
 - 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
+- 审计证据与逐项修复状态：[0.4.0-Beta 审计与修复计划](docs/0.4.0-beta-audit-and-remediation.md)
 
 
 > Android 迁移说明：收藏歌曲会按 100 首一批完整读取（不再截断）；播放开始与听歌时长会回传网易云；首页会消费网易云 `/homepage/block/page` 推荐块并在缺块时回退；用户主页/用户搜索、专辑收藏、歌手专辑、评论分页、歌曲/歌单/专辑站内资源分享与全局一起听邀请均已接入。
@@ -56,18 +57,20 @@ Root 权限不是应用正常运行的必要条件；平台增强功能应尽量
 - 歌曲、歌单、专辑、艺人、用户与播客搜索；
 - 我喜欢的音乐；
 - 用户歌单；
+- 创建公开/私密歌单、向歌单添加歌曲及从自己的歌单移除歌曲；
 - 最近播放；
 - 歌单、专辑、艺人、歌曲百科与评论详情；
 - 排行榜、首页推荐、每日推荐、私人 FM 与心动模式；
 - 播客首页、分类、订阅与节目详情；
 - 网易云音乐云盘读取、搜索、上传、播放与删除；
-- 下载、离线歌词、自动缓存与存储管理；
+- 单曲/集合多选下载、逐次音质选择、离线歌词、自动缓存与存储修复；
+- 保留 app-private 离线副本，并可导出到 MediaStore；本地库可按歌曲、艺术家、专辑和文件夹浏览；
 - 从音乐库 / 搜索结果直接播放。
 
 ### 播放器
 
 - MiniPlayer；
-- 全屏播放器；
+- Apple Music / Classic 两套全屏播放器外壳；
 - 播放队列；
 - 下一首播放、手动队列与队列排序；
 - 播放 / 暂停、上一首 / 下一首、进度控制；
@@ -76,7 +79,7 @@ Root 权限不是应用正常运行的必要条件；平台增强功能应尽量
 - 锁屏播放信息；
 - 封面与动态取色背景；
 - AutoMix 双播放器预载、音频分析、过渡规划、节拍/速度匹配、淡化与 EQ 包络；
-- 多频段均衡器、系统/播放器音量模式、睡眠定时；
+- 31 Hz–16 kHz 十段均衡器、完整预设、系统/播放器音量模式与睡眠定时；
 - 播放器共享元素、展开 / 收回动画与横屏播放器。
 
 ### 音质
@@ -102,7 +105,7 @@ Root 权限不是应用正常运行的必要条件；平台增强功能应尽量
 - 当前行焦点、缩放与颜色过渡；
 - Ruby 注音布局、翻译、间奏倒计时、点击跳转与长按分享；
 - Apple Music 拖尾滚动、回弹、模糊、高光、长音与刷新率参数；
-- EVA 动态构图、18 套 TextPV 模板和完整 TextPV 动效参数；
+- EVA 动态构图、18 套具有独立构图/背景/排版/运动参数的 TextPV 模板；
 - Skyline 横屏歌词与完整环境文字参数；
 - 系统媒体歌词、独立歌词通知和可拖动悬浮歌词。
 
@@ -183,7 +186,7 @@ Liquid Glass 在 Android 上使用 Kyant0 `AndroidLiquidGlass` 的原生 Backdro
 
    ```bash
    cd android
-   gradle :app:assembleDebug --stacktrace
+   ./gradlew :app:assembleDebug --no-daemon --max-workers=2 --stacktrace
    ```
 
 5. 构建产物位于：
@@ -193,6 +196,20 @@ Liquid Glass 在 Android 上使用 Kyant0 `AndroidLiquidGlass` 的原生 Backdro
    ```
 
 GitHub Actions 会在 `main` 分支代码更新时自动构建 Debug APK。正式提供给用户的开发版 APK 会使用项目发布密钥签名，并随对应版本号的 GitHub Release 发布。
+
+## Release 签名验证
+
+GitHub Releases 中的正式 APK 使用 MeloX 发布证书签名。证书 SHA-256 指纹为：
+
+```text
+DF:CC:A9:86:5B:87:A4:02:D3:41:98:5A:48:EB:13:2B:D8:67:9D:FA:6D:9D:50:2F:36:5D:D1:62:10:A5:EB:E9
+```
+
+可使用 Android SDK Build Tools 验证：
+
+```bash
+apksigner verify --verbose --print-certs MeloX-Android-0.4.0-Beta.apk
+```
 
 ## 项目结构
 

@@ -1,5 +1,37 @@
 # 更新日志
 
+## 0.4.0-Beta — 2026-08-20
+
+### 业务闭环与多音乐源
+
+- 增加公开/私密歌单创建、从自己的歌单移除歌曲，并把创建入口接入“添加到歌单”流程。
+- 集合下载统一支持音质选择、多选、全选/取消；专辑、歌单和排行榜不再绕过批量下载确认。
+- 下载保留 app-private 可靠副本，同时支持导出 MediaStore；本地音乐增加艺术家、专辑和文件夹分类以及缺失记录/孤立文件修复。
+- 统一歌单、专辑、歌手、排行榜和播客节目详情；Provider 按 capability 暴露入口，不再显示不可用的自动来源回退占位设置。
+- 恢复 31 Hz–16 kHz 十段均衡器和完整预设，补齐设置搜索、通知歌词模板、存储维护、更新日志、许可和诊断入口。
+
+### 界面、组件与歌词
+
+- Home 增加混合尺寸内容与三行歌曲区块；Explore 增加 hero，并按宽度使用 2/3/4 列。
+- Home、Explore、Search、Library 和集合详情采用统一窗口策略，覆盖手机、折叠屏、平板和横屏。
+- 补齐 Slider、Stepper、Bottom Search Toolbar、Context/Popup Menu、ActionSheet、Alert、Modal Surface 和 Color Picker 等高层玻璃组件。
+- 增加 Apple Music / Classic 播放器外壳选择；Classic 支持手机、平板和沉浸横屏布局。
+- 18 套生产 TextPV 风格具有独立视觉签名，并用单元测试防止模板退化合并。
+- 增加英文、简体中文和繁体中文基础资源，补充关键图标语义和未知图标的安全回退。
+
+### 性能、稳定性与构建
+
+- 取消视觉背景的整曲重复解码；暂停、后台和非歌词页停止无效帧钟及高频轮询。
+- 共享进程级 OkHttp/Provider Registry，增加有界 HTTP/Media3/动态取色/AutoMix 缓存和播放资源 single-flight。
+- 将下载索引、Library 序列化与文件维护迁移到 IO，限制歌词重组和高成本玻璃/模糊路径。
+- 启用 R8、资源收缩和 Material Symbols 子集化，纳入 Gradle wrapper、Baseline Profile 与 Macrobenchmark 旅程。
+- 发布门禁通过 `testDebugUnitTest`、`lintDebug`、Debug/Release 构建和基准模块 assemble；真机 FPS、功耗、温升和启动耗时留给设备 Macrobenchmark/Perfetto，不使用推测数据。
+
+### 构建
+
+- 版本号升级为 `0.4.0-Beta`，`versionCode 8`。
+- Release APK 使用既有 MeloX 发布证书签名，正式产物名为 `MeloX-Android-0.4.0-Beta.apk`。
+
 ## 0.3.4-Dev — 2026-08-17
 
 ### 歌词与播放器
