@@ -8,6 +8,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.rememberTransition
@@ -42,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -100,8 +100,6 @@ import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
-import com.lladlam.melox.ui.player.playerAutomaticFractionSpec
-import com.lladlam.melox.ui.player.playerGestureSettleSpec
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.provider.ProviderExploreScreen
 import com.lladlam.melox.ui.provider.ProviderHomeScreen
@@ -119,7 +117,6 @@ import com.lladlam.melox.core.network.NeteaseClipboardTarget
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.update.MeloXRelease
 import com.lladlam.melox.core.update.MeloXUpdateClient
-import com.lladlam.melox.playback.MeloXPlayerTransitionState
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackRuntime
 import kotlinx.coroutines.launch
@@ -167,28 +164,12 @@ fun MeloXApp(
     }
     var availableUpdate by remember { mutableStateOf<MeloXRelease?>(null) }
     var heartModeLaunchAttempted by remember { mutableStateOf(false) }
+    val playbackState = rememberMeloXPlaybackUiState()
     val playerTransitionState = remember { SeekableTransitionState(false) }
-    val transitionActive by remember {
-        derivedStateOf { playerTransitionState.currentState != playerTransitionState.targetState }
-    }
-    LaunchedEffect(transitionActive) {
-        MeloXPlayerTransitionState.isActive = transitionActive
-    }
-    val playbackState = rememberMeloXPlaybackUiState(transitionActive)
     val playerTransition = rememberTransition(
         transitionState = playerTransitionState,
         label = "melox-player-transition",
     )
-    val expansionProgress by remember(playerTransitionState) {
-        derivedStateOf {
-            when {
-                playerTransitionState.currentState && playerTransitionState.targetState -> 1f
-                !playerTransitionState.currentState && !playerTransitionState.targetState -> 0f
-                playerTransitionState.targetState -> playerTransitionState.fraction
-                else -> 1f - playerTransitionState.fraction
-            }
-        }
-    }
     val playerScope = rememberCoroutineScope()
     val clipboardTarget = remember(clipboardLinkRequest, selectedSource) {
         if (selectedSource == MusicSource.Netease) {
@@ -439,11 +420,8 @@ fun MeloXApp(
                     visibleRootTabs = visibleRootTabs,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     miniPlayer = { compactProgress ->
-                        // Keep the mini player always composed so the
-                        // SharedTransitionScope always has a live source
-                        // for the reverse collapse transition.
                         playerTransition.AnimatedVisibility(
-                            visible = { true },
+                            visible = { value -> !value },
                             enter = EnterTransition.None,
                             exit = ExitTransition.None,
                         ) {
@@ -454,7 +432,6 @@ fun MeloXApp(
                                 dynamicGlassEnabled = true,
                                 sharedTransitionScope = sharedScope,
                                 animatedVisibilityScope = this,
-                                expansionProgress = expansionProgress,
                             )
                         }
                     },
@@ -501,7 +478,6 @@ fun MeloXApp(
                                 animationSpec = playerGestureSettleSpec(),
                             )
                         },
-                        expansionProgress = expansionProgress,
                         sharedTransitionScope = sharedScope,
                         animatedVisibilityScope = fullPlayerAnimatedVisibilityScope,
                     )
@@ -588,10 +564,6 @@ fun MeloXApp(
                     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl ?: release.pageUrl))) }
                 },
             )
-        }
-
-        if (BuildConfig.DEBUG) {
-            MeloXPerformanceOverlay(modifier = Modifier.zIndex(999f))
         }
       }
     }
@@ -1086,6 +1058,17 @@ private fun RootGlyphIcon(
         variant = if (selected) MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
     )
 }
+
+private fun playerAutomaticFractionSpec() = tween<Float>(
+    durationMillis = 460,
+    easing = FastOutSlowInEasing,
+)
+
+private fun playerGestureSettleSpec() = spring<Float>(
+    dampingRatio = 1.0f,
+    stiffness = 420f,
+    visibilityThreshold = 0.001f,
+)
 
 private fun smoothStep(value: Float, start: Float, end: Float): Float {
     if (end <= start) return if (value >= end) 1f else 0f

@@ -1,6 +1,7 @@
 package com.lladlam.melox.ui.player
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -59,21 +60,29 @@ fun MeloXIOSMiniPlayer(
     dynamicGlassEnabled: Boolean = true,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
-    expansionProgress: Float = 0f,
 ) {
     if (!state.hasMedia) return
 
     var accumulatedDrag by remember(state.mediaId) { mutableFloatStateOf(0f) }
 
+    val expansionProgress = if (animatedVisibilityScope != null) {
+        val value by animatedVisibilityScope.transition.animateFloat(
+            transitionSpec = { meloXPlayerLinearFloatSpec() },
+            label = "mini-player-expansion-progress",
+        ) { visibility ->
+            if (visibility == EnterExitState.Visible) 0f else 1f
+        }
+        value
+    } else {
+        0f
+    }
+
     // All source chrome is driven by the same reversible expansion progress as
     // the full-player destination. The source fades as real composited content,
     // rather than only lowering text/icon colors, so the reverse transition is
     // equally visible when returning to the mini player.
-    // Fade the mini chrome out later while expanding and back in earlier
-    // while collapsing, so the return transition overlaps with full-player
-    // content and does not black out.
-    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.28f, 0.62f)
-    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.05f, 0.45f)
+    val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.10f, 0.58f)
+    val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.02f, 0.48f)
 
     val compact = compactProgress.coerceIn(0f, 1f)
     val artworkSize = lerpDp(40.dp, 30.dp, compact)
@@ -109,7 +118,7 @@ fun MeloXIOSMiniPlayer(
                     enter = EnterTransition.None,
                     exit = ExitTransition.None,
                     boundsTransform = MeloXPlayerLinearBoundsTransform,
-                    resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
+                    resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
                 )
             }
         } else {
@@ -237,7 +246,6 @@ fun MeloXIOSMiniPlayer(
 
             MiniDancingBars(
                 isPlaying = state.isPlaying,
-                visible = miniChromeAlpha > 0.05f,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = miniChromeAlpha * 0.72f),
                 modifier = Modifier
                     .width(17.dp)
@@ -279,11 +287,10 @@ fun MeloXIOSMiniPlayer(
 @Composable
 private fun MiniDancingBars(
     isPlaying: Boolean,
-    visible: Boolean,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val transition = if (isPlaying && visible) {
+    val transition = if (isPlaying) {
         rememberInfiniteTransition(label = "mini-dancing-bars")
     } else null
     val bars = listOf(.52f, .78f, .38f, .66f).mapIndexed { index, base ->
