@@ -41,6 +41,7 @@ enum class MeloXSymbol(
     Search("magnifyingglass", "search"),
     ChevronLeft("chevron.left", "chevron_left"),
     ChevronRight("chevron.right", "chevron_right"),
+    ChevronUpDown("chevron.up.chevron.down", "unfold_more"),
     Xmark("xmark", "close"),
     Ellipsis("ellipsis", "more_horiz"),
     Clock("clock", "schedule"),
@@ -110,6 +111,7 @@ private val MeloXSfSymbolCodePoints = mapOf(
     "magnifyingglass" to 0x1002AB,
     "chevron.left" to 0x100189,
     "chevron.right" to 0x10018A,
+    "chevron.up.chevron.down" to 0x10018F,
     "xmark" to 0x100184,
     "ellipsis" to 0x100360,
     "clock" to 0x10042B,
@@ -307,6 +309,7 @@ fun MeloXActionIcon(
         MeloXSymbol.ArrowDown -> "下移"
         MeloXSymbol.ChevronLeft -> "返回"
         MeloXSymbol.ChevronRight -> "打开"
+        MeloXSymbol.ChevronUpDown -> "选择选项"
         MeloXSymbol.Ellipsis -> "更多操作"
         MeloXSymbol.Xmark -> "关闭"
         MeloXSymbol.Refresh -> "刷新"

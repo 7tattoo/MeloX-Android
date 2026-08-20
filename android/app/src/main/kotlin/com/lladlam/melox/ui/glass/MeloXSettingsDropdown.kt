@@ -134,6 +134,7 @@ fun <T> MeloXSettingsDropdown(
                     backdrop = backdrop,
                     progress = progress.value,
                     velocity = progress.velocity,
+                    interactive = expanded,
                     opensAbove = opensAbove,
                     collapsedSize = anchorSize,
                     itemCount = items.size,
@@ -142,6 +143,7 @@ fun <T> MeloXSettingsDropdown(
                         MeloXSettingsMenuItem(
                             title = label,
                             checked = item == selected,
+                            enabled = expanded,
                             onClick = { onSelected(item); expanded = false },
                         )
                     }
@@ -157,14 +159,14 @@ private fun SettingsDropdownAnchor(title: String, value: String, enabled: Boolea
         Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .meloXContentSurface(MeloXShapes.largeCard, MaterialTheme.colorScheme.onBackground.copy(alpha = .045f))
+            .meloXContentSurface(MeloXShapes.largeCard, MaterialTheme.colorScheme.surface)
             .clickable(enabled = enabled, interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MeloXTypography.body, modifier = Modifier.weight(1f))
         Text(value, style = MeloXTypography.body, color = MeloXSystemColors.Red)
-        MeloXSymbolIcon(MeloXSymbol.ChevronRight, Modifier.size(16.dp).padding(start = 7.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .4f))
+        MeloXSymbolIcon(MeloXSymbol.ChevronUpDown, Modifier.size(16.dp).padding(start = 7.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .4f))
     }
 }
 
@@ -173,6 +175,7 @@ private fun MeloXSettingsContextMenu(
     backdrop: Backdrop?,
     progress: Float,
     velocity: Float,
+    interactive: Boolean,
     opensAbove: Boolean,
     collapsedSize: IntSize,
     itemCount: Int,
@@ -191,21 +194,25 @@ private fun MeloXSettingsContextMenu(
     val width = lerpDp(collapsedWidth, menuWidth, progress.coerceIn(-.04f, 1.06f))
     val height = lerpDp(collapsedHeight, menuHeight, progress.coerceIn(-.04f, 1.06f))
     val shape = ContinuousRoundedRectangle(34.dp)
-    val menuSurface = MaterialTheme.colorScheme.surface.copy(alpha = .70f * fraction)
-    val fallbackSurface = MaterialTheme.colorScheme.surface.copy(alpha = .96f)
+    val menuSurface = MaterialTheme.colorScheme.surface
+    val fallbackSurface = MaterialTheme.colorScheme.surface
 
     Column(
         Modifier
             .width(menuWidth * 1.15f)
             .height(menuHeight * 1.15f)
             .padding(top = if (opensAbove) 32.dp else 0.dp, bottom = if (opensAbove) 0.dp else 32.dp, start = 64.dp)
-            .blur(10.dp * (1f - fraction), BlurredEdgeTreatment.Unbounded)
-            .graphicsLayer {
-                alpha = fraction
-                transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
-            }
+            .then(if (interactive) highlight.modifier else Modifier)
+            .then(if (interactive) highlight.gestureModifier else Modifier)
+            .clip(shape)
+            .padding(10.dp)
             .width(width)
             .height(height)
+            .blur(10.dp * (1f - fraction), BlurredEdgeTreatment.Unbounded)
+            .graphicsLayer {
+                alpha = 1f
+                transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
+            }
             .then(
                 if (backdrop != null) Modifier.drawBackdrop(
                     backdrop = backdrop,
@@ -227,8 +234,8 @@ private fun MeloXSettingsContextMenu(
                     onDrawSurface = { drawRect(menuSurface) },
                 ) else Modifier.meloXContentSurface(shape, fallbackSurface)
             )
-            .then(highlight.modifier)
-            .then(highlight.gestureModifier)
+            .then(if (interactive) highlight.modifier else Modifier)
+            .then(if (interactive) highlight.gestureModifier else Modifier)
             .clip(shape)
             .padding(10.dp)
             .graphicsLayer {
@@ -242,7 +249,7 @@ private fun MeloXSettingsContextMenu(
 }
 
 @Composable
-private fun MeloXSettingsMenuItem(title: String, checked: Boolean, onClick: () -> Unit) {
+private fun MeloXSettingsMenuItem(title: String, checked: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val scope = rememberCoroutineScope()
     val highlight = remember(scope) { PublicInteractiveHighlight(scope) }
     Row(
@@ -250,14 +257,14 @@ private fun MeloXSettingsMenuItem(title: String, checked: Boolean, onClick: () -
             .fillMaxWidth()
             .height(44.dp)
             .background(Color.Black.copy(alpha = .15f * highlight.pressProgress), MeloXShapes.capsule)
-            .clickable(interactionSource = null, indication = null, onClick = onClick)
-            .then(highlight.modifier)
-            .then(highlight.gestureModifier)
+            .clickable(enabled = enabled, interactionSource = null, indication = null, onClick = onClick)
+            .then(if (enabled) highlight.modifier else Modifier)
+            .then(if (enabled) highlight.gestureModifier else Modifier)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-            if (checked) MeloXSymbolIcon(MeloXSymbol.Check, Modifier.size(20.dp), MeloXSystemColors.Red)
+            if (checked) MeloXSymbolIcon(MeloXSymbol.Check, Modifier.size(17.dp), MeloXSystemColors.Red)
         }
         Text(title, style = MeloXTypography.body, modifier = Modifier.weight(1f).padding(start = 8.dp))
     }
