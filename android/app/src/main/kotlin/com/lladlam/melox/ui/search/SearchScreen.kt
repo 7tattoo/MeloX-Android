@@ -707,10 +707,6 @@ private fun ProviderSearchSongResults(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .meloXContentSurface(
-                            shape = MeloXShapes.compact,
-                            surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-                        )
                         .clickable { onPlay(track) }
                         .padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -744,10 +740,6 @@ private fun ProviderSearchMediaResults(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .meloXContentSurface(
-                        shape = MeloXShapes.compact,
-                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-                    )
                     .clickable { onOpen(item) }
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -783,10 +775,6 @@ private fun SearchSongResults(values: List<SearchSong>, onPlay: (SearchSong) -> 
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .meloXContentSurface(
-                        shape = MeloXShapes.compact,
-                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-                    )
                     .clickable { onPlay(song) }
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -811,10 +799,6 @@ private fun SearchMediaResults(values: List<MeloXSearchMediaItem>, onOpen: (Melo
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .meloXContentSurface(
-                        shape = MeloXShapes.compact,
-                        surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-                    )
                     .clickable { onOpen(item) }
                     .padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,

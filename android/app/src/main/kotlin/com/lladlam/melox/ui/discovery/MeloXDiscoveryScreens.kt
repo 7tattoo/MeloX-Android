@@ -891,10 +891,6 @@ private fun HeroCollectionCard(value: DiscoveryCollection, onClick: () -> Unit) 
 private fun CollectionCard(value: DiscoveryCollection, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier
-            .meloXContentSurface(
-                shape = MeloXShapes.card,
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.035f),
-            )
             .clickable(onClick = onClick)
             .padding(8.dp),
     ) {
@@ -906,8 +902,7 @@ private fun CollectionCard(value: DiscoveryCollection, modifier: Modifier, onCli
             modifier = Modifier
                 .fillMaxWidth()
                 .height(174.dp)
-                .clip(artworkShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(artworkShape),
         ) {
             AsyncImage(
                 value.artworkUrl,
@@ -944,10 +939,6 @@ private fun SongRow(song: DiscoveryTrack, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .height(66.dp)
-            .meloXContentSurface(
-                shape = MeloXShapes.compact,
-                surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.028f),
-            )
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -955,8 +946,7 @@ private fun SongRow(song: DiscoveryTrack, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(artworkShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(artworkShape),
         ) {
             AsyncImage(song.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
