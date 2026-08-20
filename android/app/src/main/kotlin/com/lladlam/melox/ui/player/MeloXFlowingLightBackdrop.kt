@@ -74,13 +74,16 @@ internal fun MeloXLyricsArtworkBackdrop(
     modifier: Modifier = Modifier,
 ) {
     val quality = MeloXSettingsRuntime.lyricRenderingQuality
-    val planeCount = if (quality == MeloXLyricsRenderingQuality.Low) 1 else 3
+    val planeCount = when (quality) {
+        MeloXLyricsRenderingQuality.Low -> 1
+        MeloXLyricsRenderingQuality.Balanced -> 2
+        MeloXLyricsRenderingQuality.High -> 3
+    }
     val backgroundFrameRate = MeloXSettingsRuntime.lyricBackgroundFrameRate.coerceIn(15, 60)
     val saturation = if (MeloXSettingsRuntime.lyricReduceMotion) 3.5f else 2.5f
     val artworkColorFilter = remember(saturation) {
         ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(saturation) })
     }
-    var rotations by remember(artworkUrl) { mutableStateOf(List(3) { 0f }) }
     val latestIsPlaying by rememberUpdatedState(isPlaying)
     val elapsedWhilePlayingMs = remember(artworkUrl) { mutableLongStateOf(0L) }
 
@@ -91,16 +94,13 @@ internal fun MeloXLyricsArtworkBackdrop(
         var previousFrameAt = SystemClock.elapsedRealtime()
         while (true) {
             val now = SystemClock.elapsedRealtime()
-            if (latestIsPlaying) {
-                elapsedWhilePlayingMs.longValue += now - previousFrameAt
+            if (!latestIsPlaying) {
+                previousFrameAt = now
+                delay(500L)
+                continue
             }
+            elapsedWhilePlayingMs.longValue += now - previousFrameAt
             previousFrameAt = now
-            val elapsed = elapsedWhilePlayingMs.longValue.toFloat()
-            rotations = listOf(
-                -(elapsed % 120_000f) / 120_000f * 360f,
-                (elapsed % 90_000f) / 90_000f * 360f,
-                (elapsed % 70_000f) / 70_000f * 360f,
-            )
             delay((1_000L / backgroundFrameRate.toLong()).coerceAtLeast(1L))
         }
     }
@@ -128,7 +128,14 @@ internal fun MeloXLyricsArtworkBackdrop(
                         .graphicsLayer {
                             scaleX = 1.34f
                             scaleY = 1.34f
-                            rotationZ = rotations[index]
+                            val elapsed = elapsedWhilePlayingMs.longValue.toFloat()
+                            val duration = when (index) {
+                                0 -> 120_000f
+                                1 -> 90_000f
+                                else -> 70_000f
+                            }
+                            val direction = if (index == 0) -1f else 1f
+                            rotationZ = direction * (elapsed % duration) / duration * 360f
                             translationX = (index - 1) * 34f
                             translationY = (1 - index) * 22f
                             alpha = if (index == 0) .48f else .28f

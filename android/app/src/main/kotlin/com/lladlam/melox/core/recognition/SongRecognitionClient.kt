@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -34,7 +36,9 @@ data class SongRecognitionResult(
 class SongRecognitionClient(
     private val context: Context,
     private val httpClient: OkHttpClient = OkHttpClient(),
-) {
+) : AutoCloseable {
+    private val fingerprintRuntime = FingerprintRuntime(context.applicationContext)
+
     companion object {
         const val SampleRate = 8_000
     }
@@ -42,8 +46,12 @@ class SongRecognitionClient(
     suspend fun recognize(durationSeconds: Int): List<SongRecognitionResult> {
         require(durationSeconds in 3..15)
         val samples = capture(durationSeconds)
-        val fingerprint = FingerprintRuntime(context).generate(samples)
+        val fingerprint = fingerprintRuntime.generate(samples)
         return match(fingerprint, durationSeconds)
+    }
+
+    override fun close() {
+        fingerprintRuntime.close()
     }
 
     @SuppressLint("MissingPermission")
@@ -146,35 +154,47 @@ class SongRecognitionClient(
 }
 
 private class FingerprintRuntime(private val context: Context) {
+    private val generationMutex = Mutex()
+    private var webView: WebView? = null
+
     @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
-    suspend fun generate(samples: FloatArray): String = withContext(Dispatchers.Main) {
-        val bytes = ByteBuffer.allocate(samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-        samples.forEach(bytes::putFloat)
-        val pcm = Base64.encodeToString(bytes.array(), Base64.NO_WRAP)
-        suspendCancellableCoroutine { continuation ->
-            val completed = AtomicBoolean(false)
-            val webView = WebView(context)
-            fun finish(result: Result<String>) {
-                if (!completed.compareAndSet(false, true)) return
-                webView.post { webView.stopLoading(); webView.destroy() }
-                result.onSuccess(continuation::resume).onFailure(continuation::resumeWithException)
-            }
-            continuation.invokeOnCancellation {
-                if (completed.compareAndSet(false, true)) webView.post { webView.stopLoading(); webView.destroy() }
-            }
-            webView.settings.javaScriptEnabled = true
-            webView.settings.allowFileAccess = true
-            webView.addJavascriptInterface(object {
-                @JavascriptInterface fun onFingerprint(value: String) = finish(
-                    if (value.isBlank()) Result.failure(IOException("音频指纹生成失败")) else Result.success(value),
-                )
-                @JavascriptInterface fun onError(message: String) = finish(
-                    Result.failure(IOException("音频指纹生成失败：$message")),
-                )
-            }, "MeloXNative")
-            webView.webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String) {
-                    val script = """
+    suspend fun generate(samples: FloatArray): String = generationMutex.withLock {
+        withContext(Dispatchers.Main) {
+            val bytes = ByteBuffer.allocate(samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
+            samples.forEach(bytes::putFloat)
+            val pcm = Base64.encodeToString(bytes.array(), Base64.NO_WRAP)
+            suspendCancellableCoroutine { continuation ->
+                val completed = AtomicBoolean(false)
+                val runtimeView = webView ?: WebView(context).also {
+                    it.settings.javaScriptEnabled = true
+                    it.settings.allowFileAccess = true
+                    webView = it
+                }
+                fun finish(result: Result<String>) {
+                    if (!completed.compareAndSet(false, true)) return
+                    runtimeView.post {
+                        runtimeView.stopLoading()
+                        runtimeView.removeJavascriptInterface("MeloXNative")
+                    }
+                    result.onSuccess(continuation::resume).onFailure(continuation::resumeWithException)
+                }
+                continuation.invokeOnCancellation {
+                    if (completed.compareAndSet(false, true)) runtimeView.post {
+                        runtimeView.stopLoading()
+                        runtimeView.removeJavascriptInterface("MeloXNative")
+                    }
+                }
+                runtimeView.addJavascriptInterface(object {
+                    @JavascriptInterface fun onFingerprint(value: String) = finish(
+                        if (value.isBlank()) Result.failure(IOException("音频指纹生成失败")) else Result.success(value),
+                    )
+                    @JavascriptInterface fun onError(message: String) = finish(
+                        Result.failure(IOException("音频指纹生成失败：$message")),
+                    )
+                }, "MeloXNative")
+                runtimeView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String) {
+                        val script = """
                         (async function() {
                           try {
                             const bytes = Uint8Array.from(atob('$pcm'), c => c.charCodeAt(0));
@@ -185,11 +205,22 @@ private class FingerprintRuntime(private val context: Context) {
                             MeloXNative.onError(String(error && (error.stack || error.message) || error));
                           }
                         })();
-                    """.trimIndent()
-                    view.evaluateJavascript(script, null)
+                        """.trimIndent()
+                        view.evaluateJavascript(script, null)
+                    }
                 }
+                runtimeView.loadUrl("file:///android_asset/AudioFingerprint/runtime.html")
             }
-            webView.loadUrl("file:///android_asset/AudioFingerprint/runtime.html")
+        }
+    }
+
+    fun close() {
+        val runtimeView = webView ?: return
+        webView = null
+        runtimeView.post {
+            runtimeView.stopLoading()
+            runtimeView.removeJavascriptInterface("MeloXNative")
+            runtimeView.destroy()
         }
     }
 }

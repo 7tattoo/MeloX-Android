@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -575,6 +576,13 @@ private fun PlaybackSettings(context: android.content.Context) {
     }
     Spacer(Modifier.height(22.dp))
     SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true)
+    LyricsChoiceSetting(
+        context,
+        "播放器展开/收回时长",
+        "player_transition_duration_ms",
+        575,
+        listOf(300, 400, 575, 700, 900),
+    ) { "${it}ms" }
     SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true)
     SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false, "仅在启动时没有现有播放队列时执行。")
     SettingsInfoCard("耳机断开时暂停", "已由 Media3 播放服务启用")
@@ -1493,6 +1501,12 @@ private fun RecognitionSettings(context: android.content.Context) {
     var error by remember { mutableStateOf<String?>(null) }
     var results by remember { mutableStateOf<List<SongRecognitionResult>>(emptyList()) }
     var recognitionJob by remember { mutableStateOf<Job?>(null) }
+    DisposableEffect(client) {
+        onDispose {
+            recognitionJob?.cancel()
+            client.close()
+        }
+    }
 
     fun startCapture() {
         recognitionJob?.cancel()

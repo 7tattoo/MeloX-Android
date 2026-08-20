@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Process
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.PI
 import kotlin.math.abs
@@ -18,12 +19,11 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class MeloXAutoMixFrame(
@@ -68,8 +68,13 @@ data class MeloXAutoMixTrackAnalysis(
  * track, works for local/content/HTTP sources, and caches by song + source URI.
  */
 class MeloXAutoMixAudioAnalyzer(private val context: Context) {
-    private val cache = ConcurrentHashMap<String, MeloXAutoMixTrackAnalysis>()
-    private val keyLocks = ConcurrentHashMap<String, Mutex>()
+    private val cacheLock = Any()
+    private val cache = object : LinkedHashMap<String, MeloXAutoMixTrackAnalysis>(MAX_CACHE_ENTRIES, .75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, MeloXAutoMixTrackAnalysis>?,
+        ): Boolean = size > MAX_CACHE_ENTRIES
+    }
+    private val inFlight = ConcurrentHashMap<String, CompletableDeferred<Result<MeloXAutoMixTrackAnalysis>>>()
     // Allow the outgoing and incoming analysis to progress together while
     // preventing unrelated visual analysis from spawning an unbounded decoder set.
     private val decodePermits = Semaphore(2)
@@ -77,16 +82,33 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
     suspend fun analyze(songId: Long, uri: Uri): MeloXAutoMixTrackAnalysis =
         withContext(Dispatchers.IO) {
             val key = "$songId|$uri"
-            cache[key] ?: keyLocks.getOrPut(key) { Mutex() }.withLock {
-                cache[key] ?: decodePermits.withPermit {
-                    cache[key] ?: decode(uri).also { cache[key] = it }
+            cached(key)?.let { return@withContext it }
+            val pending = CompletableDeferred<Result<MeloXAutoMixTrackAnalysis>>()
+            val existing = inFlight.putIfAbsent(key, pending)
+            if (existing != null) return@withContext existing.await().getOrThrow()
+            try {
+                val result = decodePermits.withPermit {
+                    cached(key) ?: decode(uri).also { putCached(key, it) }
                 }
+                pending.complete(Result.success(result))
+                result
+            } catch (error: Throwable) {
+                pending.complete(Result.failure(error))
+                throw error
+            } finally {
+                inFlight.remove(key, pending)
             }
         }
 
     fun clear() {
-        cache.clear()
-        keyLocks.clear()
+        synchronized(cacheLock) { cache.clear() }
+    }
+
+    private fun cached(key: String): MeloXAutoMixTrackAnalysis? =
+        synchronized(cacheLock) { cache[key] }
+
+    private fun putCached(key: String, analysis: MeloXAutoMixTrackAnalysis) {
+        synchronized(cacheLock) { cache[key] = analysis }
     }
 
     private suspend fun decode(uri: Uri): MeloXAutoMixTrackAnalysis {
@@ -203,7 +225,10 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
         private var sourcePhase = 0
         private var emittedSamples = 0L
         private var previousEnergy = 0f
-        private var previousSpectrum = FloatArray(FFT_SIZE / 2)
+        private val real = FloatArray(FFT_SIZE)
+        private val imaginary = FloatArray(FFT_SIZE)
+        private val magnitudes = FloatArray(FFT_SIZE / 2)
+        private val previousSpectrum = FloatArray(FFT_SIZE / 2)
         private val rawFrames = ArrayList<RawFrame>()
 
         fun consume(buffer: ByteBuffer, sampleRate: Int, channelCount: Int, pcmEncoding: Int) {
@@ -242,8 +267,7 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
         }
 
         private fun calculateFrame() {
-            val real = FloatArray(FFT_SIZE)
-            val imaginary = FloatArray(FFT_SIZE)
+            imaginary.fill(0f)
             var squareSum = 0.0
             for (index in window.indices) {
                 val value = window[index]
@@ -251,7 +275,6 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
                 real[index] = value * (0.5f - 0.5f * cos((2.0 * PI * index) / (FFT_SIZE - 1)).toFloat())
             }
             fft(real, imaginary)
-            val magnitudes = FloatArray(FFT_SIZE / 2)
             var low = 0.0
             var mid = 0.0
             var high = 0.0
@@ -281,7 +304,7 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
                 onset = onset,
             )
             previousEnergy = energy
-            previousSpectrum = magnitudes
+            magnitudes.copyInto(previousSpectrum)
         }
 
         fun finish(): MeloXAutoMixTrackAnalysis {
@@ -341,6 +364,7 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
         private const val FRAME_DURATION_MS = HOP_SIZE * 1_000L / TARGET_SAMPLE_RATE
         private const val MIN_ANALYSIS_FRAMES = 32
         private const val AUDIBLE_THRESHOLD = .035f
+        private const val MAX_CACHE_ENTRIES = 4
 
         private fun estimateTempo(frames: List<MeloXAutoMixFrame>): TempoEstimate {
             val signal = frames.map { (it.onset * .72f + it.novelty * .18f + it.energy * .10f).toDouble() }

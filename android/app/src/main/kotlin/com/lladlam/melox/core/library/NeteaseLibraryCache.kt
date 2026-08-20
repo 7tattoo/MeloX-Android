@@ -18,7 +18,7 @@ class NeteaseLibraryCache(context: Context) {
     )
 
     suspend fun saveSnapshot(userId: Long, snapshot: NeteaseLibrarySnapshot) {
-        writeJson(File(directory, "library_$userId.json"), encodeSnapshot(snapshot))
+        writeJson(File(directory, "library_$userId.json")) { encodeSnapshot(snapshot) }
     }
 
     suspend fun loadPlaylistDetail(playlistId: Long): NeteasePlaylistDetail? = readJson(
@@ -27,7 +27,7 @@ class NeteaseLibraryCache(context: Context) {
     )
 
     suspend fun savePlaylistDetail(playlistId: Long, detail: NeteasePlaylistDetail) {
-        writeJson(File(directory, "playlist_$playlistId.json"), encodePlaylistDetail(detail))
+        writeJson(File(directory, "playlist_$playlistId.json")) { encodePlaylistDetail(detail) }
     }
 
     suspend fun loadHomeContent(cacheKey: String): NeteaseHomeContent? = readJson(File(directory, "home_${safeCacheKey(cacheKey)}.json")) { value ->
@@ -46,13 +46,13 @@ class NeteaseLibraryCache(context: Context) {
         )
     }
     suspend fun saveHomeContent(cacheKey: String, content: NeteaseHomeContent) {
-        writeJson(File(directory, "home_${safeCacheKey(cacheKey)}.json"), JSONObject()
+        writeJson(File(directory, "home_${safeCacheKey(cacheKey)}.json")) { JSONObject()
             .put("playlists", encodePlaylists(content.playlists)).put("newSongs", encodeSongs(content.newSongs))
             .put("recentlyTrending", encodeSongs(content.recentlyTrending)).put("tailoredSongs", encodeSongs(content.tailoredSongs))
             .put("chartPlaylists", encodePlaylists(content.chartPlaylists))
             .put("radarPlaylists", encodePlaylists(content.radarPlaylists)).put("personalPlaylists", encodePlaylists(content.personalPlaylists))
             .put("regionalSongs", encodeSongs(content.regionalSongs)).put("roamingSongs", encodeSongs(content.roamingSongs))
-            .put("similarSongs", encodeSongs(content.similarSongs)).put("podcasts", encodeHomePodcasts(content.podcasts)))
+            .put("similarSongs", encodeSongs(content.similarSongs)).put("podcasts", encodeHomePodcasts(content.podcasts)) }
     }
 
     suspend fun loadExplore(category: String): List<NeteasePlaylistSummary>? = readJson(
@@ -62,25 +62,40 @@ class NeteaseLibraryCache(context: Context) {
     suspend fun saveExplore(category: String, playlists: List<NeteasePlaylistSummary>) {
         writeJson(
             File(directory, "explore_${category.hashCode()}.json"),
-            JSONObject().put("playlists", encodePlaylists(playlists)),
-        )
+        ) { JSONObject().put("playlists", encodePlaylists(playlists)) }
     }
 
     private suspend fun <T> readJson(file: File, decode: (JSONObject) -> T): T? =
         withContext(Dispatchers.IO) {
             runCatching {
                 if (!file.isFile) return@runCatching null
+                if (System.currentTimeMillis() - file.lastModified() > MAX_CACHE_AGE_MS) {
+                    file.delete()
+                    return@runCatching null
+                }
                 decode(JSONObject(file.readText()))
             }.getOrNull()
         }
 
-    private suspend fun writeJson(file: File, value: JSONObject) = withContext(Dispatchers.IO) {
+    private suspend fun writeJson(file: File, value: () -> JSONObject) = withContext(Dispatchers.IO) {
         directory.mkdirs()
+        val encoded = value().toString()
         val temporary = File(file.parentFile, "${file.name}.tmp")
-        temporary.writeText(value.toString())
+        temporary.writeText(encoded)
         if (!temporary.renameTo(file)) {
-            file.writeText(value.toString())
+            file.writeText(encoded)
             temporary.delete()
+        }
+        pruneCache()
+    }
+
+    private fun pruneCache() {
+        val files = directory.listFiles()?.filter { it.isFile && !it.name.endsWith(".tmp") }.orEmpty()
+            .sortedByDescending(File::lastModified)
+        var retainedBytes = 0L
+        files.forEachIndexed { index, cached ->
+            retainedBytes += cached.length()
+            if (index >= MAX_CACHE_FILES || retainedBytes > MAX_CACHE_BYTES) cached.delete()
         }
     }
 
@@ -93,18 +108,29 @@ class NeteaseLibraryCache(context: Context) {
         /** Returns true only for the first automatic refresh in this app process. */
         @Synchronized
         fun beginLibraryColdStartRefresh(userId: Long): Boolean =
-            refreshedLibraries.add(userId)
+            boundedAdd(refreshedLibraries, userId)
 
         /** Each opened playlist is refreshed at most once in this app process. */
         @Synchronized
         fun beginPlaylistColdStartRefresh(playlistId: Long): Boolean =
-            refreshedPlaylists.add(playlistId)
+            boundedAdd(refreshedPlaylists, playlistId)
 
         @Synchronized
-        fun beginHomeColdStartRefresh(cacheKey: String): Boolean = refreshedHomes.add(cacheKey)
+        fun beginHomeColdStartRefresh(cacheKey: String): Boolean = boundedAdd(refreshedHomes, cacheKey)
 
         @Synchronized
-        fun beginExploreColdStartRefresh(category: String): Boolean = refreshedExplore.add(category)
+        fun beginExploreColdStartRefresh(category: String): Boolean = boundedAdd(refreshedExplore, category)
+
+        private fun <T> boundedAdd(values: MutableSet<T>, value: T): Boolean {
+            if (!values.add(value)) return false
+            while (values.size > MAX_REFRESH_KEYS) values.remove(values.first())
+            return true
+        }
+
+        private const val MAX_CACHE_FILES = 128
+        private const val MAX_CACHE_BYTES = 32L * 1024L * 1024L
+        private const val MAX_CACHE_AGE_MS = 30L * 24L * 60L * 60L * 1_000L
+        private const val MAX_REFRESH_KEYS = 256
     }
 }
 

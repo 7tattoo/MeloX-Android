@@ -95,6 +95,7 @@ object MeloXListenTogetherCoordinator {
         private var heartbeatTick = 0
         private var statusTick = 0
         private var firstSyncForRoom = true
+        private var controllerConnectionPending = false
 
         private val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -137,23 +138,44 @@ object MeloXListenTogetherCoordinator {
             }
         }
 
-        init { connectController(); scope.launch { monitorLoop() } }
-        fun adoptRoom(latest: MeloXListenTogetherRoom) { room = latest; failures = 0; firstSyncForRoom = true; lastRemoteQueueSignature = null; lastRemoteCommandSignature = null; playlistVersion = 1; heartbeatTick = HEARTBEAT_EVERY_TICKS; statusTick = 0; mutableState.value = State(Phase.Connected, latest) }
+        init { scope.launch { monitorLoop() } }
+        fun adoptRoom(latest: MeloXListenTogetherRoom) {
+            room = latest
+            failures = 0
+            firstSyncForRoom = true
+            lastRemoteQueueSignature = null
+            lastRemoteCommandSignature = null
+            playlistVersion = 1
+            heartbeatTick = HEARTBEAT_EVERY_TICKS
+            statusTick = 0
+            mutableState.value = State(Phase.Connected, latest)
+            connectController()
+        }
         fun clearRoom() = resetRoom()
 
         private fun connectController() {
+            if (controller != null || controllerConnectionPending || room == null) return
+            controllerConnectionPending = true
             val token = SessionToken(appContext, ComponentName(appContext, MeloXPlaybackService::class.java))
             val future = MediaController.Builder(appContext, token).buildAsync()
             future.addListener(
                 {
                     runCatching { future.get() }
                         .onSuccess { connected ->
+                            controllerConnectionPending = false
+                            if (room == null) {
+                                connected.release()
+                                return@onSuccess
+                            }
                             controller?.removeListener(listener)
                             controller = connected
                             connected.addListener(listener)
                             lastKnownSongId = connected.currentMediaItem?.mediaId?.toLongOrNull()
                         }
-                        .onFailure { error -> Log.w(TAG, "Together MediaController unavailable", error) }
+                        .onFailure { error ->
+                            controllerConnectionPending = false
+                            Log.w(TAG, "Together MediaController unavailable", error)
+                        }
                 },
                 mainExecutor,
             )
@@ -224,6 +246,7 @@ object MeloXListenTogetherCoordinator {
                         playlistVersion = 1
                         heartbeatTick = HEARTBEAT_EVERY_TICKS
                     }
+                    connectController()
                     mutableState.value = State(
                         phase = if (failures > 0) Phase.Reconnecting else Phase.Connected,
                         room = latest,
@@ -469,13 +492,16 @@ object MeloXListenTogetherCoordinator {
             lastRemoteCommandSignature = null
             queueReportJob?.cancel()
             queueReportJob = null
+            controller?.removeListener(listener)
+            controller?.release()
+            controller = null
             mutableState.value = State()
         }
     }
 
     private const val TAG = "MeloXTogether"
     private const val SYNC_INTERVAL_MS = 1_000L
-    private const val IDLE_POLL_MS = 3_000L
+    private const val IDLE_POLL_MS = 60_000L
     private const val STATUS_EVERY_TICKS = 5
     private const val HEARTBEAT_EVERY_TICKS = 5
     private const val QUEUE_DEBOUNCE_MS = 350L

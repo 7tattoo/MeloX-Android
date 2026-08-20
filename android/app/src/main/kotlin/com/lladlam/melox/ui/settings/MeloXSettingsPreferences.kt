@@ -58,6 +58,8 @@ object MeloXSettingsRuntime {
         internal set
     var artworkMotionEnabled by mutableStateOf(true)
         internal set
+    var playerTransitionDurationMs by mutableStateOf(575)
+        internal set
     var playerBackgroundIsolationEnabled by mutableStateOf(true)
         internal set
     var keepScreenOn by mutableStateOf(false)
@@ -131,6 +133,8 @@ object MeloXSettingsRuntime {
     var lyricGlowEnabled by mutableStateOf(true)
         internal set
     var lyricLongToneStrength by mutableStateOf(1f)
+        internal set
+    var lyricWordBounceEnabled by mutableStateOf(false)
         internal set
     var lyricHighlightGradientWidth by mutableStateOf(.7f)
         internal set
@@ -301,6 +305,8 @@ object MeloXSettingsRuntime {
             }
         flowingBackdropEnabled = playerBackgroundMode != MeloXPlayerBackgroundMode.BlurredArtwork
         artworkMotionEnabled = MeloXSettingsPreferences.boolean(app, "player_artwork_motion", true)
+        playerTransitionDurationMs = MeloXSettingsPreferences.int(app, "player_transition_duration_ms", 575)
+            .coerceIn(200, 1_200)
         playerBackgroundIsolationEnabled = MeloXSettingsPreferences.boolean(app, "player_background_isolation", true)
         keepScreenOn = MeloXSettingsPreferences.boolean(app, "player_keep_screen_on", false)
         screenAwakeMode = runCatching {
@@ -362,6 +368,7 @@ object MeloXSettingsRuntime {
         lyricGlowStrength = MeloXSettingsPreferences.float(app, "lyrics_glow_strength", 1f).coerceIn(0f, 1.5f)
         lyricGlowEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_glow_enabled", true)
         lyricLongToneStrength = MeloXSettingsPreferences.float(app, "lyrics_long_tone_strength", 1f).coerceIn(0f, 1.5f)
+        lyricWordBounceEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_word_bounce_enabled", false)
         lyricHighlightGradientWidth = MeloXSettingsPreferences.float(app, "lyrics_highlight_gradient_width", .7f).coerceIn(.4f, 3f)
         lyricHighlightGradientReduction = MeloXSettingsPreferences.float(app, "lyrics_highlight_gradient_reduction", .65f).coerceIn(0f, 1f)
         lyricRomanizationFontScale = MeloXSettingsPreferences.float(app, "lyrics_romanization_font_scale", .65f).coerceIn(.5f, .8f)
@@ -515,6 +522,7 @@ object MeloXSettingsPreferences {
             "lyrics_reduce_motion" -> MeloXSettingsRuntime.lyricReduceMotion = value
             "lyrics_glow_long_tones_only" -> MeloXSettingsRuntime.lyricGlowLongTonesOnly = value
             "lyrics_glow_enabled" -> MeloXSettingsRuntime.lyricGlowEnabled = value
+            "lyrics_word_bounce_enabled" -> MeloXSettingsRuntime.lyricWordBounceEnabled = value
             "lyrics_cascade_bounce_enabled" -> MeloXSettingsRuntime.lyricCascadeBounceEnabled = value
             "lyrics_scale_bounce_enabled" -> MeloXSettingsRuntime.lyricScaleBounceEnabled = value
             "lyrics_advance_word_by_word" -> MeloXSettingsRuntime.lyricAdvanceAppliesToWordByWord = value
@@ -553,6 +561,8 @@ object MeloXSettingsPreferences {
                 value.takeIf { it in setOf(30, 60, 90, 120) } ?: 60
             "lyrics_background_frame_rate" -> MeloXSettingsRuntime.lyricBackgroundFrameRate =
                 value.takeIf { it in setOf(15, 24, 30, 45, 60) } ?: 24
+            "player_transition_duration_ms" -> MeloXSettingsRuntime.playerTransitionDurationMs =
+                value.coerceIn(200, 1_200)
             "lyrics_long_tone_threshold_ms" -> MeloXSettingsRuntime.lyricLongToneThresholdMs = value.coerceIn(300, 1_500)
             "lyrics_interface_auto_hide_ms" -> MeloXSettingsRuntime.lyricInterfaceAutoHideDelayMs = value.coerceIn(3_000, 15_000)
             "lyrics_scroll_hide_threshold_dp" -> MeloXSettingsRuntime.lyricScrollHideThresholdDp = value.coerceIn(40, 240)

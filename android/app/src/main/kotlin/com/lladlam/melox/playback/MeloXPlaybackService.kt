@@ -36,7 +36,7 @@ import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
-import com.lladlam.melox.ui.settings.MeloXLyricsRenderingQuality
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXSystemLyricTitleMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,8 +76,6 @@ class MeloXPlaybackService : MediaSessionService() {
     private var mixAnalysisJob: Job? = null
     private var mixAnalysisSourceId: String? = null
     private var analyzedMixPlan: MeloXAutoMixPlan? = null
-    private var reactiveAnalysisJob: Job? = null
-    private var reactiveAnalysisMediaId: String? = null
     private var preparedMixSourceId: String? = null
     private var autoMixRetrySourceId: String? = null
     private var autoMixRetryAfterRealtimeMs = 0L
@@ -88,6 +86,8 @@ class MeloXPlaybackService : MediaSessionService() {
     private var mixIncomingStartPositionMs = 0L
     private var mixLastProgress = 0.0
     private var mixSettings = MeloXAutoMixSettings()
+    private var cachedAutoMixSettings = MeloXAutoMixSettings()
+    private var cachedAutoMixSettingsAt = 0L
     private var mixPlan = MeloXAutoMixPlan(0L, 0L)
     private val mixEqualizerEnvelope = MeloXAutoMixEqualizerEnvelope()
     private var lastMaintenanceRealtimeMs = 0L
@@ -133,9 +133,6 @@ class MeloXPlaybackService : MediaSessionService() {
             val transitionedId = mediaItem?.mediaId?.toLongOrNull(); val previousHistoryId = historySongId
             if (previousHistoryId != null && previousHistoryId != transitionedId) playbackHistoryReporter.recordDuration(previousHistoryId, elapsedMs = historyPositionMs)
             if (transitionedId != null && transitionedId != previousHistoryId) { historySongId = transitionedId; historyPositionMs = 0L; playbackHistoryReporter.recordStart(transitionedId) }
-            reactiveAnalysisJob?.cancel()
-            reactiveAnalysisJob = null
-            reactiveAnalysisMediaId = null
             MeloXAudioReactiveRuntime.select(mediaItem?.mediaId)
             mediaItem?.let(downloadStore::recordPlayback)
             if (transitionedId != systemLyricsSongId) resetSystemLyrics(mediaItem)
@@ -193,58 +190,22 @@ class MeloXPlaybackService : MediaSessionService() {
                     recoverAutoMixFailure()
                 }
             }
-            handler.postDelayed(this, 100L)
+            val nextTickMs = when {
+                mixStartedAt > 0L -> ACTIVE_MONITOR_INTERVAL_MS
+                active?.isPlaying == true -> ACTIVE_MONITOR_INTERVAL_MS
+                active?.currentMediaItem != null -> PAUSED_MONITOR_INTERVAL_MS
+                else -> IDLE_MONITOR_INTERVAL_MS
+            }
+            handler.postDelayed(this, nextTickMs)
         }
     }
 
     private fun updateAudioReactiveVisuals(active: ExoPlayer) {
         val item = active.currentMediaItem ?: return
+        // Visual motion follows the lightweight playback clock. Full-track
+        // MediaCodec analysis is reserved for explicitly enabled AutoMix; doing
+        // a second HTTP decode for decoration competes with ExoPlayer.
         MeloXAudioReactiveRuntime.publish(item.mediaId, active.currentPosition, active.isPlaying)
-        if (!MeloXSettingsPreferences.boolean(this, "player_flowing_backdrop", true)) return
-        val renderingQuality = runCatching {
-            MeloXLyricsRenderingQuality.valueOf(
-                MeloXSettingsPreferences.string(
-                    this,
-                    "lyrics_rendering_quality",
-                    MeloXLyricsRenderingQuality.Balanced.name,
-                ),
-            )
-        }.getOrDefault(MeloXLyricsRenderingQuality.Balanced)
-        if (renderingQuality == MeloXLyricsRenderingQuality.Low) {
-            // Low keeps the artwork palette and flowing phase animation, but
-            // avoids decoding the whole track while playback and Compose are
-            // competing for the little cores. Selecting Balanced/High starts
-            // the exact beat/downbeat analysis on the next monitor tick.
-            reactiveAnalysisJob?.cancel()
-            reactiveAnalysisJob = null
-            reactiveAnalysisMediaId = null
-            return
-        }
-        if (reactiveAnalysisMediaId == item.mediaId || reactiveAnalysisJob?.isActive == true) return
-        val songId = item.mediaId.toLongOrNull() ?: return
-        // Long-form content (podcasts, mixes) must not trigger a background
-        // full-track MediaCodec decode of a live HTTP stream. Decoding while
-        // ExoPlayer is streaming the same source drains bandwidth and CPU,
-        // which surfaces as intermittent audio dropouts that recover after the
-        // player buffer refills. Skip anything over a normal song length.
-        val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L
-        if (duration > MAX_AUDIO_REACTIVE_ANALYSIS_DURATION_MS) {
-            reactiveAnalysisMediaId = item.mediaId
-            return
-        }
-        reactiveAnalysisMediaId = item.mediaId
-        reactiveAnalysisJob = serviceScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    val quality = MusicQualityPreferences.read(this@MeloXPlaybackService)
-                    val uri = playbackResolver.resolveSongUri(songId, quality)
-                    autoMixAnalyzer.analyze(songId, uri)
-                }
-            }
-            result.onSuccess { MeloXAudioReactiveRuntime.attach(item.mediaId, it) }
-                .onFailure { Log.w(TAG, "Audio-reactive analysis unavailable for ${item.mediaId}", it) }
-            reactiveAnalysisJob = null
-        }
     }
 
     /** Keep timers alive across Activity recreation by owning them in playback. */
@@ -279,6 +240,7 @@ class MeloXPlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        MeloXPlaybackModePreferences.initialize(this)
         val httpFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
             .setDefaultRequestProperties(
@@ -392,7 +354,7 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     private fun maybeRunAutoMix(active: ExoPlayer) {
-        if (!MeloXPlaybackModePreferences.autoMix(this)) {
+        if (!MeloXPlaybackModeRuntime.autoMixEnabled) {
             cancelPreparedMix(releaseStandby = true)
             return
         }
@@ -405,7 +367,7 @@ class MeloXPlaybackService : MediaSessionService() {
             autoMixRetrySourceId = null
             autoMixRetryAfterRealtimeMs = 0L
         }
-        val settings = MeloXAutoMixSettings.read(this)
+        val settings = currentAutoMixSettings()
         if (preparedMixSourceId == null && remaining <= settings.preloadLeadMs) {
             PlaybackCommands.prioritizeManualQueue(active)
             prepareIncoming(active, sourceId)
@@ -441,7 +403,7 @@ class MeloXPlaybackService : MediaSessionService() {
             // analyser still owns a MediaCodec instance. Cancellation is
             // cooperative; the next 100 ms monitor tick starts the mix after
             // the codec's finally block has released the native resource.
-            val activeAnalysis = listOfNotNull(mixAnalysisJob, reactiveAnalysisJob)
+            val activeAnalysis = listOfNotNull(mixAnalysisJob)
                 .filter(Job::isActive)
             if (activeAnalysis.isNotEmpty()) {
                 activeAnalysis.forEach(Job::cancel)
@@ -480,6 +442,15 @@ class MeloXPlaybackService : MediaSessionService() {
         }
     }
 
+    private fun currentAutoMixSettings(): MeloXAutoMixSettings {
+        val now = SystemClock.elapsedRealtime()
+        if (now - cachedAutoMixSettingsAt >= SETTINGS_SNAPSHOT_INTERVAL_MS) {
+            cachedAutoMixSettings = MeloXAutoMixSettings.read(this)
+            cachedAutoMixSettingsAt = now
+        }
+        return cachedAutoMixSettings
+    }
+
     private fun supportsStableDeckEqualizers(): Boolean {
         return MeloXAutoMixEqualizerEnvelope.supportsDeckEqualizers(
             manufacturer = Build.MANUFACTURER,
@@ -496,9 +467,9 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     private fun maybeUpdateSystemLyrics(active: ExoPlayer) {
-        val metadataEnabled = MeloXSettingsPreferences.boolean(this, "system_lyrics_enabled", false)
-        val notificationEnabled = MeloXSettingsPreferences.boolean(this, "lyrics_notifications_enabled", false)
         val currentItem = active.currentMediaItem ?: return
+        val metadataEnabled = MeloXSettingsRuntime.systemLyricsEnabled
+        val notificationEnabled = MeloXSettingsRuntime.lyricNotificationsEnabled
         val songId = currentItem.mediaId.toLongOrNull() ?: return
         if (!metadataEnabled && !notificationEnabled) {
             restoreSystemLyricsMetadata(active)
@@ -508,7 +479,7 @@ class MeloXPlaybackService : MediaSessionService() {
         if (systemLyricsSongId != songId) resetSystemLyrics(currentItem)
         if (systemLyricsDocument == null && systemLyricsJob?.isActive != true) loadSystemLyrics(songId, currentItem)
         val document = systemLyricsDocument ?: return
-        val advance = MeloXSettingsPreferences.int(this, "lyrics_advance_ms", 0).toLong()
+        val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
         val index = document.highlightedIndex(active.currentPosition + advance) ?: return
         val now = SystemClock.elapsedRealtime()
         val lineChanged = index != systemLyricsLastIndex
@@ -529,15 +500,7 @@ class MeloXPlaybackService : MediaSessionService() {
                 putString(SYSTEM_ORIGINAL_TITLE_KEY, original.title?.toString().orEmpty())
                 putString(SYSTEM_ORIGINAL_ARTIST_KEY, original.artist?.toString().orEmpty())
             }
-            val titleMode = runCatching {
-                MeloXSystemLyricTitleMode.valueOf(
-                    MeloXSettingsPreferences.string(
-                        this,
-                        "system_lyrics_title_mode",
-                        MeloXSystemLyricTitleMode.LyricFirst.name,
-                    ),
-                )
-            }.getOrDefault(MeloXSystemLyricTitleMode.LyricFirst)
+            val titleMode = MeloXSettingsRuntime.systemLyricTitleMode
             val lyricMetadata = original.buildUpon().apply {
                 if (titleMode == MeloXSystemLyricTitleMode.LyricFirst) {
                     setTitle(line)
@@ -626,13 +589,11 @@ class MeloXPlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val titleMode = runCatching {
-            MeloXSystemLyricTitleMode.valueOf(
-                MeloXSettingsPreferences.string(this, "system_lyrics_title_mode", MeloXSystemLyricTitleMode.LyricFirst.name),
-            )
+            MeloXSettingsRuntime.systemLyricTitleMode
         }.getOrDefault(MeloXSystemLyricTitleMode.LyricFirst)
         val songLabel = listOf(metadata.title?.toString(), metadata.artist?.toString())
             .filter { !it.isNullOrBlank() }.joinToString(" · ")
-        val showNext = MeloXSettingsPreferences.boolean(this, "lyrics_notification_next_line", false)
+        val showNext = MeloXSettingsRuntime.lyricNotificationShowNextLine
         val detail = if (showNext && nextLine.isNotBlank()) "$songLabel\n$nextLine" else songLabel
         val builder = NotificationCompat.Builder(this, LYRICS_NOTIFICATION_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play)
@@ -644,7 +605,7 @@ class MeloXPlaybackService : MediaSessionService() {
             .setOnlyAlertOnce(true)
             .setOngoing(player?.isPlaying == true)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-        if (MeloXSettingsPreferences.boolean(this, "lyrics_notification_progress", true)) {
+        if (MeloXSettingsRuntime.lyricNotificationShowProgress) {
             val duration = player?.duration?.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L
             if (duration > 0L) builder.setProgress(1_000, ((player?.currentPosition ?: 0L) * 1_000L / duration).toInt().coerceIn(0, 1_000), false)
         }
@@ -905,6 +866,7 @@ class MeloXPlaybackService : MediaSessionService() {
         serviceScope.cancel()
         cancelPreparedMix(releaseStandby = true)
         equalizerController.release()
+        autoMixAnalyzer.clear()
         MeloXAudioReactiveRuntime.clear()
         mediaSession?.release()
         mediaSession = null
@@ -921,10 +883,10 @@ class MeloXPlaybackService : MediaSessionService() {
         const val AUTOMIX_ENVELOPE_INTERVAL_MS = 20L
         const val AUTOMIX_FAILURE_COOLDOWN_MS = 30_000L
         const val ANALYSIS_FALLBACK_GUARD_MS = 1_200L
-        // Twelve minutes keeps beat analysis for normal songs while skipping
-        // podcasts and long mixes, whose full-track decode competes with the
-        // live stream and causes audible dropouts.
-        const val MAX_AUDIO_REACTIVE_ANALYSIS_DURATION_MS = 12 * 60 * 1000L
+        const val ACTIVE_MONITOR_INTERVAL_MS = 100L
+        const val PAUSED_MONITOR_INTERVAL_MS = 500L
+        const val IDLE_MONITOR_INTERVAL_MS = 2_000L
+        const val SETTINGS_SNAPSHOT_INTERVAL_MS = 1_000L
         const val SLEEP_TIMER_END_KEY = "playback_sleep_timer_end_epoch_ms"
         const val SYSTEM_ORIGINAL_TITLE_KEY = "melox.system.original_title"
         const val SYSTEM_ORIGINAL_ARTIST_KEY = "melox.system.original_artist"

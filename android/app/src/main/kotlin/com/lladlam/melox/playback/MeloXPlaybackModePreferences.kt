@@ -8,6 +8,12 @@ import androidx.compose.runtime.setValue
 object MeloXPlaybackModeRuntime {
     var heartModeActive by mutableStateOf(false)
         internal set
+    var shuffleEnabled by mutableStateOf(false)
+        internal set
+    var autoplayEnabled by mutableStateOf(false)
+        internal set
+    var autoMixEnabled by mutableStateOf(false)
+        internal set
 }
 
 object MeloXPlaybackModePreferences {
@@ -18,6 +24,14 @@ object MeloXPlaybackModePreferences {
 
     internal fun preferences(context: Context) =
         context.applicationContext.getSharedPreferences(NAME, Context.MODE_PRIVATE)
+
+    /** Loads the process snapshot once so playback hot paths never poll SharedPreferences. */
+    fun initialize(context: Context) {
+        val preferences = preferences(context)
+        MeloXPlaybackModeRuntime.shuffleEnabled = preferences.getBoolean(KEY_SHUFFLE, false)
+        MeloXPlaybackModeRuntime.autoplayEnabled = preferences.getBoolean(KEY_AUTOPLAY, false)
+        MeloXPlaybackModeRuntime.autoMixEnabled = preferences.getBoolean(KEY_AUTOMIX, false)
+    }
 
     fun shuffle(context: Context): Boolean =
         preferences(context)
@@ -32,16 +46,19 @@ object MeloXPlaybackModePreferences {
             .getBoolean(KEY_AUTOMIX, false)
 
     fun setShuffle(context: Context, enabled: Boolean) {
+        MeloXPlaybackModeRuntime.shuffleEnabled = enabled
         preferences(context)
             .edit().putBoolean(KEY_SHUFFLE, enabled).apply()
     }
 
     fun setAutoplay(context: Context, enabled: Boolean) {
+        MeloXPlaybackModeRuntime.autoplayEnabled = enabled
         preferences(context)
             .edit().putBoolean(KEY_AUTOPLAY, enabled).apply()
     }
 
     fun setAutoMix(context: Context, enabled: Boolean) {
+        MeloXPlaybackModeRuntime.autoMixEnabled = enabled
         preferences(context)
             .edit().putBoolean(KEY_AUTOMIX, enabled).apply()
     }
@@ -67,6 +84,9 @@ object MeloXPlaybackModePreferences {
     }
 
     fun reset(context: Context) {
+        MeloXPlaybackModeRuntime.shuffleEnabled = false
+        MeloXPlaybackModeRuntime.autoplayEnabled = false
+        MeloXPlaybackModeRuntime.autoMixEnabled = false
         preferences(context).edit().clear().apply()
     }
 }

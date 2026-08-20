@@ -167,7 +167,7 @@ fun MeloXIOSLyricsPanel(
 ) {
     val configuration = LocalConfiguration.current
     if (allowAutomaticSkyline && configuration.screenWidthDp > configuration.screenHeightDp && MeloXSettingsRuntime.skylineEnabled) {
-        MeloXSkylineLyricsPanel(state, modifier, onInterfaceInteraction)
+        MeloXSkylineLyricsPanel(state, modifier, onInterfaceInteraction, active)
         return
     }
     when (MeloXSettingsRuntime.lyricsStyle) {
@@ -179,8 +179,8 @@ fun MeloXIOSLyricsPanel(
             onInterfaceVisibilityChange,
             active,
         )
-        MeloXLyricsStyle.Eva -> MeloXEvaLyricsPanel(state, modifier, onInterfaceInteraction)
-        MeloXLyricsStyle.TextPV -> MeloXTextPVLyricsPanel(state, modifier, onInterfaceInteraction)
+        MeloXLyricsStyle.Eva -> MeloXEvaLyricsPanel(state, modifier, onInterfaceInteraction, active)
+        MeloXLyricsStyle.TextPV -> MeloXTextPVLyricsPanel(state, modifier, onInterfaceInteraction, active)
     }
 }
 
@@ -281,7 +281,10 @@ private fun MeloXAppleMusicLyricsPanel(
     val refreshRate = when (renderingQuality) {
         MeloXLyricsRenderingQuality.Low -> min(MeloXSettingsRuntime.lyricRefreshRate, 30)
         MeloXLyricsRenderingQuality.Balanced -> min(MeloXSettingsRuntime.lyricRefreshRate, 60)
-        MeloXLyricsRenderingQuality.High -> MeloXSettingsRuntime.lyricRefreshRate
+        // Native glyph drawing is CPU-bound; more than one update per display
+        // frame adds work without producing a visible state. 60 Hz remains the
+        // ceiling even when a migrated preference contains 90/120 Hz.
+        MeloXLyricsRenderingQuality.High -> min(MeloXSettingsRuntime.lyricRefreshRate, 60)
     }
     val interludes = remember(lines) { sourceLyricInterludes(lines) }
     val interludeByLyricIndex = remember(interludes) { interludes.associateBy { it.followingLyricIndex } }
@@ -1486,14 +1489,9 @@ private fun MeloXGlyphLyricText(
                             }
 
                             val stopCount = when (renderingQuality) {
-                                MeloXLyricsRenderingQuality.Low -> 2
-                                MeloXLyricsRenderingQuality.Balanced -> 3
-                                // Five samples are visually continuous at the
-                                // rendered glyph width. The source renderer's
-                                // eight stops are for a CoreGraphics mask; eight
-                                // separate Android clip/draw calls only increase
-                                // overdraw without adding visible detail.
-                                MeloXLyricsRenderingQuality.High -> 5
+                                MeloXLyricsRenderingQuality.Low -> 1
+                                MeloXLyricsRenderingQuality.Balanced -> 2
+                                MeloXLyricsRenderingQuality.High -> 3
                             }
                             for (step in 0 until stopCount) {
                                 val a = step.toFloat() / stopCount.toFloat()

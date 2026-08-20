@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -90,6 +91,8 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         cookieProvider = { NeteaseSessionStore.readCookie(app) },
     )
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val storageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val storageCommands = Channel<StorageCommand>(Channel.UNLIMITED)
     private val transferSlots = Semaphore(3)
     private val jobs = ConcurrentHashMap<Long, Job>()
     private val pendingPlaylistRefs = ConcurrentHashMap<Long, MutableList<MeloXDownloadPlaylistRef>>()
@@ -101,6 +104,9 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         private set
 
     init {
+        storageScope.launch {
+            for (command in storageCommands) applyStorageCommand(command)
+        }
         scope.launch {
             val restored = withContext(Dispatchers.IO) { readIndex() }
             restored.forEach { record ->
@@ -232,7 +238,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         jobs.remove(songId)?.cancel()
         activeDownloads.remove(songId)
         pendingPlaylistRefs.remove(songId)
-        File(directory, "$songId.part").delete()
+        storageCommands.trySend(StorageCommand.Delete(setOf("$songId.part")))
     }
 
     fun remove(songId: Long) = removeMany(setOf(songId))
@@ -241,15 +247,12 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         if (songIds.isEmpty()) return
         songIds.forEach(::cancel)
         val removed = downloads.filter { it.song.id in songIds }
-        removed.forEach { record ->
-            File(directory, record.fileName).delete()
-            record.artworkFileName?.let { File(directory, it).delete() }
-            record.lyricsFileName?.let { File(directory, it).delete() }
-        }
+        val fileNames = removed.flatMap { record ->
+            listOfNotNull(record.fileName, record.artworkFileName, record.lyricsFileName)
+        }.toSet()
         downloads.removeAll { it.song.id in songIds }
         songIds.forEach(downloadsBySongId::remove)
-        cleanupUnusedPlaylistArtwork()
-        saveIndex()
+        enqueuePersist(fileNamesToDelete = fileNames, cleanupPlaylistArtwork = true)
     }
 
     fun removeAll() {
@@ -257,9 +260,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         pendingPlaylistRefs.clear()
         downloads.clear()
         downloadsBySongId.clear()
-        directory.listFiles()?.forEach { it.deleteRecursively() }
-        directory.mkdirs()
-        saveIndex()
+        storageCommands.trySend(StorageCommand.Reset)
     }
 
     fun clearError() {
@@ -367,14 +368,14 @@ class MeloXDownloadStore private constructor(private val context: Context) {
             downloadsBySongId[song.id] = record
             activeDownloads.remove(song.id)
             jobs.remove(song.id)
-            saveIndex()
+            enqueuePersist()
         } catch (_: CancellationException) {
-            temp.delete()
+            storageCommands.trySend(StorageCommand.Delete(setOf(temp.name)))
             activeDownloads.remove(song.id)
             jobs.remove(song.id)
             pendingPlaylistRefs.remove(song.id)
         } catch (error: Throwable) {
-            temp.delete()
+            storageCommands.trySend(StorageCommand.Delete(setOf(temp.name)))
             activeDownloads.remove(song.id)
             jobs.remove(song.id)
             pendingPlaylistRefs.remove(song.id)
@@ -397,7 +398,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         val updated = record.copy(sourcePlaylists = record.sourcePlaylists + ref)
         downloads[index] = updated
         downloadsBySongId[record.song.id] = updated
-        saveIndex()
+        enqueuePersist()
         scope.launch { downloadPlaylistArtworkIfAvailable(ref) }
     }
 
@@ -584,9 +585,22 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         return restored
     }
 
-    private fun saveIndex() {
+    private fun enqueuePersist(
+        fileNamesToDelete: Set<String> = emptySet(),
+        cleanupPlaylistArtwork: Boolean = false,
+    ) {
+        storageCommands.trySend(
+            StorageCommand.Persist(
+                snapshot = downloads.toList(),
+                fileNamesToDelete = fileNamesToDelete,
+                cleanupPlaylistArtwork = cleanupPlaylistArtwork,
+            ),
+        )
+    }
+
+    private fun writeIndex(snapshot: List<MeloXDownloadedSong>) {
         val array = JSONArray()
-        downloads.forEach { record ->
+        snapshot.forEach { record ->
             array.put(
                 JSONObject()
                     .put("id", record.song.id)
@@ -620,19 +634,23 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         }
         runCatching {
             directory.mkdirs()
-            indexFile.writeText(array.toString())
+            val temporary = File(directory, "index.json.tmp")
+            temporary.writeText(array.toString())
+            if (!temporary.renameTo(indexFile)) {
+                temporary.copyTo(indexFile, overwrite = true)
+                temporary.delete()
+            }
         }
     }
 
     private fun removeMissingRecord(songId: Long) {
         downloads.removeAll { it.song.id == songId }
         downloadsBySongId.remove(songId)
-        cleanupUnusedPlaylistArtwork()
-        saveIndex()
+        enqueuePersist(cleanupPlaylistArtwork = true)
     }
 
-    private fun cleanupUnusedPlaylistArtwork() {
-        val used = downloads.flatMap { it.sourcePlaylists }.map { it.id }.toSet()
+    private fun cleanupUnusedPlaylistArtwork(snapshot: List<MeloXDownloadedSong>) {
+        val used = snapshot.flatMap { it.sourcePlaylists }.map { it.id }.toSet()
         directory.listFiles()?.forEach { file ->
             if (!file.name.startsWith("playlist_") || !file.name.endsWith(".jpg")) return@forEach
             val id = file.name.removePrefix("playlist_").removeSuffix(".jpg").toLongOrNull()
@@ -640,10 +658,36 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         }
     }
 
+    private fun applyStorageCommand(command: StorageCommand) {
+        when (command) {
+            is StorageCommand.Delete -> command.fileNames.forEach { File(directory, it).delete() }
+            is StorageCommand.Persist -> {
+                command.fileNamesToDelete.forEach { File(directory, it).delete() }
+                if (command.cleanupPlaylistArtwork) cleanupUnusedPlaylistArtwork(command.snapshot)
+                writeIndex(command.snapshot)
+            }
+            StorageCommand.Reset -> {
+                directory.listFiles()?.forEach { it.deleteRecursively() }
+                directory.mkdirs()
+                writeIndex(emptyList())
+            }
+        }
+    }
+
     private fun contentUriFor(file: File): Uri =
         FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
 
     private fun playlistArtworkFileName(playlistId: Long): String = "playlist_${playlistId}.jpg"
+
+    private sealed interface StorageCommand {
+        data class Delete(val fileNames: Set<String>) : StorageCommand
+        data class Persist(
+            val snapshot: List<MeloXDownloadedSong>,
+            val fileNamesToDelete: Set<String>,
+            val cleanupPlaylistArtwork: Boolean,
+        ) : StorageCommand
+        data object Reset : StorageCommand
+    }
 
     companion object {
         @Volatile private var instance: MeloXDownloadStore? = null

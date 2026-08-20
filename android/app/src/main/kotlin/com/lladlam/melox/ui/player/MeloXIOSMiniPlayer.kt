@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,6 +84,20 @@ fun MeloXIOSMiniPlayer(
     // equally visible when returning to the mini player.
     val miniChromeAlpha = 1f - smoothStep(expansionProgress, 0.10f, 0.58f)
     val miniSurfaceAlpha = 1f - smoothStep(expansionProgress, 0.02f, 0.48f)
+
+    // Fade the source artwork according to the shared container's physical
+    // height, not an arbitrary time fraction. The fade starts at MiniPlayer
+    // height and completes at three times that height; collapse reverses it.
+    val configuration = LocalConfiguration.current
+    val miniPlayerHeight = 56f
+    val fullPlayerHeight = configuration.screenHeightDp.toFloat().coerceAtLeast(miniPlayerHeight + 1f)
+    val artworkFadeEnd = (miniPlayerHeight * 2f / (fullPlayerHeight - miniPlayerHeight))
+        .coerceIn(0.001f, 1f)
+    val miniArtworkAlpha = 1f - smoothStep(
+        expansionProgress / artworkFadeEnd,
+        0f,
+        1f,
+    )
 
     val compact = compactProgress.coerceIn(0f, 1f)
     val artworkSize = lerpDp(40.dp, 30.dp, compact)
@@ -128,10 +143,11 @@ fun MeloXIOSMiniPlayer(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .then(sharedContainerModifier),
     ) {
         Box(
-            modifier = sharedContainerModifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
         ) {
@@ -184,29 +200,14 @@ fun MeloXIOSMiniPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val sharedArtworkModifier =
-                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedElement(
-                                sharedContentState = rememberSharedContentState(
-                                    key = sharedArtworkKey(),
-                                ),
-                                animatedVisibilityScope = animatedVisibilityScope,
-                                boundsTransform = MeloXPlayerLinearBoundsTransform,
-                                renderInOverlayDuringTransition = true,
-                                zIndexInOverlay = 4f,
-                            )
-                        }
-                    } else {
-                        Modifier
-                    }
-
-                // Artwork is the persistent identity element: resize it smoothly
-                // for compact Dock mode, but do not fade it during full expansion.
+                // The artwork stays in the shared container. Applying a second
+                // sharedElement here gives it a separate timeline from the
+                // container and makes the cover visibly detach during expansion.
                 Artwork(
                     url = state.artworkUrl,
-                    modifier = sharedArtworkModifier
+                    modifier = Modifier
                         .size(artworkSize)
+                        .graphicsLayer { alpha = miniArtworkAlpha }
                         .clip(RoundedCornerShape(artworkRadius)),
                 )
 

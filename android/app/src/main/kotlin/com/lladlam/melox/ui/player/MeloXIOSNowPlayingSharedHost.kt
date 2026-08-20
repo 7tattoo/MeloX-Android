@@ -147,13 +147,16 @@ fun MeloXIOSNowPlayingSharedHost(
     // Let the shared artwork establish the transition first. The background
     // and scene then take over on the same master timeline, which prevents a
     // black first frame from winning the z-order over MiniPlay.
-    val backdropAlpha = smoothStep(expansionProgress, 0.18f, 0.72f)
+    // Compose the player backdrop from the first frame. Delaying this alpha
+    // leaves the shared container showing a black surface during the first half
+    // of the expansion even though the destination is already present.
+    val backdropAlpha = 1f
     val isolationAlpha = if (MeloXSettingsRuntime.playerBackgroundIsolationEnabled) {
         smoothStep(expansionProgress, 0.34f, 0.82f)
     } else {
         0f
     }
-    val fullPlayerAlpha = smoothStep(expansionProgress, 0.44f, 0.88f)
+    val fullPlayerAlpha = smoothStep(expansionProgress, 0f, 0.35f)
     val collapseProgress = (1f - expansionProgress).coerceIn(0f, 1f)
     val latestCollapseProgress = rememberUpdatedState(collapseProgress)
     val latestPage = rememberUpdatedState(page)
@@ -369,19 +372,20 @@ fun MeloXIOSNowPlayingSharedHost(
                             onHideLandscapeSkyline = { showLandscapeSkyline = false },
                             onLyricsInterfaceHiddenChange = { lyricsInterfaceHidden = it },
                             grabberDragModifier = alternateGrabberDragModifier,
+                            lyricsActive = page == MeloXNowPlayingPage.Lyrics &&
+                                expansionProgress >= 0.98f &&
+                                !showLandscapeSkyline,
                         )
                     }
                 }
-            }
 
-            SharedArtworkDestination(
-                state = state,
-                page = page,
-                expansionProgress = expansionProgress,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-                hidden = showLandscapeSkyline,
-            )
+                SharedArtworkDestination(
+                    state = state,
+                    page = page,
+                    expansionProgress = expansionProgress,
+                    hidden = showLandscapeSkyline,
+                )
+            }
         }
 
         CompositionLocalProvider(LocalMeloXBackdrop provides actionsBackdrop) {
@@ -406,8 +410,6 @@ private fun SharedArtworkDestination(
     state: MeloXPlaybackUiState,
     page: MeloXNowPlayingPage,
     expansionProgress: Float,
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
     hidden: Boolean = false,
 ) {
     val configuration = LocalConfiguration.current
@@ -486,25 +488,11 @@ private fun SharedArtworkDestination(
         val targetY = lerpDp(fullY, contentTop, pageFrameProgress)
         val targetRadius = 12.dp
 
-        val artworkSharedState = with(sharedTransitionScope) {
-            rememberSharedContentState(key = sharedArtworkKey())
-        }
-        val sharedModifier = with(sharedTransitionScope) {
-            Modifier.sharedElement(
-                sharedContentState = artworkSharedState,
-                animatedVisibilityScope = animatedVisibilityScope,
-                boundsTransform = MeloXPlayerLinearBoundsTransform,
-                renderInOverlayDuringTransition = true,
-                zIndexInOverlay = 4f,
-            )
-        }
-
         Box(
             modifier = Modifier
                 .offset(x = targetX, y = targetY)
                 .size(targetSize)
                 .graphicsLayer { alpha = if (hidden) 0f else 1f }
-                .then(sharedModifier),
         ) {
             Artwork(
                 url = state.artworkUrl,

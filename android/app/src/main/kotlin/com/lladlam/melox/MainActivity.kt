@@ -12,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.core.network.parseNeteaseListenTogetherInvitation
 import com.lladlam.melox.platform.lyricon.MeloXLyriconBridge
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
@@ -44,14 +43,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // These integrations build MediaControllers and register cross-process
-        // providers. Starting them before setContent delayed the first frame and
-        // left a white window on cold launch. Give the app chrome one frame to
-        // render, then restore the same process-lifetime behavior.
+        // Lyricon registers a cross-process provider. Starting it before
+        // setContent delayed the first frame and left a white window on cold
+        // launch. Listen Together is intentionally not started here: its UI or
+        // an incoming invitation creates the coordinator only when needed.
         lifecycleScope.launch {
             delay(250L)
             MeloXLyriconBridge.start(applicationContext)
-            MeloXListenTogetherCoordinator.ensureStarted(applicationContext)
         }
     }
 

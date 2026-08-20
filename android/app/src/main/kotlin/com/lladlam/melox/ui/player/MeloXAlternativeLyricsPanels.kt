@@ -1,11 +1,8 @@
 package com.lladlam.melox.ui.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -35,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,14 +63,17 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeLyricsState {
+private fun rememberAlternativeLyrics(
+    state: MeloXPlaybackUiState,
+    active: Boolean,
+): AlternativeLyricsState {
     val context = LocalContext.current.applicationContext
     val mediaId = state.mediaId
     var document by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
     var loading by remember(mediaId) { mutableStateOf(false) }
     var error by remember(mediaId) { mutableStateOf<String?>(null) }
-    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
-        if (mediaId.isNullOrBlank()) return@LaunchedEffect
+    LaunchedEffect(active, mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (!active || mediaId.isNullOrBlank() || document != null) return@LaunchedEffect
         loading = true
         error = null
         runCatching { MeloXProviderLyricsLoader.load(context, state) }
@@ -86,53 +85,62 @@ private fun rememberAlternativeLyrics(state: MeloXPlaybackUiState): AlternativeL
         if (MeloXSettingsRuntime.lyricPseudoTimingEnabled) document?.withPseudoTiming() else document
     }
     val lines = rendered?.lines.orEmpty()
-    val smoothPosition = rememberSmoothPlaybackPosition(state)
-    val position = smoothPosition + MeloXSettingsRuntime.lyricAdvanceMs
-    val index = rendered?.highlightedIndex(position)?.coerceIn(0, lines.lastIndex.coerceAtLeast(0)) ?: 0
-    return AlternativeLyricsState(lines, index, position, loading, error)
-}
-
-@Composable
-private fun rememberSmoothPlaybackPosition(state: MeloXPlaybackUiState): Long {
-    var position by remember(state.mediaId) { mutableLongStateOf(state.positionMs) }
-    LaunchedEffect(state.mediaId, state.positionMs, state.isPlaying, state.durationMs) {
+    val advanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+    var index by remember(mediaId, rendered) {
+        mutableIntStateOf(
+            rendered?.highlightedIndex(state.positionMs + advanceMs)
+                ?.coerceIn(0, lines.lastIndex.coerceAtLeast(0)) ?: 0,
+        )
+    }
+    LaunchedEffect(active, mediaId, rendered, state.positionMs, state.isPlaying, state.durationMs, advanceMs) {
+        val activeDocument = rendered ?: return@LaunchedEffect
+        if (!active || lines.isEmpty()) return@LaunchedEffect
         val anchorPosition = state.positionMs
         if (!state.isPlaying) {
-            position = anchorPosition
+            val next = activeDocument.highlightedIndex(anchorPosition + advanceMs)
+                ?.coerceIn(0, lines.lastIndex) ?: index
+            if (next != index) index = next
             return@LaunchedEffect
         }
         var anchorFrameNanos = 0L
+        var lastCheckNanos = 0L
         while (isActive) {
-            withFrameNanos { frameNanos ->
-                if (anchorFrameNanos == 0L) anchorFrameNanos = frameNanos
-                val elapsedMs = (frameNanos - anchorFrameNanos) / 1_000_000L
-                position = (anchorPosition + elapsedMs).coerceAtMost(
-                    state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
-                )
-            }
+            val frameNanos = withFrameNanos { it }
+            if (anchorFrameNanos == 0L) anchorFrameNanos = frameNanos
+            if (lastCheckNanos != 0L && frameNanos - lastCheckNanos < 33_000_000L) continue
+            lastCheckNanos = frameNanos
+            val elapsedMs = (frameNanos - anchorFrameNanos) / 1_000_000L
+            val position = (anchorPosition + elapsedMs).coerceAtMost(
+                state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
+            )
+            val next = activeDocument.highlightedIndex(position + advanceMs)
+                ?.coerceIn(0, lines.lastIndex) ?: index
+            if (next != index) index = next
         }
     }
-    return position
+    return AlternativeLyricsState(lines, index, loading, error)
 }
 
 private data class AlternativeLyricsState(
     val lines: List<LyricLine>,
     val index: Int,
-    val positionMs: Long,
     val loading: Boolean,
     val error: String?,
 )
 
 @Composable
-private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState {
+private fun rememberTextPVLyrics(
+    state: MeloXPlaybackUiState,
+    active: Boolean,
+): TextPVLyricsState {
     val context = LocalContext.current.applicationContext
     val mediaId = state.mediaId
     var document by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
     var loading by remember(mediaId) { mutableStateOf(false) }
     var error by remember(mediaId) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(mediaId, state.title, state.artist, state.album, state.durationMs) {
-        if (mediaId.isNullOrBlank()) return@LaunchedEffect
+    LaunchedEffect(active, mediaId, state.title, state.artist, state.album, state.durationMs) {
+        if (!active || mediaId.isNullOrBlank() || document != null) return@LaunchedEffect
         loading = true
         error = null
         runCatching { MeloXProviderLyricsLoader.load(context, state) }
@@ -152,8 +160,9 @@ private fun rememberTextPVLyrics(state: MeloXPlaybackUiState): TextPVLyricsState
         )
     }
 
-    LaunchedEffect(mediaId, document, state.positionMs, state.isPlaying, state.durationMs, advanceMs) {
+    LaunchedEffect(active, mediaId, document, state.positionMs, state.isPlaying, state.durationMs, advanceMs) {
         val activeDocument = document ?: return@LaunchedEffect
+        if (!active) return@LaunchedEffect
         if (lines.isEmpty()) {
             index = 0
             return@LaunchedEffect
@@ -199,8 +208,9 @@ internal fun MeloXEvaLyricsPanel(
     playback: MeloXPlaybackUiState,
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {},
+    active: Boolean = true,
 ) {
-    val state = rememberAlternativeLyrics(playback)
+    val state = rememberAlternativeLyrics(playback, active)
     Box(modifier.fillMaxSize().clickable(onClick = onInteraction), contentAlignment = Alignment.Center) {
         AlternativeLoading(state)
         if (state.lines.isNotEmpty()) {
@@ -301,27 +311,32 @@ internal fun MeloXTextPVLyricsPanel(
     playback: MeloXPlaybackUiState,
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {},
+    active: Boolean = true,
 ) {
-    val state = rememberTextPVLyrics(playback)
-    val transition = rememberInfiniteTransition(label = "text-pv-clock")
+    val state = rememberTextPVLyrics(playback, active)
+    val phaseState = remember { Animatable(0f) }
     val animationSpeed = MeloXSettingsRuntime.textPVAnimationSpeed
-    val motionIntensity = if (MeloXSettingsRuntime.lyricReduceMotion) 0f else {
+    val motionIntensity = if (!active || MeloXSettingsRuntime.lyricReduceMotion) 0f else {
         MeloXSettingsRuntime.textPVMotionIntensity
     }
-    val phaseState = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (animationSpeed <= 0f || motionIntensity <= 0f) 0f else 1f,
-        animationSpec = infiniteRepeatable(
-            tween(
+    LaunchedEffect(active, animationSpeed, motionIntensity) {
+        if (!active || animationSpeed <= 0f || motionIntensity <= 0f) {
+            phaseState.snapTo(0f)
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            phaseState.animateTo(
+                1f,
+                tween(
                 durationMillis = if (animationSpeed <= 0f) 14_000 else {
                     (14_000f / animationSpeed).toInt().coerceIn(3_500, 140_000)
                 },
                 easing = FastOutSlowInEasing,
-            ),
-            RepeatMode.Restart,
-        ),
-        label = "text-pv-phase",
-    )
+                ),
+            )
+            phaseState.snapTo(0f)
+        }
+    }
     Box(modifier.fillMaxSize().clickable(onClick = onInteraction)) {
         TextPVBackground(
             style = MeloXSettingsRuntime.textPVStyle,
@@ -495,15 +510,38 @@ internal fun MeloXSkylineLyricsPanel(
     playback: MeloXPlaybackUiState,
     modifier: Modifier = Modifier,
     onInteraction: () -> Unit = {},
+    active: Boolean = true,
 ) {
-    val state = rememberAlternativeLyrics(playback)
+    val state = rememberAlternativeLyrics(playback, active)
+    val ambientLineCount = MeloXSettingsRuntime.skylineAmbientLines
+    val ambientCharacterLimit = MeloXSettingsRuntime.skylineAmbientMaximumCharacters
+    val ambientVisibleLimit = MeloXSettingsRuntime.skylineAmbientMaximumVisibleTexts
+    val ambientPhase = remember { Animatable(0f) }
+    LaunchedEffect(active, MeloXSettingsRuntime.lyricReduceMotion, MeloXSettingsRuntime.skylineAmbientDrift) {
+        if (!active || MeloXSettingsRuntime.lyricReduceMotion || MeloXSettingsRuntime.skylineAmbientDrift <= 0f) {
+            ambientPhase.snapTo(0f)
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            ambientPhase.animateTo(1f, tween(12_000))
+            ambientPhase.snapTo(0f)
+        }
+    }
     Box(modifier.fillMaxSize().clickable(onClick = onInteraction)) {
-        val ambientTexts = state.lines
-            .drop(state.index + 1)
-            .take(MeloXSettingsRuntime.skylineAmbientLines)
-            .flatMap { it.text.chunked(MeloXSettingsRuntime.skylineAmbientMaximumCharacters) }
-            .filter(String::isNotBlank)
-            .take(MeloXSettingsRuntime.skylineAmbientMaximumVisibleTexts)
+        val ambientTexts = remember(
+            state.lines,
+            state.index,
+            ambientLineCount,
+            ambientCharacterLimit,
+            ambientVisibleLimit,
+        ) {
+            state.lines
+                .drop(state.index + 1)
+                .take(ambientLineCount)
+                .flatMap { it.text.chunked(ambientCharacterLimit) }
+                .filter(String::isNotBlank)
+                .take(ambientVisibleLimit)
+        }
         if (ambientTexts.isNotEmpty()) {
             Column(
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxWidth(.58f).rotate(-5f),
@@ -512,9 +550,6 @@ internal fun MeloXSkylineLyricsPanel(
                 ambientTexts.forEachIndexed { ambientIndex, ambient ->
                     val fade = (1f - ambientIndex.toFloat() / ambientTexts.size.coerceAtLeast(1))
                     val tilt = sin((ambientIndex + 1) * 1.73f) * MeloXSettingsRuntime.skylineAmbientMaximumTilt
-                    val drift = if (MeloXSettingsRuntime.lyricReduceMotion) 0f else {
-                        sin(state.positionMs / 1_800f + ambientIndex) * 14f * MeloXSettingsRuntime.skylineAmbientDrift
-                    }
                     Text(
                         ambient,
                         color = Color.White.copy(
@@ -527,7 +562,12 @@ internal fun MeloXSkylineLyricsPanel(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
-                            .graphicsLayer { translationX = drift }
+                            .graphicsLayer {
+                                translationX = if (MeloXSettingsRuntime.lyricReduceMotion) 0f else {
+                                    sin(ambientPhase.value * 2f * PI.toFloat() + ambientIndex) *
+                                        14f * MeloXSettingsRuntime.skylineAmbientDrift
+                                }
+                            }
                             .rotate(tilt)
                             .blur((MeloXSettingsRuntime.skylineAmbientBlur * (1f + ambientIndex * .08f)).dp),
                     )
@@ -558,7 +598,7 @@ internal fun MeloXSkylineLyricsPanel(
                     ?: nextLine?.timeMs
                     ?: (line?.timeMs?.plus(3_000L) ?: 1L)
                 val timedProgress = if (line == null || line.syllables.isEmpty()) 0f else {
-                    ((state.positionMs - line.timeMs).toFloat() / (lineEnd - line.timeMs).coerceAtLeast(1L))
+                    ((playback.positionMs - line.timeMs).toFloat() / (lineEnd - line.timeMs).coerceAtLeast(1L))
                         .coerceIn(0f, 1f)
                 }
                 val currentScale = 1f +
@@ -578,7 +618,7 @@ internal fun MeloXSkylineLyricsPanel(
                             .clickable { line?.let { playback.seekTo(it.timeMs) } },
                     )
                     if (MeloXSettingsRuntime.showLyricTranslation && !line?.translation.isNullOrBlank()) {
-                        Text(line?.translation.orEmpty(), color = Color.White.copy(alpha = .62f), fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp))
+                        Text(line.translation.orEmpty(), color = Color.White.copy(alpha = .62f), fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp))
                     }
                     nextLine?.let { next ->
                         Text(
