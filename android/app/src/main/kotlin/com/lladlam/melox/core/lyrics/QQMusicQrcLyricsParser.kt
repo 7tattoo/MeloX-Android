@@ -14,6 +14,12 @@ import javax.crypto.spec.SecretKeySpec
  */
 object QQMusicQrcLyricsParser {
     private val tripleDesKey = "!@#)(*$%123ZXC!@!@#)(NHL".toByteArray(Charsets.US_ASCII)
+    // qrcDecrypt's published QRC transform is not a single DESede operation:
+    // it performs D(KEY1) -> E(KEY2) -> D(KEY3), then zlib inflates the result.
+    // Keep the former DESede path below as a fallback for gateway variants.
+    private val qrcKey1 = "!@#)(NHL".toByteArray(Charsets.US_ASCII)
+    private val qrcKey2 = "123ZXC!@".toByteArray(Charsets.US_ASCII)
+    private val qrcKey3 = "!@#)(*$%".toByteArray(Charsets.US_ASCII)
     private val lineTiming = Regex("^\\[(\\d+),(\\d+)](.*)$")
     private val wordTiming = Regex("\\((\\d+),(\\d+)\\)")
     private val lyricContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
@@ -23,13 +29,37 @@ object QQMusicQrcLyricsParser {
     fun decryptHex(value: String): String {
         val normalized = value.trim()
         if (normalized.isBlank() || normalized.length % 2 != 0 || !normalized.all { it.isHexDigit() }) return ""
-        return runCatching {
-            val encrypted = ByteArray(normalized.length / 2) { index ->
+        val encrypted = runCatching {
+            ByteArray(normalized.length / 2) { index ->
                 normalized.substring(index * 2, index * 2 + 2).toInt(16).toByte()
             }
-            val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(tripleDesKey, "DESede"))
-            val compressed = cipher.doFinal(encrypted)
+        }.getOrElse { return "" }
+        return decodeCompressed(qrcDecrypt(encrypted))
+            .ifBlank { decodeCompressed(legacyTripleDesDecrypt(encrypted)) }
+    }
+
+    private fun qrcDecrypt(encrypted: ByteArray): ByteArray = runCatching {
+        val first = des(encrypted, qrcKey1, Cipher.DECRYPT_MODE)
+        val second = des(first, qrcKey2, Cipher.ENCRYPT_MODE)
+        des(second, qrcKey3, Cipher.DECRYPT_MODE)
+    }.getOrDefault(ByteArray(0))
+
+    private fun legacyTripleDesDecrypt(encrypted: ByteArray): ByteArray = runCatching {
+        Cipher.getInstance("DESede/ECB/NoPadding").run {
+            init(Cipher.DECRYPT_MODE, SecretKeySpec(tripleDesKey, "DESede"))
+            doFinal(encrypted)
+        }
+    }.getOrDefault(ByteArray(0))
+
+    private fun des(input: ByteArray, key: ByteArray, mode: Int): ByteArray =
+        Cipher.getInstance("DES/ECB/NoPadding").run {
+            init(mode, SecretKeySpec(key, "DES"))
+            doFinal(input)
+        }
+
+    private fun decodeCompressed(compressed: ByteArray): String {
+        if (compressed.isEmpty()) return ""
+        return runCatching {
             InflaterInputStream(ByteArrayInputStream(compressed)).use { stream ->
                 stream.readBytes().toString(Charsets.UTF_8)
             }.trimEnd('\u0000')
