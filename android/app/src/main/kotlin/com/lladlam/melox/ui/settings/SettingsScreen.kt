@@ -593,7 +593,7 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
     }
     MeloXSettingsDropdown(
         title = "副歌词内容",
-        selected = MeloXSecondaryLyricMode.Auto,
+        selected = MeloXSettingsRuntime.floatingSecondaryMode,
         items = listOf(
             MeloXSecondaryLyricMode.Auto to "自动（翻译/罗马音/下一句）",
             MeloXSecondaryLyricMode.Translation to "翻译",
@@ -889,7 +889,7 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
     )
     MeloXSettingsDropdown(
         title = "屏幕常亮范围",
-        selected = MeloXScreenAwakeMode.Disabled,
+        selected = MeloXSettingsRuntime.screenAwakeMode,
         items = listOf(
             MeloXScreenAwakeMode.Disabled to "关闭",
             MeloXScreenAwakeMode.Player to "播放器常亮",
