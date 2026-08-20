@@ -42,10 +42,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
@@ -187,6 +189,7 @@ fun MeloXGlassToggle(
         else -> Color(0xFF787878).copy(alpha = if (dark) 0.36f else 0.20f)
     }
     val pageBackdrop = LocalMeloXBackdrop.current
+    val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     Box(
         modifier = modifier
             .width(64.dp)
@@ -211,7 +214,11 @@ fun MeloXGlassToggle(
             Modifier
                 .offset {
                     IntOffset(
-                        x = (2.dp.toPx() + 20.dp.toPx() * fraction).roundToInt(),
+                        x = if (isLtr) {
+                            (2.dp.toPx() + 20.dp.toPx() * fraction).roundToInt()
+                        } else {
+                            (22.dp.toPx() - 20.dp.toPx() * fraction).roundToInt()
+                        },
                         y = 2.dp.roundToPx(),
                     )
                 }

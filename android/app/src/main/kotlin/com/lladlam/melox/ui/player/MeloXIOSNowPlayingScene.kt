@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -60,6 +61,7 @@ import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.layout.rememberMeloXWindowInfo
 import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
 import kotlinx.coroutines.delay
 
@@ -413,6 +415,7 @@ private fun MeloXIOSLandscapeNowPlayingScene(
     grabberDragModifier: Modifier,
     lyricsActive: Boolean = true,
 ) {
+    val window = rememberMeloXWindowInfo()
     var showsLyricsControls by remember(state.mediaId) { mutableStateOf(true) }
     var activityGeneration by remember(state.mediaId) { mutableIntStateOf(0) }
 
@@ -468,7 +471,12 @@ private fun MeloXIOSLandscapeNowPlayingScene(
     ) {
         SceneGrabber(onDismiss = onDismiss, dragModifier = grabberDragModifier)
 
-        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = window.maxContentWidth)
+                .weight(1f),
+        ) {
             // The shared host owns the only artwork instance in this empty left
             // column, so rotations and page changes never duplicate the cover.
             Spacer(Modifier.weight(.43f).fillMaxHeight())
