@@ -48,9 +48,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import com.lladlam.melox.ui.glass.publicdemo.PublicInteractiveHighlight
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.util.lerp
+import kotlin.math.roundToInt
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -207,7 +209,12 @@ fun MeloXGlassToggle(
         )
         Box(
             Modifier
-                .offset(x = 2.dp + 20.dp * fraction, y = 2.dp)
+                .offset {
+                    IntOffset(
+                        x = (2.dp.toPx() + 20.dp.toPx() * fraction).roundToInt(),
+                        y = 2.dp.roundToPx(),
+                    )
+                }
                 .size(width = 40.dp, height = 24.dp)
                 .then(
                     if (pageBackdrop != null) {

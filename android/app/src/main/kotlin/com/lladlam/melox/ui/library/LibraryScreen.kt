@@ -1380,7 +1380,7 @@ private fun MeloXPlaylistDetailScreen(
         if (providerPlaylist != null) {
             val capability = providerPlaylistCapability
             if (capability == null) {
-                errorMessage = "${providerPlaylist.id.source.displayName} 尚未实现歌单详情能力"
+                errorMessage = "${providerPlaylist.id.source.displayName} 当前不提供歌单详情能力"
                 loading = false
                 return
             }

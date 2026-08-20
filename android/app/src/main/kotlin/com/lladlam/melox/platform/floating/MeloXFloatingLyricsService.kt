@@ -23,6 +23,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.lladlam.melox.MainActivity
+import com.lladlam.melox.R
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.lyrics.LyricsDocument
@@ -177,7 +178,7 @@ class MeloXFloatingLyricsService : Service() {
             textSize = fontSize.toFloat()
             gravity = Gravity.CENTER
             maxLines = 2
-            text = "MeloX 悬浮歌词"
+            text = getString(R.string.floating_lyrics_title)
         }
         secondaryText = TextView(this).apply {
             setTextColor(Color.argb(150, 255, 255, 255))
@@ -225,6 +226,10 @@ class MeloXFloatingLyricsService : Service() {
                     windowManager?.updateViewLayout(view, params)
                     true
                 }
+                MotionEvent.ACTION_UP -> {
+                    view.performClick()
+                    true
+                }
                 else -> false
             }
         }
@@ -257,7 +262,7 @@ class MeloXFloatingLyricsService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("MeloX 悬浮歌词")
+            .setContentTitle(getString(R.string.floating_lyrics_title))
             .setContentText("正在其他应用上方显示歌词")
             .setContentIntent(open)
             .addAction(0, "停止", stop)

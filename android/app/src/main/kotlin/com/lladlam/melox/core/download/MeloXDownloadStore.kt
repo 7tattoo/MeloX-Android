@@ -2,6 +2,7 @@ package com.lladlam.melox.core.download
 
 import android.content.ContentValues
 import android.content.Context
+import android.annotation.SuppressLint
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -802,6 +803,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
     }
 
     companion object {
+        @SuppressLint("StaticFieldLeak") // The store normalizes its field to applicationContext.
         @Volatile private var instance: MeloXDownloadStore? = null
 
         fun get(context: Context): MeloXDownloadStore =

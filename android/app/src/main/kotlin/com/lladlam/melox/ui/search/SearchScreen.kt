@@ -921,17 +921,17 @@ private fun SearchCollectionDetail(
                         val tracks = when (item) {
                             is ProviderSearchDestination.Playlist -> {
                                 val capability = provider as? PlaylistCapability
-                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现歌单详情")
+                                    ?: throw IllegalStateException("${item.source.displayName} 当前不提供歌单详情")
                                 capability.playlistDetail(item.value, page = 1, pageSize = 150).tracks
                             }
                             is ProviderSearchDestination.Album -> {
                                 val capability = provider as? AlbumCapability
-                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现专辑详情")
+                                    ?: throw IllegalStateException("${item.source.displayName} 当前不提供专辑详情")
                                 capability.albumDetail(item.value, page = 1, pageSize = 150).tracks
                             }
                             is ProviderSearchDestination.Artist -> {
                                 val capability = provider as? ArtistCapability
-                                    ?: throw IllegalStateException("${item.source.displayName} 尚未实现歌手详情")
+                                    ?: throw IllegalStateException("${item.source.displayName} 当前不提供歌手详情")
                                 capability.artistDetail(item.value, page = 1, pageSize = 150).tracks
                             }
                         }

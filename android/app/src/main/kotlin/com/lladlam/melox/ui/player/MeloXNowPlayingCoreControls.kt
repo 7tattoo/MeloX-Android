@@ -567,7 +567,7 @@ internal fun ScenePageSelector(
 
 private fun showSystemAudioOutputSwitcher(context: Context) {
     if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
         MediaRouter2.getInstance(context).showSystemOutputSwitcher()
     ) {
         return

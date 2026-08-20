@@ -995,7 +995,7 @@ private fun DiscoveryCollectionDetail(
                 val ranking = (collection as DiscoveryCollection.ProviderRanking).ranking
                 val provider = MeloXMusicProviders.create(context).require(ranking.id.source)
                 val capability = provider as? RankingCapability
-                    ?: throw IllegalStateException("${ranking.id.source.displayName} 尚未实现排行榜详情")
+                    ?: throw IllegalStateException("${ranking.id.source.displayName} 当前不提供排行榜详情")
                 capability.rankingTracks(ranking, page = 1, pageSize = 150)
                     .items.map { DiscoveryTrack.Provider(it) }
             }

@@ -23,11 +23,12 @@
     <string name="action_share">分享</string>
     <string name="search_placeholder">歌曲、歌手、專輯或歌單</string>
     <string name="search_clear">清除搜尋內容</string>
-    <string name="state_loading">正在載入…</string>
-    <string name="state_empty">暫無內容</string>
+    <string name="melox_state_loading">正在載入…</string>
+    <string name="melox_state_empty">暫無內容</string>
     <string name="player_style_apple">Apple Music</string>
     <string name="player_style_classic">經典</string>
     <string name="page_placement">頁面放置</string>
     <string name="accessibility_account">帳號</string>
     <string name="accessibility_now_playing">正在播放</string>
+    <string name="floating_lyrics_title">MeloX 懸浮歌詞</string>
 </resources>

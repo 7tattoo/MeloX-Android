@@ -23,11 +23,12 @@
     <string name="action_share">Share</string>
     <string name="search_placeholder">Music, artists, albums or playlists</string>
     <string name="search_clear">Clear search</string>
-    <string name="state_loading">Loading…</string>
-    <string name="state_empty">Nothing here yet</string>
+    <string name="melox_state_loading">Loading…</string>
+    <string name="melox_state_empty">Nothing here yet</string>
     <string name="player_style_apple">Apple Music</string>
     <string name="player_style_classic">Classic</string>
     <string name="page_placement">Page placement</string>
     <string name="accessibility_account">Account</string>
     <string name="accessibility_now_playing">Now playing</string>
+    <string name="floating_lyrics_title">MeloX floating lyrics</string>
 </resources>

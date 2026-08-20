@@ -1,7 +1,8 @@
 package com.lladlam.melox.ui.layout
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -20,9 +21,10 @@ data class MeloXWindowInfo(
 /** One shared window policy for phone, foldable and tablet page layouts. */
 @Composable
 fun rememberMeloXWindowInfo(): MeloXWindowInfo {
-    val configuration = LocalConfiguration.current
-    val width = configuration.screenWidthDp
-    val height = configuration.screenHeightDp
+    val containerSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    val width = with(density) { containerSize.width.toDp().value.toInt() }
+    val height = with(density) { containerSize.height.toDp().value.toInt() }
     val widthClass = when {
         width >= 840 -> MeloXWindowWidthClass.Expanded
         width >= 600 -> MeloXWindowWidthClass.Medium

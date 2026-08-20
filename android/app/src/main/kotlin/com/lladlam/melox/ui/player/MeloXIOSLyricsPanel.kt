@@ -41,6 +41,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -747,11 +748,10 @@ private fun MeloXAppleMusicLyricsPanel(
                 // invalidated and recomposed every visible lyric item per
                 // frame. Exact coordinates are only required while the user is
                 // browsing; playback mode has a stable source-derived stride.
-                val visibleItemsByIndex = if (isBrowsingLyrics) {
-                    listState.layoutInfo.visibleItemsInfo.associateBy { it.index }
-                } else {
-                    emptyMap()
+                val browsingVisibleItemsByIndex by remember(listState) {
+                    derivedStateOf { listState.layoutInfo.visibleItemsInfo.associateBy { it.index } }
                 }
+                val visibleItemsByIndex = if (isBrowsingLyrics) browsingVisibleItemsByIndex else emptyMap()
 
                 LazyColumn(
                     state = listState,

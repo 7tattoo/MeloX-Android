@@ -273,15 +273,6 @@ fun ProviderSettingsHub(
                             Spacer(Modifier.height(7.dp))
                         }
                     }
-
-                    Spacer(Modifier.height(8.dp))
-                    ProviderSettingToggle(
-                        title = "自动选择其他来源",
-                        subtitle = "暂未开放；不会因为当前来源不可播而静默切换平台",
-                        checked = false,
-                        enabled = false,
-                        onCheckedChange = {},
-                    )
             }
             MeloXGlassButton(
                 onClick = { showServiceDialog = false },
