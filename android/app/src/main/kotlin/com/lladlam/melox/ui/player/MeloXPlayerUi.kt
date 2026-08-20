@@ -72,6 +72,8 @@ import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXVolumeControlMode
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -970,10 +972,12 @@ internal fun Artwork(
                 contentScale = ContentScale.Crop,
             )
         } else {
-            Text(
-                text = "♪",
-                fontSize = 36.sp,
+            MeloXSymbolIcon(
+                symbol = MeloXSymbol.MusicNote,
+                modifier = Modifier.size(44.dp),
                 color = Color.White.copy(alpha = 0.24f),
+                iconSize = 42.sp,
+                contentDescription = "默认专辑封面",
             )
         }
     }
