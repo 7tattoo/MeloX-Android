@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1803,16 +1804,17 @@ private fun SettingsToggleRow(
 ) {
     var value by remember(key) { mutableStateOf(MeloXSettingsPreferences.boolean(context, key, default)) }
     SettingsGlassGroup {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                note?.let { Text(it, modifier = Modifier.padding(top = 3.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f)) }
-            }
-            MeloXGlassToggle(checked = value, onCheckedChange = {
-                value = it
-                MeloXSettingsPreferences.setBoolean(context, key, it)
-            })
-        }
+        MeloXIosListRow(
+            title = title,
+            subtitle = note,
+            trailing = {
+                MeloXGlassToggle(checked = value, onCheckedChange = {
+                    value = it
+                    MeloXSettingsPreferences.setBoolean(context, key, it)
+                })
+            },
+            showTopSeparator = false,
+        )
     }
     Spacer(Modifier.height(10.dp))
 }
@@ -1825,13 +1827,12 @@ private fun SettingsExternalToggleRow(
     onValueChange: (Boolean) -> Unit,
 ) {
     SettingsGlassGroup {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                note?.let { Text(it, modifier = Modifier.padding(top = 3.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f)) }
-            }
-            MeloXGlassToggle(checked = value, onCheckedChange = onValueChange)
-        }
+        MeloXIosListRow(
+            title = title,
+            subtitle = note,
+            trailing = { MeloXGlassToggle(checked = value, onCheckedChange = onValueChange) },
+            showTopSeparator = false,
+        )
     }
     Spacer(Modifier.height(10.dp))
 }
@@ -1848,13 +1849,8 @@ private fun SettingsChoiceRow(title: String, selected: Boolean, onClick: () -> U
 }
 
 @Composable
-private fun SettingsGlassGroup(content: @Composable () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().meloXContentSurface(
-            shape = MeloXShapes.largeCard,
-            surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .045f),
-        ),
-    ) { content() }
+private fun SettingsGlassGroup(content: @Composable ColumnScope.() -> Unit) {
+    MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surface, content = content)
 }
 
 @Composable
