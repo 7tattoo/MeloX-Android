@@ -97,7 +97,7 @@ object QQMusicQrcLyricsParser {
         val romanizationOffset = estimateGlobalOffset(primaryLines, romanized)
 
         return LyricsDocument(
-            primaryLines.mapIndexed { index, line ->
+            lines = primaryLines.mapIndexed { index, line ->
                 val translationLine = alignedAnnotation(
                     target = line,
                     index = index,
@@ -118,6 +118,8 @@ object QQMusicQrcLyricsParser {
                     romanizationSyllables = romanizationLine?.syllables.orEmpty(),
                 )
             },
+            source = LyricSource.QQMusic,
+            quality = LyricQuality.WordSynchronized,
         )
     }
 
