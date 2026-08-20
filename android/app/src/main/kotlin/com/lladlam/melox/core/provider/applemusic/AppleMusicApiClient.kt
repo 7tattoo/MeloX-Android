@@ -50,7 +50,7 @@ import org.json.JSONObject
  */
 class AppleMusicApiClient(
     private val sessionProvider: () -> AppleMusicSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) : MusicProvider,
     SearchCapability,
     CatalogSearchCapability,

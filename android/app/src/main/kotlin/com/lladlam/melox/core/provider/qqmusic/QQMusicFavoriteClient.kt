@@ -23,7 +23,7 @@ internal fun qqMusicLoginType(musicKey: String): Int =
 /** Authenticated QQ Music "我喜欢" writer. */
 class QQMusicFavoriteClient(
     private val sessionProvider: () -> QQMusicSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     internal data class SongWriteRef(
         val songId: Long,

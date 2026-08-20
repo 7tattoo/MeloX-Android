@@ -21,6 +21,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
@@ -139,6 +140,7 @@ class MeloXPlaybackService : MediaSessionService() {
             val active = player
             if (active != null) {
                 applyLocalArtworkMetadata(active)
+                prefetchFollowing(active)
                 if (!MeloXNetworkAvailability.isOnline(this@MeloXPlaybackService)) {
                     val id = active.currentMediaItem?.mediaId?.toLongOrNull()
                     if (id != null && !downloadStore.contains(id)) {
@@ -159,6 +161,16 @@ class MeloXPlaybackService : MediaSessionService() {
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             if (updatingSystemLyricsMetadata) return
             if (mixStartedAt == 0L) cancelPreparedMix()
+        }
+    }
+
+    private fun prefetchFollowing(active: ExoPlayer) {
+        val nextIndex = active.currentMediaItemIndex + 1
+        if (nextIndex !in 0 until active.mediaItemCount) return
+        val uri = active.getMediaItemAt(nextIndex).localConfiguration?.uri ?: return
+        serviceScope.launch(Dispatchers.IO) {
+            runCatching { playbackResolver.prefetch(uri) }
+                .onFailure { Log.d(TAG, "Next source prefetch skipped: ${it.message}") }
         }
     }
 
@@ -259,8 +271,13 @@ class MeloXPlaybackService : MediaSessionService() {
             localSourceProvider = downloadStore::localPlaybackUri,
         )
         autoMixAnalyzer = MeloXAutoMixAudioAnalyzer(this)
+        val upstream = DefaultDataSource.Factory(this, httpFactory)
+        val cached = CacheDataSource.Factory()
+            .setCache(MeloXMediaCache.get(this))
+            .setUpstreamDataSourceFactory(upstream)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         val resolving = ResolvingDataSource.Factory(
-            DefaultDataSource.Factory(this, httpFactory),
+            cached,
             playbackResolver,
         )
         mediaSourceFactory = DefaultMediaSourceFactory(this).setDataSourceFactory(resolving)

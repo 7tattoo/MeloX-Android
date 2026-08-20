@@ -29,7 +29,7 @@ import okhttp3.OkHttpClient
  */
 class NeteaseProvider(
     cookieProvider: () -> String = { "" },
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) : MusicProvider, SearchCapability, LyricsCapability, PlaybackCapability {
     override val source: MusicSource = MusicSource.Netease
     override val displayName: String = source.displayName

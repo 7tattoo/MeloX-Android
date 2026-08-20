@@ -8,7 +8,7 @@ import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import java.net.URI
-import java.util.concurrent.ConcurrentHashMap
+import java.util.LinkedHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -42,15 +42,20 @@ internal data class ArtworkDynamicPalette(
 internal object ArtworkDynamicPaletteProvider {
     private const val GRID = 3
     private const val TARGET_SIZE = 160
-    private val cache = ConcurrentHashMap<String, ArtworkDynamicPalette>()
-    private val http = OkHttpClient()
+    private const val MAX_CACHE_ENTRIES = 48
+    private val cache = object : LinkedHashMap<String, ArtworkDynamicPalette>(MAX_CACHE_ENTRIES, .75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, ArtworkDynamicPalette>?,
+        ): Boolean = size > MAX_CACHE_ENTRIES
+    }
+    private val http = com.lladlam.melox.core.network.MeloXHttpClient.shared
 
     suspend fun paletteFor(context: Context, url: String?): ArtworkDynamicPalette {
         val source = url?.takeIf(String::isNotBlank) ?: return ArtworkDynamicPalette.Fallback
-        cache[source]?.let { return it }
+        cached(source)?.let { return it }
 
         return withContext(Dispatchers.IO) {
-            cache[source]?.let { return@withContext it }
+            cached(source)?.let { return@withContext it }
             val palette = runCatching {
                 val decoded = decodeArtwork(context, source)
                 val scaled = if (decoded.width == TARGET_SIZE && decoded.height == TARGET_SIZE) {
@@ -69,10 +74,12 @@ internal object ArtworkDynamicPaletteProvider {
             // Do not cache transient HTTP/decoder failures. A cold start or a
             // later retry must be able to recover instead of pinning fallback
             // colors to this artwork URL for the entire process lifetime.
-            if (palette != null) cache[source] = palette
+            if (palette != null) synchronized(cache) { cache[source] = palette }
             palette ?: ArtworkDynamicPalette.Fallback
         }
     }
+
+    private fun cached(source: String): ArtworkDynamicPalette? = synchronized(cache) { cache[source] }
 
     private fun decodeArtwork(context: Context, source: String): Bitmap {
         val uri = Uri.parse(source)

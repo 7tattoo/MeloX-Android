@@ -23,7 +23,7 @@ import org.json.JSONObject
  */
 internal class NeteaseAuthenticatedWeapi(
     private val cookieProvider: () -> String,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val random = SecureRandom()
     private val syntheticDeviceId = randomHex(26).uppercase()

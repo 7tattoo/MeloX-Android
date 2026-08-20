@@ -15,6 +15,8 @@ import com.lladlam.melox.core.music.model.ProviderTrackMetadata
 import com.lladlam.melox.core.music.provider.MusicProviderRegistry
 import com.lladlam.melox.core.music.provider.PlaybackCapability
 import java.io.IOException
+import java.util.LinkedHashMap
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -35,14 +37,22 @@ class ProviderPlaybackResolver(
         val quality: AudioQualityTier,
     )
 
-    private val resolvedUris = ConcurrentHashMap<ResolveKey, Uri>()
+    private val cacheLock = Any()
+    private val resolvedUris = object : LinkedHashMap<ResolveKey, Uri>(MAX_RESOLVED_URIS, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ResolveKey, Uri>?): Boolean =
+            size > MAX_RESOLVED_URIS
+    }
+    private val inFlight = ConcurrentHashMap<ResolveKey, CompletableFuture<Uri>>()
 
     override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
         val uri = dataSpec.uri
         if (uri.scheme != MeloXScheme) return dataSpec
         if (uri.host == LegacySongHost) return neteaseResolver.resolveDataSpec(dataSpec)
         if (uri.host != ProviderTrackHost) return dataSpec
-        return dataSpec.withUri(resolveProviderUri(uri))
+        return dataSpec.buildUpon()
+            .setUri(resolveProviderUri(uri))
+            .setKey(dataSpec.key ?: uri.toString())
+            .build()
     }
 
     override fun resolveReportedUri(uri: Uri): Uri {
@@ -51,7 +61,11 @@ class ProviderPlaybackResolver(
         if (uri.host != ProviderTrackHost) return uri
         val source = parseSource(uri) ?: return uri
         val quality = currentQuality(uri)
-        return resolvedUris[ResolveKey(uri.toString(), authKeyProvider(source), quality)] ?: uri
+        return cached(ResolveKey(uri.toString(), authKeyProvider(source), quality)) ?: uri
+    }
+
+    internal fun prefetch(uri: Uri) {
+        if (isProviderTrackUri(uri)) resolveProviderUri(uri)
     }
 
     private fun resolveProviderUri(uri: Uri): Uri {
@@ -63,42 +77,56 @@ class ProviderPlaybackResolver(
             ?: throw IOException("Invalid MeloX provider track ID: $uri")
         val quality = currentQuality(uri)
         val key = ResolveKey(uri.toString(), authKeyProvider(source), quality)
-        resolvedUris[key]?.let { return it }
+        cached(key)?.let { return it }
+        val pending = CompletableFuture<Uri>()
+        val existing = inFlight.putIfAbsent(key, pending)
+        if (existing != null) return runCatching { existing.get() }
+            .getOrElse { throw IOException("Unable to resolve provider playback source", it.cause ?: it) }
 
-        val id = MusicResourceId(source, resourceValue)
-        val track = MusicTrack(
-            id = id,
-            title = "",
-            artists = emptyList(),
-            providerMetadata = providerMetadata(uri, id),
-        )
-        val provider = providers.require(source)
-        val playback = provider as? PlaybackCapability
-            ?: throw IOException("${provider.displayName} 当前没有实现播放能力")
-        val resolution = runBlocking(Dispatchers.IO) {
-            playback.resolvePlayback(track, quality)
-        }
-        val result = when (resolution) {
-            is PlaybackResolution.Playable -> {
-                ProviderPlaybackQualityRuntime.recordActual(
-                    id = id,
-                    requested = quality,
-                    actual = resolution.actualQuality ?: resolution.requestedQuality,
-                )
-                Uri.parse(resolution.url)
-            }
-            is PlaybackResolution.Preview -> Uri.parse(resolution.url)
-            PlaybackResolution.LoginRequired -> throw IOException("${provider.displayName} 需要登录后播放")
-            PlaybackResolution.SubscriptionRequired -> throw IOException("${provider.displayName} 当前歌曲需要对应会员权益")
-            PlaybackResolution.RegionRestricted -> throw IOException("${provider.displayName} 当前地区不可播放")
-            PlaybackResolution.CopyrightRestricted -> throw IOException("${provider.displayName} 当前版权不可播放")
-            is PlaybackResolution.Unavailable -> throw IOException(
-                resolution.reason ?: "${provider.displayName} 暂时没有可播放音源",
+        return try {
+            val id = MusicResourceId(source, resourceValue)
+            val track = MusicTrack(
+                id = id,
+                title = "",
+                artists = emptyList(),
+                providerMetadata = providerMetadata(uri, id),
             )
+            val provider = providers.require(source)
+            val playback = provider as? PlaybackCapability
+                ?: throw IOException("${provider.displayName} 当前没有实现播放能力")
+            val resolution = runBlocking(Dispatchers.IO) {
+                playback.resolvePlayback(track, quality)
+            }
+            val result = when (resolution) {
+                is PlaybackResolution.Playable -> {
+                    ProviderPlaybackQualityRuntime.recordActual(
+                        id = id,
+                        requested = quality,
+                        actual = resolution.actualQuality ?: resolution.requestedQuality,
+                    )
+                    Uri.parse(resolution.url)
+                }
+                is PlaybackResolution.Preview -> Uri.parse(resolution.url)
+                PlaybackResolution.LoginRequired -> throw IOException("${provider.displayName} 需要登录后播放")
+                PlaybackResolution.SubscriptionRequired -> throw IOException("${provider.displayName} 当前歌曲需要对应会员权益")
+                PlaybackResolution.RegionRestricted -> throw IOException("${provider.displayName} 当前地区不可播放")
+                PlaybackResolution.CopyrightRestricted -> throw IOException("${provider.displayName} 当前版权不可播放")
+                is PlaybackResolution.Unavailable -> throw IOException(
+                    resolution.reason ?: "${provider.displayName} 暂时没有可播放音源",
+                )
+            }
+            synchronized(cacheLock) { resolvedUris[key] = result }
+            pending.complete(result)
+            result
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            inFlight.remove(key, pending)
         }
-        resolvedUris[key] = result
-        return result
     }
+
+    private fun cached(key: ResolveKey): Uri? = synchronized(cacheLock) { resolvedUris[key] }
 
     private fun currentQuality(uri: Uri): AudioQualityTier {
         // The quality selector updates this runtime before Media3 prepare(). That
@@ -149,6 +177,7 @@ class ProviderPlaybackResolver(
         private const val KugouAlbumIdQuery = "kgAlbumId"
         private const val AppleStorefrontQuery = "appleStorefront"
         private const val ApplePreviewUrlQuery = "applePreviewUrl"
+        private const val MAX_RESOLVED_URIS = 96
 
         fun isProviderTrackUri(uri: Uri): Boolean =
             uri.scheme == MeloXScheme && uri.host == ProviderTrackHost

@@ -16,7 +16,7 @@ data class MeloXRelease(
     val publishedAt: String,
 )
 
-class MeloXUpdateClient(private val httpClient: OkHttpClient = OkHttpClient()) {
+class MeloXUpdateClient(private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared) {
     suspend fun latestStableRelease(): MeloXRelease = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("https://api.github.com/repos/lladlam/MeloX-Android/releases?per_page=30")

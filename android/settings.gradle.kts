@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "MeloX-Android"
 include(":app")
 include(":hidden-api")
+include(":baselineprofile")

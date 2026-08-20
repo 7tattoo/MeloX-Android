@@ -26,7 +26,7 @@ import org.json.JSONObject
  */
 internal class KugouLyricsClient(
     sessionProvider: () -> KugouSession,
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val requests = KugouRequestClient(sessionProvider, httpClient)
 

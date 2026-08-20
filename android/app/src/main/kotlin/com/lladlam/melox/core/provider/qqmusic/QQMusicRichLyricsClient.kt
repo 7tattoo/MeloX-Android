@@ -18,7 +18,7 @@ import org.json.JSONObject
 /** QRC/translation/romanization request path used before the legacy LRC fallback. */
 class QQMusicRichLyricsClient(
     private val sessionProvider: () -> QQMusicSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private data class SongIdentity(
         val songMid: String,

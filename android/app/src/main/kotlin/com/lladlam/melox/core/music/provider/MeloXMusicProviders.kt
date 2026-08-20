@@ -9,34 +9,44 @@ import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.netease.NeteaseProvider
 import com.lladlam.melox.core.provider.qqmusic.QQMusicProvider
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.network.MeloXHttpClient
 import okhttp3.OkHttpClient
 
 /** Creates provider instances that all read their authentication state locally. */
 object MeloXMusicProviders {
+    @Volatile
+    private var sharedRegistry: MusicProviderRegistry? = null
+
     fun create(
         context: Context,
-        httpClient: OkHttpClient = OkHttpClient(),
+        httpClient: OkHttpClient = MeloXHttpClient.shared,
     ): MusicProviderRegistry {
         val appContext = context.applicationContext
-        return MusicProviderRegistry(
+        if (httpClient !== MeloXHttpClient.shared) return buildRegistry(appContext, httpClient)
+        return sharedRegistry ?: synchronized(this) {
+            sharedRegistry ?: buildRegistry(appContext, httpClient).also { sharedRegistry = it }
+        }
+    }
+
+    private fun buildRegistry(context: Context, httpClient: OkHttpClient): MusicProviderRegistry =
+        MusicProviderRegistry(
             listOf(
                 NeteaseProvider(
-                    cookieProvider = { NeteaseSessionStore.readCookie(appContext) },
+                    cookieProvider = { NeteaseSessionStore.readCookie(context) },
                     httpClient = httpClient,
                 ),
                 QQMusicProvider(
-                    sessionProvider = { QQMusicSessionStore.read(appContext) },
+                    sessionProvider = { QQMusicSessionStore.read(context) },
                     httpClient = httpClient,
                 ),
                 KugouProvider(
-                    sessionProvider = { KugouSessionStore.read(appContext) },
+                    sessionProvider = { KugouSessionStore.read(context) },
                     httpClient = httpClient,
                 ),
                 AppleMusicApiClient(
-                    sessionProvider = { AppleMusicSessionStore.read(appContext) },
+                    sessionProvider = { AppleMusicSessionStore.read(context) },
                     httpClient = httpClient,
                 ),
             ),
         )
-    }
 }

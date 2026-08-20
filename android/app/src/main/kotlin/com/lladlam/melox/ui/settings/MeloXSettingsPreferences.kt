@@ -42,6 +42,8 @@ enum class MeloXLyricsFontWeight(val composeWeight: FontWeight) {
 
 /** Process-visible settings used by UI paths that need immediate recomposition. */
 object MeloXSettingsRuntime {
+    var performanceOverlayEnabled by mutableStateOf(false)
+        internal set
     var themeMode by mutableStateOf(MeloXThemeMode.System)
         internal set
     var podcastsEnabled by mutableStateOf(true)
@@ -287,6 +289,7 @@ object MeloXSettingsRuntime {
         if (initialized && !force) return
         initialized = true
         val app = context.applicationContext
+        performanceOverlayEnabled = MeloXSettingsPreferences.boolean(app, "developer_performance_overlay", false)
         themeMode = runCatching {
             MeloXThemeMode.valueOf(MeloXSettingsPreferences.string(app, "theme_mode", MeloXThemeMode.System.name))
         }.getOrDefault(MeloXThemeMode.System)
@@ -503,6 +506,7 @@ object MeloXSettingsPreferences {
     fun setBoolean(context: Context, key: String, value: Boolean) {
         prefs(context).edit().putBoolean(key, value).apply()
         when (key) {
+            "developer_performance_overlay" -> MeloXSettingsRuntime.performanceOverlayEnabled = value
             "feature_podcasts" -> MeloXSettingsRuntime.podcastsEnabled = value
             "feature_history" -> MeloXSettingsRuntime.listeningHistoryEnabled = value
             "feature_downloads" -> MeloXSettingsRuntime.downloadsEnabled = value

@@ -18,7 +18,7 @@ import org.json.JSONObject
 
 class QQMusicRankingClient(
     private val sessionProvider: () -> QQMusicSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     suspend fun tracks(
         ranking: MusicRankingSummary,

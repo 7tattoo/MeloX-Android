@@ -14,7 +14,7 @@ data class MeloXUserPlayRecord(val song: SearchSong, val playCount: Int, val sco
 data class MeloXCommentRepliesPage(val ownerComment: MeloXMusicComment?, val replies: List<MeloXMusicComment>, val totalCount: Int, val hasMore: Boolean, val nextTime: Long)
 data class MeloXCommentsPage(val hotComments: List<MeloXMusicComment>, val comments: List<MeloXMusicComment>, val totalCount: Int, val hasMore: Boolean, val nextOffset: Int, val beforeTime: Long)
 
-class NeteaseSocialExtrasClient(cookieProvider: () -> String, httpClient: OkHttpClient = OkHttpClient()) {
+class NeteaseSocialExtrasClient(cookieProvider: () -> String, httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared) {
     private val cookieProvider = cookieProvider
     private val eapi = NeteaseAuthenticatedEapi(cookieProvider, httpClient)
     private val weapi = NeteaseAuthenticatedWeapi(cookieProvider, httpClient)

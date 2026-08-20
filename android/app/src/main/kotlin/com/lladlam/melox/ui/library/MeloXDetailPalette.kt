@@ -3,7 +3,7 @@ package com.lladlam.melox.ui.library
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.Color
-import java.util.concurrent.ConcurrentHashMap
+import java.util.LinkedHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -29,14 +29,19 @@ internal data class MeloXDetailPalette(
  */
 internal object MeloXDetailPaletteProvider {
     private const val TARGET_SIZE = 160
-    private val http = OkHttpClient()
-    private val cache = ConcurrentHashMap<String, MeloXDetailPalette>()
+    private const val MAX_CACHE_ENTRIES = 48
+    private val http = com.lladlam.melox.core.network.MeloXHttpClient.shared
+    private val cache = object : LinkedHashMap<String, MeloXDetailPalette>(MAX_CACHE_ENTRIES, .75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, MeloXDetailPalette>?,
+        ): Boolean = size > MAX_CACHE_ENTRIES
+    }
 
     suspend fun paletteFor(url: String?): MeloXDetailPalette {
         val source = url?.takeIf(String::isNotBlank) ?: return MeloXDetailPalette.LightFallback
-        cache[source]?.let { return it }
+        cached(source)?.let { return it }
         return withContext(Dispatchers.IO) {
-            cache[source]?.let { return@withContext it }
+            cached(source)?.let { return@withContext it }
             val palette = runCatching {
                 val request = Request.Builder()
                     .url(optimizedArtworkUrl(source))
@@ -44,8 +49,7 @@ internal object MeloXDetailPaletteProvider {
                     .build()
                 http.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error("Artwork HTTP ${response.code}")
-                    val bytes = response.body.bytes()
-                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    val decoded = response.body.byteStream().use(BitmapFactory::decodeStream)
                         ?: error("Unable to decode artwork")
                     val maximum = maxOf(decoded.width, decoded.height)
                     val scale = if (maximum > TARGET_SIZE) TARGET_SIZE.toFloat() / maximum else 1f
@@ -64,11 +68,13 @@ internal object MeloXDetailPaletteProvider {
                         decoded.recycle()
                     }
                 }
-            }.getOrElse { MeloXDetailPalette.LightFallback }
-            cache[source] = palette
-            palette
+            }.getOrNull()
+            if (palette != null) synchronized(cache) { cache[source] = palette }
+            palette ?: MeloXDetailPalette.LightFallback
         }
     }
+
+    private fun cached(source: String): MeloXDetailPalette? = synchronized(cache) { cache[source] }
 
     private fun makePalette(bitmap: Bitmap): MeloXDetailPalette {
         var r = 0.0

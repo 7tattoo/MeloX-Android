@@ -40,7 +40,7 @@ data class QQMusicAccountProfile(
  */
 class QQMusicApiClient(
     private val sessionProvider: () -> QQMusicSession = { QQMusicSession("", "", "") },
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     suspend fun accountProfile(
         session: QQMusicSession = sessionProvider(),

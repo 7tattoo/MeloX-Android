@@ -51,7 +51,7 @@ data class MeloXPrivateMessage(
 /** Authenticated write/comment/wiki routes mirrored from upstream MeloX NeteaseAPI. */
 class NeteaseMusicOperationsClient(
     private val cookieProvider: () -> String,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val syntheticDeviceId = randomHex(26).uppercase()
     private val authenticatedWeapi = NeteaseAuthenticatedWeapi(cookieProvider, httpClient)

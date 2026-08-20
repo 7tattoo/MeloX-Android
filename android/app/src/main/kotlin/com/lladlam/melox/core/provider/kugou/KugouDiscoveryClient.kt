@@ -22,7 +22,7 @@ import org.json.JSONObject
  */
 class KugouDiscoveryClient(
     private val sessionProvider: () -> KugouSession,
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val requests = KugouRequestClient(sessionProvider, httpClient)
 

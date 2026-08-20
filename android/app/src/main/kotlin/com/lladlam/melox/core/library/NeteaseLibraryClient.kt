@@ -19,7 +19,7 @@ import org.json.JSONObject
 /** Authenticated library routes mirrored from MeloX NeteaseAPI.swift. */
 class NeteaseLibraryClient(
     private val cookieProvider: () -> String,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val syntheticDeviceId: String = randomHex(26).uppercase()
     private val authenticatedWeapi = com.lladlam.melox.core.network.NeteaseAuthenticatedWeapi(cookieProvider, httpClient)

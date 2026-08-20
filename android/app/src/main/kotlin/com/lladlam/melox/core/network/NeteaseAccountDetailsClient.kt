@@ -7,7 +7,7 @@ import okhttp3.OkHttpClient
 import org.json.JSONObject
 
 data class MeloXAccountDetail(val userId: Long, val nickname: String, val avatarUrl: String?, val backgroundUrl: String?, val signature: String?, val level: Int, val listenSongs: Int, val follows: Int, val followers: Int, val playlistCount: Int)
-class NeteaseAccountDetailsClient(cookieProvider: () -> String, httpClient: OkHttpClient = OkHttpClient()) {
+class NeteaseAccountDetailsClient(cookieProvider: () -> String, httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared) {
     private val cookieProvider = cookieProvider; private val weapi = NeteaseAuthenticatedWeapi(cookieProvider, httpClient); private val eapi = NeteaseAuthenticatedEapi(cookieProvider, httpClient)
     suspend fun userDetail(userId: Long): MeloXAccountDetail = withContext(Dispatchers.IO) {
         val loggedIn = NeteaseSessionStore.containsMusicU(cookieProvider())

@@ -9,7 +9,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,7 +38,7 @@ private data class PerfSnapshot(
  * profiling. Only enabled in debug builds from MeloXApp.
  *
  * Logs are written to the app's external files dir so they can be pulled with:
- *   adb pull /sdcard/Android/data/com.lladlam.melox/files/melox_perf.log
+ *   adb pull /sdcard/Android/data/com.lladlam.melox.android/files/melox_perf.log
  */
 @Composable
 fun MeloXPerformanceOverlay(modifier: Modifier = Modifier) {
@@ -58,9 +57,15 @@ fun MeloXPerformanceOverlay(modifier: Modifier = Modifier) {
                     frameTimesNs[idx % frameTimesNs.size] = delta
                     idx++
                     if (idx % 6 == 0) {
-                        val valid = frameTimesNs.filter { it > 0 }
-                        val avgNs = valid.average()
-                        val maxNs = valid.maxOrNull() ?: 0L
+                        val count = minOf(idx, frameTimesNs.size)
+                        var sumNs = 0L
+                        var maxNs = 0L
+                        repeat(count) { sampleIndex ->
+                            val sample = frameTimesNs[sampleIndex]
+                            sumNs += sample
+                            if (sample > maxNs) maxNs = sample
+                        }
+                        val avgNs = if (count > 0) sumNs.toDouble() / count else 0.0
                         val fps = if (avgNs > 0) (1_000_000_000.0 / avgNs).toFloat() else 0f
                         snapshot = PerfSnapshot(
                             fps = fps,
@@ -84,7 +89,7 @@ fun MeloXPerformanceOverlay(modifier: Modifier = Modifier) {
             writer.appendLine("# ts,fps,avg_ms,max_ms,frames")
             writer.flush()
             while (isActive) {
-                delay(1000L)
+                delay(5_000L)
                 val s = snapshot
                 val line = buildString {
                     append(System.currentTimeMillis())
@@ -99,7 +104,6 @@ fun MeloXPerformanceOverlay(modifier: Modifier = Modifier) {
                 }
                 withContext(Dispatchers.IO) {
                     writer.appendLine(line)
-                    writer.flush()
                 }
             }
         } finally {

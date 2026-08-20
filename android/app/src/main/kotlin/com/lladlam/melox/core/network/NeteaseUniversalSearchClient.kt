@@ -104,7 +104,7 @@ data class MeloXCloudPage(
 /** Search routes mirrored from upstream MeloX SearchView/NeteaseAPI. */
 class NeteaseUniversalSearchClient(
     private val cookieProvider: () -> String,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val syntheticDeviceId = randomHex(26).uppercase()
     private val weapi by lazy { NeteaseAuthenticatedWeapi(cookieProvider, httpClient) }

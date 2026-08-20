@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 internal class KugouRequestClient(
     private val sessionProvider: () -> KugouSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     companion object {
         const val AppId = 1005

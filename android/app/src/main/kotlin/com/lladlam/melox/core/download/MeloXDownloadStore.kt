@@ -81,7 +81,7 @@ class MeloXDownloadStore private constructor(private val context: Context) {
     private val app = context.applicationContext
     private val directory = File(app.filesDir, "melox_downloads").apply { mkdirs() }
     private val indexFile = File(directory, "index.json")
-    private val http = OkHttpClient()
+    private val http = com.lladlam.melox.core.network.MeloXHttpClient.shared
     private val qualityClient = NeteaseQualityClient(
         cookieProvider = { NeteaseSessionStore.readCookie(app) },
         httpClient = http,

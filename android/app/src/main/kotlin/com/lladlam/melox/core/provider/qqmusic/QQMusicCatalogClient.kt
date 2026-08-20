@@ -24,7 +24,7 @@ import org.json.JSONObject
 /** QQ Music non-song catalog APIs mapped into provider-neutral MeloX models. */
 class QQMusicCatalogClient(
     private val sessionProvider: () -> QQMusicSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     suspend fun searchPlaylists(query: String, page: Int, pageSize: Int): MusicPage<MusicPlaylistSummary> {
         val result = searchByType(query, 3, page, pageSize)

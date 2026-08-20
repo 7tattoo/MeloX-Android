@@ -15,7 +15,7 @@ import org.json.JSONObject
 /** Shared EAPI transport used by feature modules. */
 internal class NeteaseAuthenticatedEapi(
     private val cookieProvider: () -> String,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val syntheticDeviceId = randomHex(26).uppercase()
 

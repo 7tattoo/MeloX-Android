@@ -32,7 +32,7 @@ import okhttp3.OkHttpClient
 
 class KugouProvider(
     sessionProvider: () -> KugouSession,
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) : MusicProvider,
     SearchCapability,
     CatalogSearchCapability,

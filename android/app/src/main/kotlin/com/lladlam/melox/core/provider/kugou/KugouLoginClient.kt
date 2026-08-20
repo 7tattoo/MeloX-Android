@@ -34,7 +34,7 @@ sealed interface KugouQrLoginState {
  */
 class KugouLoginClient(
     private val sessionProvider: () -> KugouSession,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     suspend fun createQrSession(): KugouQrLoginSession = withContext(Dispatchers.IO) {
         val session = sessionProvider()

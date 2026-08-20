@@ -10,6 +10,8 @@ import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import java.io.IOException
+import java.util.LinkedHashMap
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
 @OptIn(UnstableApi::class)
@@ -25,7 +27,12 @@ class NeteasePlaybackResolver(
         val cookieHeader: String,
     )
 
-    private val resolvedUris = ConcurrentHashMap<ResolveKey, Uri>()
+    private val cacheLock = Any()
+    private val resolvedUris = object : LinkedHashMap<ResolveKey, Uri>(MAX_RESOLVED_URIS, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ResolveKey, Uri>?): Boolean =
+            size > MAX_RESOLVED_URIS
+    }
+    private val inFlight = ConcurrentHashMap<ResolveKey, CompletableFuture<Uri>>()
     private val qualityClient = NeteaseQualityClient(cookieProvider = cookieProvider)
 
     @Volatile
@@ -43,12 +50,25 @@ class NeteasePlaybackResolver(
         localSourceProvider(songId)?.let { return it }
         val cookieHeader = cookieProvider()
         val key = ResolveKey(songId, quality, cookieHeader)
-        return resolvedUris[key] ?: run {
+        cached(key)?.let { return it }
+        val pending = CompletableFuture<Uri>()
+        val existing = inFlight.putIfAbsent(key, pending)
+        if (existing != null) return runCatching { existing.get() }
+            .getOrElse { throw IOException("Unable to resolve playback source", it.cause ?: it) }
+        return try {
             val source = qualityClient.playbackSourceBlocking(
                 songId = songId,
                 requestedQuality = quality,
             )
-            Uri.parse(source.url).also { resolvedUris[key] = it }
+            Uri.parse(source.url).also {
+                synchronized(cacheLock) { resolvedUris[key] = it }
+                pending.complete(it)
+            }
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            inFlight.remove(key, pending)
         }
     }
 
@@ -75,7 +95,10 @@ class NeteasePlaybackResolver(
 
         val resolved = resolveSongUri(songId, requestedQuality)
 
-        return dataSpec.withUri(resolved)
+        return dataSpec.buildUpon()
+            .setUri(resolved)
+            .setKey(dataSpec.key ?: uri.toString())
+            .build()
     }
 
     override fun resolveReportedUri(uri: Uri): Uri {
@@ -88,8 +111,22 @@ class NeteasePlaybackResolver(
         val requestedQuality = MusicQuality.fromApiLevel(uri.getQueryParameter(QUALITY_QUERY))
             ?: MusicQualityRuntime.selected
         val currentCookieHeader = cookieProvider()
-        return resolvedUris[ResolveKey(songId, requestedQuality, currentCookieHeader)] ?: uri
+        return cached(ResolveKey(songId, requestedQuality, currentCookieHeader)) ?: uri
     }
+
+    fun prefetch(uri: Uri) {
+        if (ProviderPlaybackResolver.isProviderTrackUri(uri)) {
+            providerDelegate()?.prefetch(uri)
+            return
+        }
+        if (uri.scheme != MELOX_SCHEME || uri.host != SONG_HOST) return
+        val songId = uri.lastPathSegment?.toLongOrNull() ?: return
+        val quality = MusicQuality.fromApiLevel(uri.getQueryParameter(QUALITY_QUERY))
+            ?: MusicQualityRuntime.selected
+        resolveSongUri(songId, quality)
+    }
+
+    private fun cached(key: ResolveKey): Uri? = synchronized(cacheLock) { resolvedUris[key] }
 
     private fun providerDelegate(): ProviderPlaybackResolver? {
         providerDelegate?.let { return it }
@@ -107,6 +144,7 @@ class NeteasePlaybackResolver(
         private const val MELOX_SCHEME = "melox"
         private const val SONG_HOST = "song"
         private const val QUALITY_QUERY = "quality"
+        private const val MAX_RESOLVED_URIS = 96
 
         fun uriForSong(
             songId: Long,

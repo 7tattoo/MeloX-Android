@@ -1695,6 +1695,16 @@ private fun AboutSettings(context: android.content.Context) {
 
 @Composable
 private fun DeveloperSettings() {
+    val context = LocalContext.current
+    if (BuildConfig.DEBUG) {
+        SettingsToggleRow(
+            context = context,
+            title = "帧率与帧时间悬浮层",
+            key = "developer_performance_overlay",
+            default = false,
+            note = "仅 Debug 构建可用；每 5 秒写入一次 melox_perf.log。",
+        )
+    }
     SettingsInfoCard("AutoMix 分析", "Android 原生 MediaCodec 整曲解码，生成节拍、重拍、乐句、能量和频谱时间轴；分析失败时才使用所选降级策略。")
     Spacer(Modifier.height(10.dp))
     SettingsInfoCard("播放器与网络日志", "使用 Logcat 的 MeloXPlayback / 网络标签；不再保存无效偏好")

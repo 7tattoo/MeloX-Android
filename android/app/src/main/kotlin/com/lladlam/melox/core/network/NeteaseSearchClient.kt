@@ -20,7 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class NeteaseSearchClient(
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
     private val cookieProvider: () -> String = { "" },
 ) {
     private val syntheticDeviceId: String = randomHex(26).uppercase()

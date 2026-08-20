@@ -16,7 +16,7 @@ import org.json.JSONObject
 /** Authenticated Kugou user-playlist writer using provider-native listid values. */
 class KugouPlaylistWriteClient(
     private val sessionProvider: () -> KugouSession,
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val requests = KugouRequestClient(sessionProvider, httpClient)
 

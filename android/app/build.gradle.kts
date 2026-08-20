@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("androidx.baselineprofile")
 }
 
 android {
@@ -17,22 +18,30 @@ android {
 
     // Release credentials are supplied from the command line or CI secrets;
     // passwords and the external keystore are deliberately not committed.
-    val meloxReleaseSigning = signingConfigs.create("meloxRelease") {
-        val keystorePath = providers.gradleProperty("meloxReleaseStoreFile").orNull
-        val keystorePassword = providers.gradleProperty("meloxReleaseStorePassword").orNull
-        val keyAliasValue = providers.gradleProperty("meloxReleaseKeyAlias").orNull
-        val keyPasswordValue = providers.gradleProperty("meloxReleaseKeyPassword").orNull
-        if (keystorePath != null && keystorePassword != null && keyAliasValue != null && keyPasswordValue != null) {
+    val keystorePath = providers.gradleProperty("meloxReleaseStoreFile").orNull
+    val keystorePassword = providers.gradleProperty("meloxReleaseStorePassword").orNull
+    val keyAliasValue = providers.gradleProperty("meloxReleaseKeyAlias").orNull
+    val keyPasswordValue = providers.gradleProperty("meloxReleaseKeyPassword").orNull
+    val meloxReleaseSigning = if (
+        keystorePath != null && keystorePassword != null && keyAliasValue != null && keyPasswordValue != null
+    ) {
+        signingConfigs.create("meloxRelease") {
             storeFile = file(keystorePath)
             storePassword = keystorePassword
             keyAlias = keyAliasValue
             keyPassword = keyPasswordValue
         }
-    }
+    } else null
 
     buildTypes {
         getByName("release") {
-            signingConfig = meloxReleaseSigning
+            meloxReleaseSigning?.let { signingConfig = it }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
@@ -111,4 +120,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    baselineProfile(project(":baselineprofile"))
 }

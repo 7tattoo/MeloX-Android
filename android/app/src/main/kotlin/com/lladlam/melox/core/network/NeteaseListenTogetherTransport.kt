@@ -38,7 +38,7 @@ data class MeloXListenTogetherSnapshot(
 /** Complete Together transport mirroring MeloX's command and playlist protocol. */
 class NeteaseListenTogetherTransport(
     cookieProvider: () -> String,
-    httpClient: OkHttpClient = OkHttpClient(),
+    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val eapi = NeteaseAuthenticatedEapi(cookieProvider, httpClient)
 

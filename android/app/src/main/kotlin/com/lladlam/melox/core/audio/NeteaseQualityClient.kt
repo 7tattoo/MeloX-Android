@@ -31,7 +31,7 @@ data class NeteasePlaybackSource(
  */
 class NeteaseQualityClient(
     private val cookieProvider: () -> String = { "" },
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) {
     private val syntheticDeviceId: String = randomHex(26).uppercase()
 

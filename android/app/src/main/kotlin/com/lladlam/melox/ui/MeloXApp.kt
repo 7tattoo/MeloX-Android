@@ -565,6 +565,9 @@ fun MeloXApp(
                 },
             )
         }
+        if (BuildConfig.DEBUG && MeloXSettingsRuntime.performanceOverlayEnabled) {
+            MeloXPerformanceOverlay()
+        }
       }
     }
 }

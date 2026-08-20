@@ -35,7 +35,7 @@ data class SongRecognitionResult(
 /** Android port of MeloX's NetEase audio-fingerprint recognition pipeline. */
 class SongRecognitionClient(
     private val context: Context,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
 ) : AutoCloseable {
     private val fingerprintRuntime = FingerprintRuntime(context.applicationContext)
 
