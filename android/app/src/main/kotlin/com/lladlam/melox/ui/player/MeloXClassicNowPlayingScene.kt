@@ -25,8 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.ui.glass.MeloXGlassIconButton
 import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.layout.MeloXWindowWidthClass
+import com.lladlam.melox.ui.layout.rememberMeloXWindowInfo
 
-/** Classic shell reuses the same playback state and controls as the Apple shell. */
+/** Classic shell preserves its visual language for every player page and window class. */
 @Composable
 internal fun MeloXClassicNowPlayingScene(
     state: MeloXPlaybackUiState,
@@ -36,12 +38,18 @@ internal fun MeloXClassicNowPlayingScene(
     onShowActions: () -> Unit,
     onShowQuality: () -> Unit,
 ) {
+    val window = rememberMeloXWindowInfo()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 700.dp || maxWidth > maxHeight
-        val tabletPortrait = maxWidth >= 600.dp && !wide
+        val wide = window.isLandscape || window.widthClass != MeloXWindowWidthClass.Compact
+        val tabletPortrait = window.widthClass != MeloXWindowWidthClass.Compact && !window.isLandscape
         val availableWidth = maxWidth
         val availableHeight = maxHeight
-        Column(Modifier.fillMaxSize().padding(horizontal = if (tabletPortrait) 42.dp else 22.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .widthIn(max = window.maxContentWidth)
+                .padding(horizontal = window.gutter),
+        ) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -51,7 +59,7 @@ internal fun MeloXClassicNowPlayingScene(
                 Text("正在播放", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 MeloXGlassIconButton(MeloXSymbol.Ellipsis, onShowActions, contentDescription = "播放操作")
             }
-            if (wide) {
+            if (page == MeloXNowPlayingPage.Artwork && wide) {
                 Row(
                     Modifier.fillMaxSize().padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(38.dp),
@@ -67,7 +75,7 @@ internal fun MeloXClassicNowPlayingScene(
                         MeloXNowPlayingCoreControls(state, page, onPageChanged, onShowQuality)
                     }
                 }
-            } else {
+            } else if (page == MeloXNowPlayingPage.Artwork) {
                 Box(Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp), contentAlignment = Alignment.Center) {
                     Artwork(
                         state.artworkUrl,
@@ -77,8 +85,73 @@ internal fun MeloXClassicNowPlayingScene(
                 ClassicMetadata(state)
                 Spacer(Modifier.height(8.dp))
                 MeloXNowPlayingCoreControls(state, page, onPageChanged, onShowQuality)
+            } else if (wide) {
+                Row(
+                    Modifier.fillMaxSize().padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Artwork(
+                        state.artworkUrl,
+                        Modifier
+                            .weight(.40f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp)),
+                    )
+                    ClassicAlternatePage(
+                        state = state,
+                        page = page,
+                        onPageChanged = onPageChanged,
+                        onShowQuality = onShowQuality,
+                        modifier = Modifier.weight(.60f).fillMaxSize(),
+                    )
+                }
+            } else {
+                ClassicMetadata(state)
+                ClassicAlternatePage(
+                    state = state,
+                    page = page,
+                    onPageChanged = onPageChanged,
+                    onShowQuality = onShowQuality,
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 16.dp),
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun ClassicAlternatePage(
+    state: MeloXPlaybackUiState,
+    page: MeloXNowPlayingPage,
+    onPageChanged: (MeloXNowPlayingPage) -> Unit,
+    onShowQuality: () -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier) {
+        ClassicMetadata(state)
+        Spacer(Modifier.height(12.dp))
+        when (page) {
+            MeloXNowPlayingPage.Lyrics -> MeloXIOSLyricsPanel(
+                state = state,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                allowAutomaticSkyline = false,
+            )
+            MeloXNowPlayingPage.Queue -> MeloXQueuePanel(
+                state = state,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                showSongHeader = false,
+                interactive = true,
+            )
+            MeloXNowPlayingPage.Artwork -> Unit
+        }
+        Spacer(Modifier.height(8.dp))
+        MeloXNowPlayingCoreControls(
+            state = state,
+            page = page,
+            onPageSelected = onPageChanged,
+            onShowQuality = onShowQuality,
+        )
     }
 }
 

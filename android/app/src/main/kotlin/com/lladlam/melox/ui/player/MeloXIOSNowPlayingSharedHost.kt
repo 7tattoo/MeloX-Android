@@ -345,7 +345,7 @@ fun MeloXIOSNowPlayingSharedHost(
                             .fillMaxSize()
                             .graphicsLayer { alpha = fullPlayerAlpha },
                     ) {
-                        if (MeloXSettingsRuntime.playerShell == MeloXPlayerShell.Classic && page == MeloXNowPlayingPage.Artwork) {
+                        if (MeloXSettingsRuntime.playerShell == MeloXPlayerShell.Classic) {
                             MeloXClassicNowPlayingScene(
                                 state = state,
                                 page = page,
@@ -392,7 +392,7 @@ fun MeloXIOSNowPlayingSharedHost(
                     }
                 }
 
-                if (!(MeloXSettingsRuntime.playerShell == MeloXPlayerShell.Classic && page == MeloXNowPlayingPage.Artwork)) {
+                if (MeloXSettingsRuntime.playerShell != MeloXPlayerShell.Classic) {
                     SharedArtworkDestination(
                         state = state,
                         page = page,
