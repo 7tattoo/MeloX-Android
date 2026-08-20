@@ -25,11 +25,10 @@ import androidx.compose.ui.unit.sp
 import com.lladlam.melox.R
 
 /**
- * Semantic icon inventory aligned with the SF Symbols names in the supplied
- * Figma library. Android cannot bundle Apple's private SF Symbols font, so
- * these names render through the license-compatible Material Symbols Rounded
- * font shipped with the app. The semantic names remain Apple-compatible and
- * can be swapped to a native SF font on a platform that provides one.
+ * Semantic icon inventory aligned with SF Symbols names. Apple does not
+ * license SF Symbols for redistribution in Android APKs, so the Android build
+ * maps each semantic name to the license-compatible Material Symbols Rounded
+ * font shipped with the app.
  */
 enum class MeloXSymbol(
     val sfSymbolName: String,
@@ -72,6 +71,17 @@ enum class MeloXSymbol(
     Microphone("mic", "mic"),
     Storage("internaldrive", "storage"),
     Bug("ladybug", "bug_report"),
+    Play("play.fill", "play_arrow"),
+    Pause("pause.fill", "pause"),
+    Previous("backward.fill", "skip_previous"),
+    Next("forward.fill", "skip_next"),
+    Shuffle("shuffle", "shuffle"),
+    Repeat("repeat", "repeat"),
+    Volume("speaker.wave.2", "volume_up"),
+    Queue("text.line.first.and.arrowtriangle.forward", "queue_music"),
+    MoreVertical("ellipsis", "more_vert"),
+    Circle("circle", "radio_button_unchecked"),
+    CheckCircle("checkmark.circle.fill", "check_circle"),
     Unknown("questionmark.circle", "help"),
 }
 
@@ -191,6 +201,7 @@ fun MeloXActionIcon(
         "♡", "♥" -> MeloXSymbol.Heart
         "▣", "⇥", "♬" -> MeloXSymbol.List
         "✓" -> MeloXSymbol.Check
+        "○" -> MeloXSymbol.Circle
         "♫", "♬" -> MeloXSymbol.MusicNote
         "✦" -> MeloXSymbol.Sparkles
         "❞" -> MeloXSymbol.Quote
@@ -209,6 +220,7 @@ fun MeloXActionIcon(
         "›" -> MeloXSymbol.ChevronRight
         "•••", "…" -> MeloXSymbol.Ellipsis
         "×" -> MeloXSymbol.Xmark
+        "♪" -> MeloXSymbol.MusicNote
         "↻" -> MeloXSymbol.Refresh
         else -> MeloXSymbol.Unknown
     }
@@ -234,6 +246,17 @@ fun MeloXActionIcon(
         MeloXSymbol.Storage -> "存储"
         MeloXSymbol.Settings -> "设置"
         MeloXSymbol.Bug -> "诊断"
+        MeloXSymbol.Play -> "播放"
+        MeloXSymbol.Pause -> "暂停"
+        MeloXSymbol.Previous -> "上一首"
+        MeloXSymbol.Next -> "下一首"
+        MeloXSymbol.Shuffle -> "随机播放"
+        MeloXSymbol.Repeat -> "重复播放"
+        MeloXSymbol.Volume -> "音量"
+        MeloXSymbol.Queue -> "播放队列"
+        MeloXSymbol.MoreVertical -> "更多操作"
+        MeloXSymbol.Circle -> "未选择"
+        MeloXSymbol.CheckCircle -> "已选择"
         MeloXSymbol.ArrowUp -> "上移"
         MeloXSymbol.ArrowDown -> "下移"
         MeloXSymbol.ChevronLeft -> "返回"
