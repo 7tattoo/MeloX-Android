@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -85,6 +86,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricRomanizationAligner
@@ -1288,6 +1290,7 @@ private fun MeloXGlyphLyricText(
     softBlurDp: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer(cacheSize = 64)
     BoxWithConstraints(modifier = modifier) {
@@ -1430,8 +1433,14 @@ private fun MeloXGlyphLyricText(
                 val rowReveal = ((playbackTimeMs - first).toFloat() / (last - first).coerceAtLeast(1L))
                     .coerceIn(0f, 1f)
                 if (rowReveal > 0f) {
-                    clipRect(right = size.width * rowReveal) {
-                        drawText(layout, color = Color.White)
+                    if (isRtl) {
+                        clipRect(left = size.width * (1f - rowReveal)) {
+                            drawText(layout, color = Color.White)
+                        }
+                    } else {
+                        clipRect(right = size.width * rowReveal) {
+                            drawText(layout, color = Color.White)
+                        }
                     }
                 }
                 return@Canvas
@@ -1490,14 +1499,19 @@ private fun MeloXGlyphLyricText(
                             bounds.width * MeloXSettingsRuntime.lyricHighlightGradientWidth,
                             1.5f * density.density,
                         )
-                        val front = bounds.left - feather + (bounds.width + feather) * reveal
-                        val solidRight = min(front, bounds.right)
+                        val front = if (isRtl) {
+                            bounds.right + feather - (bounds.width + feather) * reveal
+                        } else {
+                            bounds.left - feather + (bounds.width + feather) * reveal
+                        }
+                        val solidLeft = if (isRtl) max(front, bounds.left) else bounds.left
+                        val solidRight = if (isRtl) bounds.right else min(front, bounds.right)
                         val glow = fx.glow * effectsStrength * MeloXSettingsRuntime.lyricGlowStrength
 
                         fun drawRevealed(alpha: Float) {
-                            if (solidRight > bounds.left) {
+                            if (solidRight > solidLeft) {
                                 clipRect(
-                                    left = bounds.left,
+                                    left = solidLeft,
                                     top = bounds.top,
                                     right = solidRight,
                                     bottom = bounds.bottom,
@@ -1520,8 +1534,16 @@ private fun MeloXGlyphLyricText(
                                     (1f - MeloXSettingsRuntime.lyricHighlightGradientReduction * mid)
                                 val maskAlpha = baseMask +
                                     (1f - baseMask) * glow.coerceIn(0f, 1f) * .14f
-                                val left = max(front + feather * a, bounds.left)
-                                val right = min(front + feather * b, bounds.right)
+                                val left = if (isRtl) {
+                                    max(front - feather * b, bounds.left)
+                                } else {
+                                    max(front + feather * a, bounds.left)
+                                }
+                                val right = if (isRtl) {
+                                    min(front - feather * a, bounds.right)
+                                } else {
+                                    min(front + feather * b, bounds.right)
+                                }
                                 if (right > left) {
                                     clipRect(
                                         left = left,

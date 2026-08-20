@@ -428,7 +428,7 @@ private fun MeloXIOSLandscapeNowPlayingScene(
     }
     LaunchedEffect(page, showsLyricsControls, activityGeneration) {
         if (page != MeloXNowPlayingPage.Lyrics || !showsLyricsControls) return@LaunchedEffect
-        delay(5_000L)
+        delay(MeloXSettingsRuntime.lyricInterfaceAutoHideDelayMs.toLong())
         showsLyricsControls = false
     }
 
