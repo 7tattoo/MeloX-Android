@@ -408,14 +408,6 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
         }
     }
     val protocol = remember { HyperOsFocusBridge.protocol(context) }
-    SettingsInfoCard(
-        "HyperOS",
-        if (protocol == HyperOsFocusBridge.Protocol.Unsupported) {
-            "当前系统未公开焦点通知协议；继续使用标准 Media3 通知。"
-        } else {
-            "已检测到 HyperOS ${protocol.version} 焦点通知协议，歌词通知会附带实时播放负载。"
-        },
-    )
     LyricsStringChoiceSetting(
         context,
         "系统媒体标题格式",
@@ -555,7 +547,6 @@ private fun SkylineLyricsSettings(context: android.content.Context) {
         currentWidth = .64f; nextOpacity = .48f; ambientFontSize = 44f; ambientOpacity = 1f
         ambientBlur = 1f; ambientTilt = 8f; ambientDrift = 1f
     }
-    SettingsInfoCard("显示条件", "仅在播放器歌词页横屏时切换；竖屏继续使用歌词设置中选择的渲染器。")
 }
 
 @Composable
@@ -597,10 +588,6 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
             )
         }
     }
-    SettingsInfoCard(
-        "悬浮窗权限",
-        if (permissionGranted) "已允许；关闭开关或通知中的“停止”即可结束服务。" else "未允许；开启时会跳转到系统授权页。",
-    )
     LyricsStringChoiceSetting(
         context,
         "副歌词内容",
@@ -649,8 +636,7 @@ private fun PlaybackSettings(context: android.content.Context) {
         listOf(300, 400, 575, 700, 900),
     ) { "${it}ms" }
     SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true)
-    SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false, "仅在启动时没有现有播放队列时执行。")
-    SettingsInfoCard("耳机断开时暂停", "已由 Media3 播放服务启用")
+    SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false)
     Spacer(Modifier.height(10.dp))
     var volumeMode by remember { mutableStateOf(MeloXSettingsRuntime.volumeControlMode) }
     Text("音量滑杆控制", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
@@ -898,7 +884,6 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
             MeloXPlayerBackgroundMode.BlurredArtwork -> "静态模糊封面"
         }
     }
-    SettingsInfoCard("背景说明", "取色流动光影会从专辑封面提取颜色生成动态背景；Apple 三层歌词背景只在歌词页使用三张旋转专辑图。")
     SettingsToggleRow(
         context,
         "播放器背景隔离",
@@ -1293,7 +1278,6 @@ private fun MessagesSettings(context: android.content.Context) {
                 }
             }
         }
-        if (!busy && contacts.isEmpty() && error == null) SettingsInfoCard("暂无联系人", "关注网易云用户后，可在这里发起站内私信。")
         return
     }
 
@@ -1393,9 +1377,7 @@ private fun StorageSettings(context: android.content.Context) {
     }
     LaunchedEffect(Unit) { refresh() }
 
-    SettingsInfoCard("临时缓存", cacheSize)
     Spacer(Modifier.height(10.dp))
-    SettingsInfoCard("已下载歌曲", "${downloads.downloads.size} 首 · ${formatBytes(downloads.totalByteCount)}")
     Spacer(Modifier.height(14.dp))
 
     var autoCache by remember { mutableStateOf(MeloXSettingsPreferences.boolean(context, "downloads_auto_cache", false)) }
@@ -1439,13 +1421,8 @@ private fun StorageSettings(context: android.content.Context) {
 
     if (downloads.downloads.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
-        SettingsInfoCard("下载管理", "请在音乐库 → 下载中按歌曲、艺术家、专辑或文件夹浏览、批量导出和删除。")
-        Spacer(Modifier.height(12.dp))
         SettingsDangerButton("删除全部已下载歌曲") { downloads.removeAll() }
-    } else if (downloads.activeDownloads.isEmpty()) {
-        SettingsInfoCard("下载", "还没有下载歌曲；可在歌曲的“更多”菜单中选择“下载歌曲”。")
     }
-
     downloads.errorMessage?.let { Text(it, color=MaterialTheme.colorScheme.error, fontSize=12.sp, modifier=Modifier.padding(top=10.dp)) }
     maintenanceMessage?.let { Text(it, color=MaterialTheme.colorScheme.primary, fontSize=12.sp, modifier=Modifier.padding(top=10.dp)) }
     Spacer(Modifier.height(14.dp))
@@ -1516,7 +1493,6 @@ private fun TabLayoutSettings(context: android.content.Context) {
         }
     }
     Spacer(Modifier.height(12.dp))
-    SettingsInfoCard("标签栏", "页面开关和排序立即生效；设置与搜索始终保留")
     Spacer(Modifier.height(18.dp))
     Text("首页区块", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
     Spacer(Modifier.height(8.dp))
@@ -1654,7 +1630,6 @@ private fun RecognitionSettings(context: android.content.Context) {
         if (granted) startCapture() else error = "没有麦克风权限；请在系统设置中允许 MeloX 使用麦克风。"
     }
 
-    SettingsInfoCard("网易云音频指纹", "音频只在设备上转为指纹；匹配请求发送指纹，不上传原始录音。持续识别会每 9 秒追加一次结果。")
     Spacer(Modifier.height(14.dp))
     Text("识别时长", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
     Spacer(Modifier.height(8.dp))
@@ -1686,7 +1661,7 @@ private fun RecognitionSettings(context: android.content.Context) {
         Text(status, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f), fontSize = 13.sp)
     }
     error?.let { message ->
-        SettingsInfoCard("识别失败", message)
+        Text(message, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
         Spacer(Modifier.height(12.dp))
     }
     if (results.isNotEmpty()) {
@@ -1755,7 +1730,7 @@ private fun AboutSettings(context: android.content.Context) {
     }
     updateStatus?.let { message ->
         Spacer(Modifier.height(10.dp))
-        SettingsInfoCard("更新状态", message)
+        Text(message, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
     }
     release?.takeIf { updateClient.isNewer(it.version, BuildConfig.VERSION_NAME) }?.let { available ->
         Spacer(Modifier.height(10.dp))
@@ -1768,12 +1743,6 @@ private fun AboutSettings(context: android.content.Context) {
         }
     }
     Spacer(Modifier.height(14.dp))
-    SettingsInfoCard(
-        "内置更新日志 · 0.2.0—0.4.0-Beta",
-        "0.4.0-Beta：歌单写操作、本地音乐导出与分类、统一详情、批量下载、十段均衡器、通知歌词模板、性能与包体治理。\n" +
-            "0.3.4：歌词样式、播放器过渡、多音乐源与下载体验修正。\n" +
-            "0.2.x：网易云音乐库、搜索、评论、AutoMix 与系统歌词能力。",
-    )
     Spacer(Modifier.height(10.dp))
     SettingsActionButton("恢复推荐的播放器设置") {
         MeloXSettingsPreferences.resetRecommendedPlayerSettings(context)
@@ -1837,18 +1806,12 @@ private fun DeveloperSettings() {
             MeloXSettingsPreferences.setBoolean(context, "developer_automix_diagnostics", it)
         }
         if (diagnosticsVisible) {
-            SettingsInfoCard(
-                "分析状态",
-                "进行中 ${diagnostics.activeAnalyses} · 已完成 ${diagnostics.completedAnalyses} · 失败 ${diagnostics.failedAnalyses} · 缓存 ${diagnostics.memoryCacheEntries}/4\n${diagnostics.lastStatus}",
-            )
             Spacer(Modifier.height(8.dp))
             SettingsActionButton("刷新分析状态") { diagnostics = MeloXAutoMixDiagnostics.snapshot() }
             Spacer(Modifier.height(10.dp))
         }
     }
-    SettingsInfoCard("AutoMix 分析", "Android 原生 MediaCodec 整曲解码，生成节拍、重拍、乐句、能量和频谱时间轴；分析失败时才使用所选降级策略。")
     Spacer(Modifier.height(10.dp))
-    SettingsInfoCard("播放器与网络日志", "使用 Logcat 的 MeloXPlayback / 网络标签；不再保存无效偏好")
 }
 
 @Composable
