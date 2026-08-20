@@ -515,7 +515,9 @@ private fun MeloXIOSLandscapeNowPlayingScene(
                                     showsLyricsControls = it
                                     if (it) activityGeneration += 1
                                 },
-                                allowAutomaticSkyline = true,
+                                // Skyline is an explicit alternate presentation. Enabling it
+                                // exposes the affordance but must not override the lyric style.
+                                allowAutomaticSkyline = false,
                                 active = lyricsActive,
                             )
                             LandscapeLyricsPageSelector(

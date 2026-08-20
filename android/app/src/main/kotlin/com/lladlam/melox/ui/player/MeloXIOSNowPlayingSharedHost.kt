@@ -112,8 +112,7 @@ fun MeloXIOSNowPlayingSharedHost(
     LaunchedEffect(isLandscape) {
         if (!isLandscape) showLandscapeSkyline = false else lyricsInterfaceHidden = false
     }
-    val skylineVisible = isLandscape && page == MeloXNowPlayingPage.Lyrics &&
-        (MeloXSettingsRuntime.skylineEnabled || showLandscapeSkyline)
+    val skylineVisible = isLandscape && page == MeloXNowPlayingPage.Lyrics && showLandscapeSkyline
     DisposableEffect(
         MeloXSettingsRuntime.screenAwakeMode,
         MeloXSettingsRuntime.skylineKeepsScreenAwake,
