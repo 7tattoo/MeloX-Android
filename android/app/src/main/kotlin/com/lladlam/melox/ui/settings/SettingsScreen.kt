@@ -87,6 +87,7 @@ import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXGlassTextField
 import com.lladlam.melox.ui.glass.MeloXGlassToggle
+import com.lladlam.melox.ui.glass.MeloXSettingsDropdown
 import com.lladlam.melox.ui.glass.MeloXShapes
 import com.lladlam.melox.ui.glass.MeloXTypography
 import com.lladlam.melox.ui.glass.MeloXIosGroupedList
@@ -408,13 +409,15 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
         }
     }
     val protocol = remember { HyperOsFocusBridge.protocol(context) }
-    LyricsStringChoiceSetting(
-        context,
-        "系统媒体标题格式",
-        "system_lyrics_title_mode",
-        MeloXSystemLyricTitleMode.LyricFirst.name,
-        MeloXSystemLyricTitleMode.entries.map { it.name },
-    ) { if (it == MeloXSystemLyricTitleMode.LyricFirst.name) "歌词作为标题" else "歌曲作为标题" }
+    MeloXSettingsDropdown(
+        title = "系统媒体标题格式",
+        selected = MeloXSettingsRuntime.systemLyricTitleMode,
+        items = listOf(
+            MeloXSystemLyricTitleMode.LyricFirst to "歌词作为标题",
+            MeloXSystemLyricTitleMode.SongFirst to "歌曲作为标题",
+        ),
+        onSelected = { MeloXSettingsPreferences.setString(context, "system_lyrics_title_mode", it.name) },
+    )
     SettingsToggleRow(context, "通知显示下一句", "lyrics_notification_next_line", false)
     SettingsToggleRow(context, "通知显示播放进度", "lyrics_notification_progress", true)
     SettingsToggleRow(context, "通知显示封面", "lyrics_notification_artwork", true)
@@ -588,21 +591,18 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
             )
         }
     }
-    LyricsStringChoiceSetting(
-        context,
-        "副歌词内容",
-        "floating_lyrics_secondary_mode",
-        MeloXSecondaryLyricMode.Auto.name,
-        MeloXSecondaryLyricMode.entries.map { it.name },
-    ) {
-        when (MeloXSecondaryLyricMode.valueOf(it)) {
-            MeloXSecondaryLyricMode.Auto -> "自动（翻译/罗马音/下一句）"
-            MeloXSecondaryLyricMode.Translation -> "翻译"
-            MeloXSecondaryLyricMode.Romanization -> "罗马音"
-            MeloXSecondaryLyricMode.NextLine -> "下一句"
-            MeloXSecondaryLyricMode.Hidden -> "不显示"
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "副歌词内容",
+        selected = MeloXSecondaryLyricMode.Auto,
+        items = listOf(
+            MeloXSecondaryLyricMode.Auto to "自动（翻译/罗马音/下一句）",
+            MeloXSecondaryLyricMode.Translation to "翻译",
+            MeloXSecondaryLyricMode.Romanization to "罗马音",
+            MeloXSecondaryLyricMode.NextLine to "下一句",
+            MeloXSecondaryLyricMode.Hidden to "不显示",
+        ),
+        onSelected = { MeloXSettingsPreferences.setString(context, "floating_lyrics_secondary_mode", it.name) },
+    )
     LyricsChoiceSetting(
         context,
         "主歌词字号",
@@ -615,17 +615,13 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
 
 @Composable
 private fun PlaybackSettings(context: android.content.Context) {
-    Text("播放音质", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
     var quality by remember { mutableStateOf(MusicQualityPreferences.read(context)) }
-    SettingsGlassGroup {
-        MusicQuality.entries.forEach { item ->
-            SettingsChoiceRow(item.title, item == quality) {
-                quality = item
-                PlaybackCommands.changeQuality(context, item)
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "播放音质",
+        selected = quality,
+        items = MusicQuality.entries.map { it to it.title },
+        onSelected = { quality = it; PlaybackCommands.changeQuality(context, it) },
+    )
     Spacer(Modifier.height(22.dp))
     SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true)
     LyricsChoiceSetting(
@@ -871,19 +867,19 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
     Spacer(Modifier.height(14.dp))
     SettingsToggleRow(context, "流动光影背景", "player_flowing_backdrop", true, "关闭后使用模糊封面背景。")
     SettingsToggleRow(context, "封面播放动效", "player_artwork_motion", true)
-    LyricsStringChoiceSetting(
-        context,
-        "播放器背景",
-        "player_background_mode",
-        MeloXSettingsRuntime.playerBackgroundMode.name,
-        MeloXPlayerBackgroundMode.entries.map { it.name },
-    ) {
-        when (MeloXPlayerBackgroundMode.valueOf(it)) {
-            MeloXPlayerBackgroundMode.FlowingLight -> "取色流动光影（原版）"
-            MeloXPlayerBackgroundMode.AppleLyrics -> "Apple 三层歌词背景"
-            MeloXPlayerBackgroundMode.BlurredArtwork -> "静态模糊封面"
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "播放器背景",
+        selected = MeloXSettingsRuntime.playerBackgroundMode,
+        items = listOf(
+            MeloXPlayerBackgroundMode.FlowingLight to "取色流动光影（原版）",
+            MeloXPlayerBackgroundMode.AppleLyrics to "Apple 三层歌词背景",
+            MeloXPlayerBackgroundMode.BlurredArtwork to "静态模糊封面",
+        ),
+        onSelected = {
+            MeloXSettingsPreferences.setString(context, "player_background_mode", it.name)
+            MeloXSettingsRuntime.flowingBackdropEnabled = it != MeloXPlayerBackgroundMode.BlurredArtwork
+        },
+    )
     SettingsToggleRow(
         context,
         "播放器背景隔离",
@@ -891,39 +887,32 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
         true,
         "开启后播放器独立覆盖首页；关闭后恢复原始透明背景，可能透出下层页面。",
     )
-    LyricsStringChoiceSetting(
-        context,
-        "屏幕常亮范围",
-        "player_screen_awake_mode",
-        MeloXScreenAwakeMode.Disabled.name,
-        MeloXScreenAwakeMode.entries.map { it.name },
-    ) {
-        when (MeloXScreenAwakeMode.valueOf(it)) {
-            MeloXScreenAwakeMode.Disabled -> "关闭"
-            MeloXScreenAwakeMode.Player -> "播放器常亮"
-            MeloXScreenAwakeMode.Lyrics -> "歌词页常亮"
-            MeloXScreenAwakeMode.HiddenLyricsInterface -> "歌词页隐藏 UI 后常亮"
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "屏幕常亮范围",
+        selected = MeloXScreenAwakeMode.Disabled,
+        items = listOf(
+            MeloXScreenAwakeMode.Disabled to "关闭",
+            MeloXScreenAwakeMode.Player to "播放器常亮",
+            MeloXScreenAwakeMode.Lyrics to "歌词页常亮",
+            MeloXScreenAwakeMode.HiddenLyricsInterface to "歌词页隐藏 UI 后常亮",
+        ),
+        onSelected = { MeloXSettingsPreferences.setString(context, "player_screen_awake_mode", it.name) },
+    )
 }
 
 @Composable
 private fun LyricsSettings(context: android.content.Context) {
     var lyricsStyle by remember { mutableStateOf(MeloXSettingsRuntime.lyricsStyle) }
-    Text("歌词样式", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(
+    MeloXSettingsDropdown(
+        title = "歌词样式",
+        selected = lyricsStyle,
+        items = listOf(
             MeloXLyricsStyle.AppleMusic to "Apple Music",
             MeloXLyricsStyle.Eva to "EVA 动态排版",
             MeloXLyricsStyle.TextPV to "文字 PV",
-        ).forEach { (style, title) ->
-            SettingsChoiceRow(title, lyricsStyle == style) {
-                MeloXSettingsPreferences.setString(context, "lyrics_style", style.name)
-                lyricsStyle = style
-            }
-        }
-    }
+        ),
+        onSelected = { lyricsStyle = it; MeloXSettingsPreferences.setString(context, "lyrics_style", it.name) },
+    )
     if (lyricsStyle == MeloXLyricsStyle.TextPV) {
         var pvStyle by remember { mutableStateOf(MeloXSettingsRuntime.textPVStyle) }
         var pvMotionIntensity by remember { mutableStateOf(MeloXSettingsRuntime.textPVMotionIntensity) }
@@ -986,19 +975,16 @@ private fun LyricsSettings(context: android.content.Context) {
         }
     }
     Spacer(Modifier.height(16.dp))
-    LyricsStringChoiceSetting(
-        context,
-        "歌词渲染质量",
-        "lyrics_rendering_quality",
-        MeloXLyricsRenderingQuality.Balanced.name,
-        MeloXLyricsRenderingQuality.entries.map { it.name },
-    ) { value ->
-        when (MeloXLyricsRenderingQuality.valueOf(value)) {
-            MeloXLyricsRenderingQuality.Low -> "低 · 更省电"
-            MeloXLyricsRenderingQuality.Balanced -> "均衡 · 推荐"
-            MeloXLyricsRenderingQuality.High -> "高 · 完整 iOS 效果"
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "歌词渲染质量",
+        selected = MeloXSettingsRuntime.lyricRenderingQuality,
+        items = listOf(
+            MeloXLyricsRenderingQuality.Low to "低 · 更省电",
+            MeloXLyricsRenderingQuality.Balanced to "均衡 · 推荐",
+            MeloXLyricsRenderingQuality.High to "高 · 完整 iOS 效果",
+        ),
+        onSelected = { MeloXSettingsPreferences.setString(context, "lyrics_rendering_quality", it.name) },
+    )
     SettingsToggleRow(context, "显示翻译", "lyrics_translation", true)
     SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true)
     LyricsStringChoiceSetting(
@@ -1350,16 +1336,12 @@ private fun MessagesSettings(context: android.content.Context) {
 @Composable
 private fun ContentSettings(context: android.content.Context) {
     var area by remember { mutableStateOf(MeloXSettingsRuntime.musicArea) }
-    Text("新碟与发现地区", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf("全部", "华语", "欧美", "日本", "韩国").forEach { value ->
-            SettingsChoiceRow(value, area == value) {
-                area = value
-                MeloXSettingsPreferences.setString(context, "music_area", value)
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "新碟与发现地区",
+        selected = area,
+        items = listOf("全部" to "全部", "华语" to "华语", "欧美" to "欧美", "日本" to "日本", "韩国" to "韩国"),
+        onSelected = { area = it; MeloXSettingsPreferences.setString(context, "music_area", it) },
+    )
     Spacer(Modifier.height(20.dp))
     SettingsToggleRow(context, "显示歌单播放量", "content_playlist_play_count", true)
     SettingsToggleRow(context, "发现页显示精品歌单", "content_high_quality_playlist", true)
@@ -1543,33 +1525,30 @@ private fun TabLayoutSettings(context: android.content.Context) {
 @Composable
 private fun GeneralSettings(context: android.content.Context) {
     var theme by remember { mutableStateOf(MeloXSettingsRuntime.themeMode) }
-    Text("主题", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(
+    MeloXSettingsDropdown(
+        title = "主题",
+        selected = theme,
+        items = listOf(
             MeloXThemeMode.System to "跟随系统",
             MeloXThemeMode.Light to "浅色",
             MeloXThemeMode.Dark to "深色",
-        ).forEach { (mode, title) ->
-            SettingsChoiceRow(title, theme == mode) {
-                theme = mode
-                MeloXSettingsPreferences.setString(context, "theme_mode", mode.name)
-            }
-        }
-    }
+        ),
+        onSelected = { theme = it; MeloXSettingsPreferences.setString(context, "theme_mode", it.name) },
+    )
     Spacer(Modifier.height(20.dp))
     SettingsToggleRow(context, "记住上次标签页", "general_remember_tab", true)
     var defaultTab by remember { mutableStateOf(MeloXSettingsRuntime.defaultTab) }
-    Text("默认启动页", modifier = Modifier.padding(top = 14.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf("Home" to "首页", "Explore" to "发现", "Library" to "音乐库", "Settings" to "设置").forEach { (value, title) ->
-            SettingsChoiceRow(title, defaultTab == value) {
-                defaultTab = value
-                MeloXSettingsPreferences.setString(context, "general_default_tab", value)
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "默认启动页",
+        selected = defaultTab,
+        items = listOf(
+            "Home" to "首页",
+            "Explore" to "发现",
+            "Library" to "音乐库",
+            "Settings" to "设置",
+        ),
+        onSelected = { defaultTab = it; MeloXSettingsPreferences.setString(context, "general_default_tab", it) },
+    )
     SettingsToggleRow(context, "识别剪贴板中的网易云链接", "general_clipboard_links", true, "每次回到前台只读取一次；识别歌曲或歌单后会先询问是否打开。")
 }
 
