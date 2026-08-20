@@ -9,6 +9,21 @@ data class LyricSyllable(
     val endTimeMs: Long,
 )
 
+/** Authored word timing and LRC-inferred display durations must not be conflated. */
+enum class LyricTimingKind { Precise, LineSynchronized }
+
+data class LyricAgent(
+    val id: String,
+    val name: String,
+    val alignment: LyricAgentAlignment = LyricAgentAlignment.Normal,
+)
+
+enum class LyricAgentAlignment { Normal, Flipped }
+
+enum class LyricSource { Netease, QQMusic, Kugou, AppleMusic, AmlL, Local }
+
+enum class LyricQuality { Fallback, LineSynchronized, WordSynchronized, Authored }
+
 data class LyricLine(
     val timeMs: Long,
     val durationMs: Long? = null,
@@ -17,10 +32,14 @@ data class LyricLine(
     val translation: String? = null,
     val romanization: String? = null,
     val romanizationSyllables: List<LyricSyllable> = emptyList(),
+    val agent: LyricAgent? = null,
+    val timingKind: LyricTimingKind = LyricTimingKind.Precise,
 )
 
 data class LyricsDocument(
     val lines: List<LyricLine>,
+    val source: LyricSource = LyricSource.Local,
+    val quality: LyricQuality = LyricQuality.Fallback,
     /** Whether line-timed lyrics may be expanded into synthetic per-grapheme timing. */
     val pseudoTimingAllowed: Boolean = true,
 ) {
@@ -138,6 +157,7 @@ object NeteaseLyricParser {
                     .toDoubleOrNull() ?: continue
                 result += LyricLine(
                     timeMs = ((minutes * 60.0 + seconds) * 1_000.0).toLong(),
+                    timingKind = LyricTimingKind.LineSynchronized,
                     text = text,
                 )
             }
@@ -165,6 +185,7 @@ object NeteaseLyricParser {
                 result += LyricLine(
                     timeMs = startMs,
                     durationMs = durationMs,
+                    timingKind = LyricTimingKind.LineSynchronized,
                     text = text,
                 )
                 continue
@@ -194,6 +215,7 @@ object NeteaseLyricParser {
             result += LyricLine(
                 timeMs = startMs,
                 durationMs = durationMs,
+                timingKind = LyricTimingKind.Precise,
                 text = text,
                 syllables = syllables,
             )
