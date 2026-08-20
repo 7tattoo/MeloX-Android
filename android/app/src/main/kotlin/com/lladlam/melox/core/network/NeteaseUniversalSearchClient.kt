@@ -469,6 +469,11 @@ class NeteaseUniversalSearchClient(
         )
     }
 
+    suspend fun podcastProgramDetail(programId: Long): MeloXPodcastProgram? = withContext(Dispatchers.IO) {
+        val response = eapi("/api/dj/program/detail", JSONObject().put("id", programId))
+        parsePodcastProgram(response.optJSONObject("program") ?: response.optJSONObject("data"))
+    }
+
     suspend fun subscribedPodcasts(offset: Int = 0, limit: Int = 50): MeloXPodcastPage<MeloXPodcast> =
         withContext(Dispatchers.IO) {
             val response = eapi(

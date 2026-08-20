@@ -1,6 +1,7 @@
 package com.lladlam.melox.core.network
 
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import java.io.IOException
 import java.net.URLEncoder
 import java.security.MessageDigest
@@ -48,6 +49,31 @@ data class MeloXPrivateMessage(
     val timeMs: Long,
 )
 
+internal data class NeteasePlaylistCreateSpec(val name: String, val privacy: Int)
+
+internal fun neteasePlaylistCreateSpec(name: String, privatePlaylist: Boolean): NeteasePlaylistCreateSpec {
+    val normalizedName = name.trim()
+    require(normalizedName.isNotBlank()) { "歌单名称不能为空" }
+    return NeteasePlaylistCreateSpec(normalizedName, if (privatePlaylist) 10 else 0)
+}
+
+internal data class NeteasePlaylistMutationSpec(
+    val songId: Long,
+    val playlistId: Long,
+    val operation: String,
+)
+
+internal fun neteasePlaylistMutationSpec(
+    songId: Long,
+    playlistId: Long,
+    operation: String,
+): NeteasePlaylistMutationSpec {
+    require(songId > 0L) { "歌曲 ID 无效" }
+    require(playlistId > 0L) { "歌单 ID 无效" }
+    require(operation == "add" || operation == "del") { "歌单写操作无效" }
+    return NeteasePlaylistMutationSpec(songId, playlistId, operation)
+}
+
 /** Authenticated write/comment/wiki routes mirrored from upstream MeloX NeteaseAPI. */
 class NeteaseMusicOperationsClient(
     private val cookieProvider: () -> String,
@@ -67,17 +93,62 @@ class NeteaseMusicOperationsClient(
     }
 
     suspend fun addSongToPlaylist(songId: Long, playlistId: Long) = withContext(Dispatchers.IO) {
+        val spec = neteasePlaylistMutationSpec(songId, playlistId, "add")
         ensureLoggedIn()
         val path = "/api/v1/playlist/manipulate/tracks"
-        val id = songId.toString()
+        val id = spec.songId.toString()
         val first = runCatching {
-            eapi(path, JSONObject().put("op", "add").put("pid", playlistId)
+            eapi(path, JSONObject().put("op", spec.operation).put("pid", spec.playlistId)
                 .put("trackIds", "[\"$id\"]").put("imme", "true"), true)
         }
         if (first.isFailure) {
-            eapi(path, JSONObject().put("op", "add").put("pid", playlistId)
+            eapi(path, JSONObject().put("op", spec.operation).put("pid", spec.playlistId)
                 .put("trackIds", "[\"$id\",\"$id\"]").put("imme", "true"), true)
         }
+        Unit
+    }
+
+    suspend fun createPlaylist(name: String, privatePlaylist: Boolean): NeteasePlaylistSummary =
+        withContext(Dispatchers.IO) {
+            val spec = neteasePlaylistCreateSpec(name, privatePlaylist)
+            ensureLoggedIn()
+            val response = eapi(
+                "/api/playlist/create",
+                JSONObject()
+                    .put("name", spec.name)
+                    .put("privacy", spec.privacy),
+                true,
+            )
+            val playlist = response.optJSONObject("playlist")
+                ?: throw IOException("网易云没有返回新建歌单")
+            val id = playlist.optLong("id", 0L)
+            if (id <= 0L) throw IOException("网易云没有返回有效的歌单 ID")
+            val creator = playlist.optJSONObject("creator")
+            NeteasePlaylistSummary(
+                id = id,
+                name = playlist.optString("name").ifBlank { spec.name },
+                coverUrl = secure(playlist.optString("coverImgUrl").takeIf(String::isNotBlank)),
+                trackCount = playlist.optInt("trackCount", 0),
+                creatorName = creator?.optString("nickname").orEmpty(),
+                creatorUserId = creator?.optLong("userId", 0L)?.takeIf { it > 0L },
+                playCount = playlist.optLong("playCount", 0L),
+                description = playlist.optString("description").takeIf(String::isNotBlank),
+            )
+        }
+
+    suspend fun removeSongFromPlaylist(songId: Long, playlistId: Long) = withContext(Dispatchers.IO) {
+        val spec = neteasePlaylistMutationSpec(songId, playlistId, "del")
+        ensureLoggedIn()
+        val id = spec.songId.toString()
+        eapi(
+            "/api/v1/playlist/manipulate/tracks",
+            JSONObject()
+                .put("op", spec.operation)
+                .put("pid", spec.playlistId)
+                .put("trackIds", "[\"$id\"]")
+                .put("imme", "true"),
+            true,
+        )
         Unit
     }
 

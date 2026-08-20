@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +84,8 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.shapes.Capsule
 import com.lladlam.melox.ui.library.LibraryScreen
+import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.cloud.MeloXCloudMusicScreen
 import com.lladlam.melox.ui.discovery.MeloXExploreScreen
 import com.lladlam.melox.ui.discovery.MeloXHomeScreen
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
@@ -129,6 +132,9 @@ enum class AppTab(val title: String) {
     Home("首页"),
     Explore("发现"),
     Library("音乐库"),
+    Podcasts("播客"),
+    Downloads("下载"),
+    Cloud("云盘"),
     Settings("设置"),
     Services("音乐服务"),
     Search("搜索"),
@@ -154,6 +160,7 @@ fun MeloXApp(
         )
     }.getOrDefault(AppTab.Home)
     var selectedTab by remember { mutableStateOf(initialTab) }
+    var settingsRouteRequest by remember { mutableStateOf<String?>(null) }
     var showNeteaseLogin by remember { mutableStateOf(false) }
     var loginReturnTab by remember { mutableStateOf(AppTab.Settings) }
     var tabBarMinimized by remember { mutableStateOf(false) }
@@ -197,6 +204,7 @@ fun MeloXApp(
         }
     }
     val neteaseSession = rememberNeteaseSessionStore()
+    val rootPageState = rememberSaveableStateHolder()
     // Page glass samples a stable background layer. The page itself is
     // recorded separately for the bottom chrome, so neither layer samples
     // its own controls and HWUI never enters a recursive RenderNode graph.
@@ -315,6 +323,9 @@ fun MeloXApp(
                 AppTab.Home -> MeloXSettingsRuntime.homeTabEnabled
                 AppTab.Explore -> MeloXSettingsRuntime.exploreTabEnabled
                 AppTab.Library -> MeloXSettingsRuntime.libraryTabEnabled
+                AppTab.Podcasts -> MeloXSettingsRuntime.podcastsEnabled && MeloXSettingsRuntime.podcastsTabPlacement
+                AppTab.Downloads -> MeloXSettingsRuntime.downloadsEnabled && MeloXSettingsRuntime.downloadsTabPlacement
+                AppTab.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled && MeloXSettingsRuntime.cloudTabPlacement
                 AppTab.Settings -> true
                 AppTab.Services -> false
                 AppTab.Search -> false
@@ -355,9 +366,22 @@ fun MeloXApp(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    when (selectedTab) {
+                    rootPageState.SaveableStateProvider(selectedTab.name) { when (selectedTab) {
                         AppTab.Search -> if (selectedSource == MusicSource.Netease) SearchScreen() else ProviderSearchScreen(selectedSource)
-                        AppTab.Home -> if (selectedSource == MusicSource.Netease) MeloXHomeScreen() else ProviderHomeScreen(selectedSource)
+                        AppTab.Home -> MeloXHomeScreen(
+                            source = selectedSource,
+                            onOpenTool = { route ->
+                                when (route) {
+                                    "Podcasts" -> selectedTab = AppTab.Podcasts
+                                    "Downloads" -> selectedTab = AppTab.Downloads
+                                    "Cloud" -> selectedTab = AppTab.Cloud
+                                    else -> {
+                                        settingsRouteRequest = route
+                                        selectedTab = AppTab.Settings
+                                    }
+                                }
+                            },
+                        )
                         AppTab.Explore -> if (selectedSource == MusicSource.Netease) MeloXExploreScreen() else ProviderExploreScreen(selectedSource)
                         AppTab.Library -> if (selectedSource == MusicSource.Netease) {
                             LibraryScreen(
@@ -372,6 +396,16 @@ fun MeloXApp(
                         } else {
                             ProviderLibraryScreen(selectedSource)
                         }
+                        AppTab.Podcasts -> MeloXPodcastScreen()
+                        AppTab.Downloads -> LibraryScreen(
+                            session = neteaseSession,
+                            onLogin = {
+                                loginReturnTab = AppTab.Downloads
+                                showNeteaseLogin = true
+                            },
+                            forcedPageName = "Downloads",
+                        )
+                        AppTab.Cloud -> MeloXCloudMusicScreen()
                         AppTab.Settings -> ProviderSettingsHub(
                             currentSource = selectedSource,
                             onSourceSelected = { source ->
@@ -389,6 +423,8 @@ fun MeloXApp(
                                 showNeteaseLogin = true
                             },
                             onOpenServices = { selectedTab = AppTab.Services },
+                            initialRouteRequest = settingsRouteRequest,
+                            onInitialRouteConsumed = { settingsRouteRequest = null },
                         )
                         AppTab.Services -> ProviderServicesScreen(
                             currentSource = selectedSource,
@@ -403,7 +439,7 @@ fun MeloXApp(
                             },
                             onBack = { selectedTab = AppTab.Settings },
                         )
-                    }
+                    } }
                 }
             }
 
@@ -689,12 +725,7 @@ private fun MeloXBottomChrome(
             val expandedNavWidth = maxWidth - horizontalMargin * 2 - expandedGap - 64.dp
             val navWidth = lerpDp(expandedNavWidth, compactSize, shrinkStage)
             val navShape = Capsule()
-            val primaryTabs = listOf(
-                AppTab.Home to RootGlyph.Home,
-                AppTab.Explore to RootGlyph.Explore,
-                AppTab.Library to RootGlyph.Library,
-                AppTab.Settings to RootGlyph.Settings,
-            ).filter { it.first in visibleRootTabs }
+            val primaryTabs = visibleRootTabs.map { it to it.rootGlyph() }
 
             val desiredCompactMiniVisibleWidth =
                 (maxWidth - horizontalMargin * 2 - compactSize * 2 - compactGap * 2)
@@ -1027,7 +1058,7 @@ private fun RowScope.RootTabButton(
     }
 }
 
-private enum class RootGlyph { Home, Explore, Library, Settings, Search }
+private enum class RootGlyph { Home, Explore, Library, Podcasts, Downloads, Cloud, Settings, Search }
 
 @Suppress("UNUSED_PARAMETER")
 private fun AppTab.titleFor(source: MusicSource): String = title
@@ -1036,6 +1067,9 @@ private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Home -> RootGlyph.Home
     AppTab.Explore -> RootGlyph.Explore
     AppTab.Library -> RootGlyph.Library
+    AppTab.Podcasts -> RootGlyph.Podcasts
+    AppTab.Downloads -> RootGlyph.Downloads
+    AppTab.Cloud -> RootGlyph.Cloud
     AppTab.Settings -> RootGlyph.Settings
     AppTab.Services -> RootGlyph.Settings
     AppTab.Search -> RootGlyph.Search
@@ -1053,6 +1087,9 @@ private fun RootGlyphIcon(
             RootGlyph.Home -> MeloXSymbol.Home
             RootGlyph.Explore -> MeloXSymbol.Explore
             RootGlyph.Library -> MeloXSymbol.Library
+            RootGlyph.Podcasts -> MeloXSymbol.RadioWaves
+            RootGlyph.Downloads -> MeloXSymbol.Download
+            RootGlyph.Cloud -> MeloXSymbol.Storage
             RootGlyph.Settings -> MeloXSymbol.Settings
             RootGlyph.Search -> MeloXSymbol.Search
         },

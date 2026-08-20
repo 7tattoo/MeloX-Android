@@ -60,6 +60,34 @@ data class MeloXAutoMixTrackAnalysis(
     )
 }
 
+data class MeloXAutoMixDiagnosticSnapshot(
+    val activeAnalyses: Int,
+    val completedAnalyses: Int,
+    val failedAnalyses: Int,
+    val memoryCacheEntries: Int,
+    val lastStatus: String,
+)
+
+object MeloXAutoMixDiagnostics {
+    private val active = java.util.concurrent.atomic.AtomicInteger()
+    private val completed = java.util.concurrent.atomic.AtomicInteger()
+    private val failed = java.util.concurrent.atomic.AtomicInteger()
+    @Volatile private var cacheEntries = 0
+    @Volatile private var lastStatus = "尚未开始分析"
+
+    internal fun started(songId: Long) { active.incrementAndGet(); lastStatus = "正在分析歌曲 $songId" }
+    internal fun completed(songId: Long, bpm: Double, entries: Int) {
+        active.decrementAndGet(); completed.incrementAndGet(); cacheEntries = entries
+        lastStatus = "歌曲 $songId 分析完成 · %.1f BPM".format(bpm)
+    }
+    internal fun failed(songId: Long, message: String) {
+        active.decrementAndGet(); failed.incrementAndGet(); lastStatus = "歌曲 $songId 分析失败 · $message"
+    }
+    internal fun cacheHit(songId: Long, entries: Int) { cacheEntries = entries; lastStatus = "歌曲 $songId 命中分析缓存" }
+    internal fun cleared() { cacheEntries = 0; lastStatus = "分析缓存已清空" }
+    fun snapshot() = MeloXAutoMixDiagnosticSnapshot(active.get(), completed.get(), failed.get(), cacheEntries, lastStatus)
+}
+
 /**
  * Native Android equivalent of MeloX's BeatNet analysis pipeline. Android
  * cannot execute the upstream CoreML package, so this implementation decodes
@@ -82,18 +110,24 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
     suspend fun analyze(songId: Long, uri: Uri): MeloXAutoMixTrackAnalysis =
         withContext(Dispatchers.IO) {
             val key = "$songId|$uri"
-            cached(key)?.let { return@withContext it }
+            cached(key)?.let {
+                MeloXAutoMixDiagnostics.cacheHit(songId, cacheSize())
+                return@withContext it
+            }
             val pending = CompletableDeferred<Result<MeloXAutoMixTrackAnalysis>>()
             val existing = inFlight.putIfAbsent(key, pending)
             if (existing != null) return@withContext existing.await().getOrThrow()
+            MeloXAutoMixDiagnostics.started(songId)
             try {
                 val result = decodePermits.withPermit {
                     cached(key) ?: decode(uri).also { putCached(key, it) }
                 }
                 pending.complete(Result.success(result))
+                MeloXAutoMixDiagnostics.completed(songId, result.bpm, cacheSize())
                 result
             } catch (error: Throwable) {
                 pending.complete(Result.failure(error))
+                MeloXAutoMixDiagnostics.failed(songId, error.message ?: error::class.java.simpleName)
                 throw error
             } finally {
                 inFlight.remove(key, pending)
@@ -102,7 +136,10 @@ class MeloXAutoMixAudioAnalyzer(private val context: Context) {
 
     fun clear() {
         synchronized(cacheLock) { cache.clear() }
+        MeloXAutoMixDiagnostics.cleared()
     }
+
+    private fun cacheSize(): Int = synchronized(cacheLock) { cache.size }
 
     private fun cached(key: String): MeloXAutoMixTrackAnalysis? =
         synchronized(cacheLock) { cache[key] }

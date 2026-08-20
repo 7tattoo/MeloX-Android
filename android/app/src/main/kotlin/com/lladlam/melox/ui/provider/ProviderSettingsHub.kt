@@ -66,6 +66,8 @@ fun ProviderSettingsHub(
     neteaseSession: NeteaseSessionStore,
     onNeteaseLogin: () -> Unit,
     onOpenServices: () -> Unit,
+    initialRouteRequest: String? = null,
+    onInitialRouteConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val accountManager = remember(neteaseSession) {
@@ -126,6 +128,8 @@ fun ProviderSettingsHub(
         session = neteaseSession,
         onLogin = onNeteaseLogin,
         onOpenServices = onOpenServices,
+        initialRouteRequest = initialRouteRequest,
+        onInitialRouteConsumed = onInitialRouteConsumed,
     )
 
     if (showServiceDialog) {

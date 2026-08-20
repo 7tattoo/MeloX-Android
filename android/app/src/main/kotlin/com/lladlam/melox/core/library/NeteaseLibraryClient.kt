@@ -103,7 +103,15 @@ class NeteaseLibraryClient(
                     val radio = program.optJSONObject("radio") ?: continue
                     val radioId = radio.optLong("id", -1L)
                     if (radioId <= 0L) continue
-                    add(NeteaseHomePodcast(radioId, radio.optString("name").ifBlank { program.optString("name").ifBlank { "播客" } }, secureUrl(program.optString("coverUrl").takeIf(String::isNotBlank) ?: radio.optString("picUrl").orEmpty()).takeIf(String::isNotBlank)))
+                    val programName = program.optString("name").ifBlank { radio.optString("name").ifBlank { "播客节目" } }
+                    val cover = secureUrl(program.optString("coverUrl").takeIf(String::isNotBlank) ?: radio.optString("picUrl").orEmpty()).takeIf(String::isNotBlank)
+                    val playbackSong = parseSong(program.optJSONObject("mainSong") ?: JSONObject())?.copy(
+                        name = programName,
+                        artists = program.optJSONObject("dj")?.optString("nickname").orEmpty().ifBlank { radio.optString("name") },
+                        album = radio.optString("name"),
+                        artworkUrl = cover,
+                    )
+                    add(NeteaseHomePodcast(radioId, programName, cover, program.optLong("id", 0L).takeIf { it > 0L }, playbackSong))
                 }
             }.distinctBy(NeteaseHomePodcast::id).take(limit)
         }.getOrDefault(emptyList()) else emptyList()

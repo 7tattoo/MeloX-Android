@@ -139,10 +139,23 @@ internal object NeteaseHomeBlockParser {
         val program = value.optJSONObject("resourceExtInfo")?.optJSONObject("djProgram")
         val radio = program?.optJSONObject("radio")
         val radioId = radio?.let { longValue(it, "id") } ?: return null
+        val programId = program.let { longValue(it, "id") }
+        val programName = program.optString("name")
+            .ifBlank { ui?.optJSONObject("mainTitle")?.optString("title").orEmpty() }
+            .ifBlank { radio.optString("name") }
+            .ifBlank { "播客节目" }
+        val playbackSong = program.optJSONObject("mainSong")?.let(::parseSong)?.copy(
+            name = programName,
+            artists = program.optJSONObject("dj")?.optString("nickname").orEmpty().ifBlank { radio.optString("name") },
+            album = radio.optString("name"),
+            artworkUrl = secure(program.optString("coverUrl").takeIf(String::isNotBlank) ?: radio.optString("picUrl").takeIf(String::isNotBlank)),
+        )
         return NeteaseHomePodcast(
             id = radioId,
-            name = radio.optString("name").ifBlank { program.optString("name").ifBlank { ui?.optJSONObject("mainTitle")?.optString("title").orEmpty().ifBlank { "播客" } } },
+            name = programName,
             artworkUrl = secure(program.optString("coverUrl").takeIf(String::isNotBlank) ?: radio.optString("picUrl").takeIf(String::isNotBlank) ?: ui?.optJSONObject("image")?.optString("imageUrl")?.takeIf(String::isNotBlank)),
+            programId = programId,
+            playbackSong = playbackSong,
         )
     }
 

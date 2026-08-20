@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontWeight
+import com.lladlam.melox.playback.MeloXPlaybackModePreferences
 
 enum class MeloXThemeMode { System, Light, Dark }
 enum class MeloXLyricAnnotationDisplayMode { FocusedLine, AllLines }
@@ -53,6 +54,24 @@ object MeloXSettingsRuntime {
     var downloadsEnabled by mutableStateOf(true)
         internal set
     var cloudMusicEnabled by mutableStateOf(true)
+        internal set
+    var podcastsHomePlacement by mutableStateOf(true)
+        internal set
+    var podcastsTabPlacement by mutableStateOf(false)
+        internal set
+    var podcastsLibraryPlacement by mutableStateOf(true)
+        internal set
+    var downloadsHomePlacement by mutableStateOf(false)
+        internal set
+    var downloadsTabPlacement by mutableStateOf(false)
+        internal set
+    var downloadsLibraryPlacement by mutableStateOf(true)
+        internal set
+    var cloudHomePlacement by mutableStateOf(false)
+        internal set
+    var cloudTabPlacement by mutableStateOf(false)
+        internal set
+    var cloudLibraryPlacement by mutableStateOf(true)
         internal set
     var flowingBackdropEnabled by mutableStateOf(true)
         internal set
@@ -234,6 +253,18 @@ object MeloXSettingsRuntime {
         internal set
     var lyricNotificationShowProgress by mutableStateOf(true)
         internal set
+    var lyricNotificationShowArtwork by mutableStateOf(true)
+        internal set
+    var lyricNotificationBackgroundOnly by mutableStateOf(false)
+        internal set
+    var lyricNotificationDismissWhenPaused by mutableStateOf(true)
+        internal set
+    var lyricNotificationTitleTemplate by mutableStateOf("{lyric}")
+        internal set
+    var lyricNotificationSubtitleTemplate by mutableStateOf("{song} · {artist}")
+        internal set
+    var lyricNotificationFallback by mutableStateOf("{song} · {artist}")
+        internal set
     var floatingLyricsEnabled by mutableStateOf(false)
         internal set
     var floatingSecondaryMode by mutableStateOf(MeloXSecondaryLyricMode.Auto)
@@ -258,7 +289,7 @@ object MeloXSettingsRuntime {
         internal set
     var rememberLastTab by mutableStateOf(true)
         internal set
-    var tabOrder by mutableStateOf(listOf("Home", "Explore", "Library", "Settings"))
+    var tabOrder by mutableStateOf(listOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings"))
         internal set
     var defaultTab by mutableStateOf("Home")
         internal set
@@ -285,6 +316,27 @@ object MeloXSettingsRuntime {
 
     private var initialized = false
 
+    /** Reads only state required to draw the first root frame. The remaining settings load after setContent. */
+    fun initializeCritical(context: Context) {
+        val app = context.applicationContext
+        themeMode = runCatching {
+            MeloXThemeMode.valueOf(MeloXSettingsPreferences.string(app, "theme_mode", MeloXThemeMode.System.name))
+        }.getOrDefault(MeloXThemeMode.System)
+        homeTabEnabled = MeloXSettingsPreferences.boolean(app, "tab_home", true)
+        exploreTabEnabled = MeloXSettingsPreferences.boolean(app, "tab_explore", true)
+        libraryTabEnabled = MeloXSettingsPreferences.boolean(app, "tab_library", true)
+        podcastsTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_podcasts_tab", false)
+        downloadsTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_downloads_tab", false)
+        cloudTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_cloud_tab", false)
+        rememberLastTab = MeloXSettingsPreferences.boolean(app, "general_remember_tab", true)
+        tabOrder = MeloXSettingsPreferences.string(app, "tab_order", "Home,Explore,Library,Podcasts,Downloads,Cloud,Settings")
+            .split(',').filter { it in setOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings") }.distinct()
+            .let { order -> (order + listOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings")).distinct() }
+        defaultTab = MeloXSettingsPreferences.string(app, "general_default_tab", "Home")
+        rememberLibraryPage = MeloXSettingsPreferences.boolean(app, "library_remember_page", true)
+        defaultLibraryPage = MeloXSettingsPreferences.string(app, "library_default_page", "Songs")
+    }
+
     fun initialize(context: Context, force: Boolean = false) {
         if (initialized && !force) return
         initialized = true
@@ -297,6 +349,15 @@ object MeloXSettingsRuntime {
         listeningHistoryEnabled = MeloXSettingsPreferences.boolean(app, "feature_history", true)
         downloadsEnabled = MeloXSettingsPreferences.boolean(app, "feature_downloads", true)
         cloudMusicEnabled = MeloXSettingsPreferences.boolean(app, "feature_cloud_music", true)
+        podcastsHomePlacement = MeloXSettingsPreferences.boolean(app, "placement_podcasts_home", true)
+        podcastsTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_podcasts_tab", false)
+        podcastsLibraryPlacement = MeloXSettingsPreferences.boolean(app, "placement_podcasts_library", true)
+        downloadsHomePlacement = MeloXSettingsPreferences.boolean(app, "placement_downloads_home", false)
+        downloadsTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_downloads_tab", false)
+        downloadsLibraryPlacement = MeloXSettingsPreferences.boolean(app, "placement_downloads_library", true)
+        cloudHomePlacement = MeloXSettingsPreferences.boolean(app, "placement_cloud_home", false)
+        cloudTabPlacement = MeloXSettingsPreferences.boolean(app, "placement_cloud_tab", false)
+        cloudLibraryPlacement = MeloXSettingsPreferences.boolean(app, "placement_cloud_library", true)
         val legacyFlowingBackdropEnabled = MeloXSettingsPreferences.boolean(app, "player_flowing_backdrop", true)
         playerBackgroundMode = MeloXSettingsPreferences.string(app, "player_background_mode", "")
             .takeIf { it.isNotBlank() }
@@ -433,6 +494,12 @@ object MeloXSettingsRuntime {
         }.getOrDefault(MeloXSystemLyricTitleMode.LyricFirst)
         lyricNotificationShowNextLine = MeloXSettingsPreferences.boolean(app, "lyrics_notification_next_line", false)
         lyricNotificationShowProgress = MeloXSettingsPreferences.boolean(app, "lyrics_notification_progress", true)
+        lyricNotificationShowArtwork = MeloXSettingsPreferences.boolean(app, "lyrics_notification_artwork", true)
+        lyricNotificationBackgroundOnly = MeloXSettingsPreferences.boolean(app, "lyrics_notification_background_only", false)
+        lyricNotificationDismissWhenPaused = MeloXSettingsPreferences.boolean(app, "lyrics_notification_dismiss_paused", true)
+        lyricNotificationTitleTemplate = MeloXSettingsPreferences.string(app, "lyrics_notification_title_template", "{lyric}")
+        lyricNotificationSubtitleTemplate = MeloXSettingsPreferences.string(app, "lyrics_notification_subtitle_template", "{song} · {artist}")
+        lyricNotificationFallback = MeloXSettingsPreferences.string(app, "lyrics_notification_fallback", "{song} · {artist}")
         floatingLyricsEnabled = MeloXSettingsPreferences.boolean(app, "floating_lyrics_enabled", false)
         floatingSecondaryMode = runCatching {
             MeloXSecondaryLyricMode.valueOf(
@@ -451,9 +518,9 @@ object MeloXSettingsRuntime {
         exploreTabEnabled = MeloXSettingsPreferences.boolean(app, "tab_explore", true)
         libraryTabEnabled = MeloXSettingsPreferences.boolean(app, "tab_library", true)
         rememberLastTab = MeloXSettingsPreferences.boolean(app, "general_remember_tab", true)
-        tabOrder = MeloXSettingsPreferences.string(app, "tab_order", "Home,Explore,Library,Settings")
-            .split(',').filter { it in setOf("Home", "Explore", "Library", "Settings") }.distinct()
-            .let { order -> (order + listOf("Home", "Explore", "Library", "Settings")).distinct() }
+        tabOrder = MeloXSettingsPreferences.string(app, "tab_order", "Home,Explore,Library,Podcasts,Downloads,Cloud,Settings")
+            .split(',').filter { it in setOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings") }.distinct()
+            .let { order -> (order + listOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings")).distinct() }
         defaultTab = MeloXSettingsPreferences.string(app, "general_default_tab", "Home")
         rememberLibraryPage = MeloXSettingsPreferences.boolean(app, "library_remember_page", true)
         defaultLibraryPage = MeloXSettingsPreferences.string(app, "library_default_page", "Songs")
@@ -484,6 +551,8 @@ object MeloXSettingsPreferences {
 
     fun initialize(context: Context) = MeloXSettingsRuntime.initialize(context)
 
+    fun initializeCritical(context: Context) = MeloXSettingsRuntime.initializeCritical(context)
+
     fun boolean(context: Context, key: String, default: Boolean = false): Boolean =
         prefs(context).getBoolean(key, default)
 
@@ -495,6 +564,15 @@ object MeloXSettingsPreferences {
 
     fun float(context: Context, key: String, default: Float = 0f): Float =
         prefs(context).getFloat(key, default)
+
+    fun number(context: Context, key: String, default: Float = 0f): Float =
+        when (val value = prefs(context).all[key]) {
+            is Float -> value
+            is Int -> value.toFloat()
+            is Long -> value.toFloat()
+            is Double -> value.toFloat()
+            else -> default
+        }
 
     fun long(context: Context, key: String, default: Long = 0L): Long =
         prefs(context).getLong(key, default)
@@ -511,6 +589,15 @@ object MeloXSettingsPreferences {
             "feature_history" -> MeloXSettingsRuntime.listeningHistoryEnabled = value
             "feature_downloads" -> MeloXSettingsRuntime.downloadsEnabled = value
             "feature_cloud_music" -> MeloXSettingsRuntime.cloudMusicEnabled = value
+            "placement_podcasts_home" -> MeloXSettingsRuntime.podcastsHomePlacement = value
+            "placement_podcasts_tab" -> MeloXSettingsRuntime.podcastsTabPlacement = value
+            "placement_podcasts_library" -> MeloXSettingsRuntime.podcastsLibraryPlacement = value
+            "placement_downloads_home" -> MeloXSettingsRuntime.downloadsHomePlacement = value
+            "placement_downloads_tab" -> MeloXSettingsRuntime.downloadsTabPlacement = value
+            "placement_downloads_library" -> MeloXSettingsRuntime.downloadsLibraryPlacement = value
+            "placement_cloud_home" -> MeloXSettingsRuntime.cloudHomePlacement = value
+            "placement_cloud_tab" -> MeloXSettingsRuntime.cloudTabPlacement = value
+            "placement_cloud_library" -> MeloXSettingsRuntime.cloudLibraryPlacement = value
             "player_flowing_backdrop" -> MeloXSettingsRuntime.flowingBackdropEnabled = value
             "player_artwork_motion" -> MeloXSettingsRuntime.artworkMotionEnabled = value
             "player_background_isolation" -> MeloXSettingsRuntime.playerBackgroundIsolationEnabled = value
@@ -537,6 +624,9 @@ object MeloXSettingsPreferences {
             "lyrics_notifications_enabled" -> MeloXSettingsRuntime.lyricNotificationsEnabled = value
             "lyrics_notification_next_line" -> MeloXSettingsRuntime.lyricNotificationShowNextLine = value
             "lyrics_notification_progress" -> MeloXSettingsRuntime.lyricNotificationShowProgress = value
+            "lyrics_notification_artwork" -> MeloXSettingsRuntime.lyricNotificationShowArtwork = value
+            "lyrics_notification_background_only" -> MeloXSettingsRuntime.lyricNotificationBackgroundOnly = value
+            "lyrics_notification_dismiss_paused" -> MeloXSettingsRuntime.lyricNotificationDismissWhenPaused = value
             "floating_lyrics_enabled" -> MeloXSettingsRuntime.floatingLyricsEnabled = value
             "floating_lyrics_high_contrast" -> MeloXSettingsRuntime.floatingHighContrast = value
             "tab_home" -> MeloXSettingsRuntime.homeTabEnabled = value
@@ -681,6 +771,9 @@ object MeloXSettingsPreferences {
             "system_lyrics_title_mode" -> MeloXSettingsRuntime.systemLyricTitleMode = runCatching {
                 MeloXSystemLyricTitleMode.valueOf(value)
             }.getOrDefault(MeloXSystemLyricTitleMode.LyricFirst)
+            "lyrics_notification_title_template" -> MeloXSettingsRuntime.lyricNotificationTitleTemplate = value
+            "lyrics_notification_subtitle_template" -> MeloXSettingsRuntime.lyricNotificationSubtitleTemplate = value
+            "lyrics_notification_fallback" -> MeloXSettingsRuntime.lyricNotificationFallback = value
             "floating_lyrics_secondary_mode" -> MeloXSettingsRuntime.floatingSecondaryMode = runCatching {
                 MeloXSecondaryLyricMode.valueOf(value)
             }.getOrDefault(MeloXSecondaryLyricMode.Auto)
@@ -696,5 +789,22 @@ object MeloXSettingsPreferences {
     fun reset(context: Context) {
         prefs(context).edit().clear().apply()
         MeloXSettingsRuntime.initialize(context, force = true)
+    }
+
+    fun resetRecommendedPlayerSettings(context: Context) {
+        prefs(context).edit()
+            .remove("player_background_mode")
+            .remove("player_flowing_backdrop")
+            .remove("player_artwork_motion")
+            .remove("player_background_isolation")
+            .remove("player_transition_duration_ms")
+            .remove("lyrics_style")
+            .remove("lyrics_rendering_quality")
+            .remove("lyrics_text_pv_style")
+            .remove("lyrics_text_pv_motion_intensity")
+            .remove("lyrics_text_pv_animation_speed")
+            .apply()
+        MeloXPlaybackModePreferences.reset(context)
+        MeloXSettingsRuntime.initialize(context.applicationContext, force = true)
     }
 }

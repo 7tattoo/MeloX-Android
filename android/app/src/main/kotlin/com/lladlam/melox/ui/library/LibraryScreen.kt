@@ -1,7 +1,14 @@
 package com.lladlam.melox.ui.library
 
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -137,10 +144,10 @@ private enum class MeloXLibraryPage(val title: String) {
  */
 private fun MeloXLibraryPage.isEnabled(source: MusicSource): Boolean = when {
     source != MusicSource.Netease -> this == MeloXLibraryPage.Playlists
-    this == MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled
+    this == MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled && MeloXSettingsRuntime.podcastsLibraryPlacement
     this == MeloXLibraryPage.History -> MeloXSettingsRuntime.listeningHistoryEnabled
-    this == MeloXLibraryPage.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled
-    this == MeloXLibraryPage.Downloads -> MeloXSettingsRuntime.downloadsEnabled
+    this == MeloXLibraryPage.Cloud -> MeloXSettingsRuntime.cloudMusicEnabled && MeloXSettingsRuntime.cloudLibraryPlacement
+    this == MeloXLibraryPage.Downloads -> MeloXSettingsRuntime.downloadsEnabled && MeloXSettingsRuntime.downloadsLibraryPlacement
     else -> true
 }
 
@@ -150,6 +157,7 @@ fun LibraryScreen(
     session: NeteaseSessionStore,
     onLogin: (() -> Unit)?,
     source: MusicSource = MusicSource.Netease,
+    forcedPageName: String? = null,
     playlistBackEnabled: Boolean = true,
     onModalVisibilityChanged: (Boolean) -> Unit = {},
 ) {
@@ -173,17 +181,17 @@ fun LibraryScreen(
         "library_last_page_${source.storageValue}"
     }
 
-    val initialLibraryPage = remember(source) {
+    val initialLibraryPage = remember(source, forcedPageName) {
         val fallback = if (source == MusicSource.Netease) MeloXLibraryPage.Songs else MeloXLibraryPage.Playlists
-        val name = if (MeloXSettingsRuntime.rememberLibraryPage) {
+        val name = forcedPageName ?: if (MeloXSettingsRuntime.rememberLibraryPage) {
             MeloXSettingsPreferences.string(appContext, libraryPagePreferenceKey, fallback.name)
         } else fallback.name
         runCatching { MeloXLibraryPage.valueOf(name) }
             .getOrDefault(fallback)
-            .takeIf { it.isEnabled(source) }
+            .takeIf { forcedPageName != null || it.isEnabled(source) }
             ?: fallback
     }
-    var selectedPage by remember(source) { mutableStateOf(initialLibraryPage) }
+    var selectedPage by remember(source, forcedPageName) { mutableStateOf(initialLibraryPage) }
     var selectedPlaylist by remember(source, session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
     var snapshot by remember(source, session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
     var providerAccount by remember(source) { mutableStateOf<MusicAccountSummary?>(null) }
@@ -223,7 +231,7 @@ fun LibraryScreen(
             runCatching {
                 withContext(Dispatchers.IO) {
                     val account = capability.accountSummary()
-                    val playlists = if (account != null) {
+                    val playlists = if (account != null && provider is PlaylistCapability) {
                         capability.userPlaylists(page = 1, pageSize = 100).items
                     } else {
                         emptyList()
@@ -255,7 +263,7 @@ fun LibraryScreen(
     }
 
     LaunchedEffect(source, selectedPage) {
-        if (MeloXSettingsRuntime.rememberLibraryPage) {
+        if (forcedPageName == null && MeloXSettingsRuntime.rememberLibraryPage) {
             MeloXSettingsPreferences.setString(appContext, libraryPagePreferenceKey, selectedPage.name)
         }
     }
@@ -267,7 +275,7 @@ fun LibraryScreen(
         MeloXSettingsRuntime.cloudMusicEnabled,
         MeloXSettingsRuntime.downloadsEnabled,
     ) {
-        if (!selectedPage.isEnabled(source)) {
+        if (forcedPageName == null && !selectedPage.isEnabled(source)) {
             selectedPage = if (source == MusicSource.Netease) MeloXLibraryPage.Songs else MeloXLibraryPage.Playlists
         }
     }
@@ -345,6 +353,7 @@ fun LibraryScreen(
                         selected = selectedPage,
                         onSelected = { selectedPage = it },
                         source = source,
+                        forcedPageName = forcedPageName,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
 
@@ -456,6 +465,9 @@ fun LibraryScreen(
 }
 
 private enum class MeloXDownloadsPage { Root, Active, Playlists, PlaylistDetail }
+private enum class MeloXLocalBrowseMode(val title: String) {
+    Songs("歌曲"), Artists("艺术家"), Albums("专辑"), Folders("文件夹")
+}
 
 @Composable
 private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
@@ -464,10 +476,45 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
     var selectedPlaylistId by remember { mutableStateOf<Long?>(null) }
     var selecting by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var browseMode by remember { mutableStateOf(MeloXLocalBrowseMode.Songs) }
+    var browseGroup by remember { mutableStateOf<String?>(null) }
+    var exportMessage by remember { mutableStateOf<String?>(null) }
 
     val active = downloads.activeDownloads.values.toList()
     val completed = downloads.downloads.toList()
     val groups = downloads.downloadedPlaylists
+    val browseGroups = remember(completed, browseMode) {
+        when (browseMode) {
+            MeloXLocalBrowseMode.Songs -> emptyMap()
+            MeloXLocalBrowseMode.Artists -> completed.groupBy { it.song.artists.ifBlank { "未知艺术家" } }
+            MeloXLocalBrowseMode.Albums -> completed.groupBy { it.song.album.ifBlank { "未知专辑" } }
+            MeloXLocalBrowseMode.Folders -> mapOf("Music/MeloX" to completed)
+        }.toSortedMap()
+    }
+    val visibleCompleted = remember(completed, browseMode, browseGroup, browseGroups) {
+        if (browseMode == MeloXLocalBrowseMode.Songs) completed
+        else browseGroup?.let { browseGroups[it].orEmpty() }.orEmpty()
+    }
+
+    fun exportSelected() {
+        if (selectedIds.isEmpty()) return
+        if (
+            Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            (context as? Activity)?.let {
+                ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 4104)
+            }
+            exportMessage = "请授予存储权限后再次导出"
+            return
+        }
+        downloads.exportToMusicLibrary(selectedIds) { result ->
+            exportMessage = result.fold(
+                onSuccess = { "已导出 $it 首到 Music/MeloX" },
+                onFailure = { it.message ?: "导出失败" },
+            )
+        }
+    }
 
     BackHandler(enabled = page != MeloXDownloadsPage.Root) {
         page = if (page == MeloXDownloadsPage.PlaylistDetail) MeloXDownloadsPage.Playlists else MeloXDownloadsPage.Root
@@ -538,6 +585,32 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
               }
           }
       }
+      item {
+          Row(
+              Modifier.fillMaxWidth().padding(bottom = 8.dp),
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+              MeloXLocalBrowseMode.entries.forEach { mode ->
+                  Text(
+                      mode.title,
+                      color = if (browseMode == mode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = .55f),
+                      fontWeight = if (browseMode == mode) FontWeight.Bold else FontWeight.Medium,
+                      modifier = Modifier
+                          .clip(RoundedCornerShape(14.dp))
+                          .background(MaterialTheme.colorScheme.onBackground.copy(alpha = if (browseMode == mode) .10f else .04f))
+                          .clickable {
+                              browseMode = mode
+                              browseGroup = null
+                              selectedIds = emptySet()
+                          }
+                          .padding(horizontal = 12.dp, vertical = 7.dp),
+                  )
+              }
+          }
+      }
+      exportMessage?.let { value ->
+          item { Text(value, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp)) }
+      }
   if (groups.isNotEmpty()) {
       item {
           DownloadNavigationCard(
@@ -547,7 +620,18 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
           )
       }
   }
-      items(completed, key = { "download-${it.song.id}" }) { item ->
+      if (browseMode != MeloXLocalBrowseMode.Songs && browseGroup == null) {
+          items(browseGroups.entries.toList(), key = { "browse-${browseMode.name}-${it.key}" }) { group ->
+              DownloadNavigationCard(
+                  title = group.key,
+                  subtitle = "${group.value.size} 首歌曲",
+                  onClick = { browseGroup = group.key },
+              )
+          }
+      } else if (browseMode != MeloXLocalBrowseMode.Songs) {
+          item { DownloadsSubpageHeader(browseGroup.orEmpty()) { browseGroup = null } }
+      }
+      items(visibleCompleted, key = { "download-${it.song.id}" }) { item ->
           val checked = item.song.id in selectedIds
           Row(
               Modifier
@@ -588,22 +672,31 @@ private fun MeloXLibraryDownloadsPage(downloads: MeloXDownloadStore) {
       if (selecting) {
           item {
               val canDelete = selectedIds.isNotEmpty()
-              Box(
-                  Modifier.fillMaxWidth().padding(top = 16.dp).height(48.dp)
-                      .clip(RoundedCornerShape(18.dp))
-                      .background(MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) .14f else .05f))
-                      .clickable(enabled = canDelete) {
-                          downloads.removeMany(selectedIds)
-                          selectedIds = emptySet()
-                          selecting = false
-                      },
-                  contentAlignment = Alignment.Center,
-              ) {
-                  Text(
-                      if (canDelete) "删除已选 ${selectedIds.size} 首" else "请选择歌曲",
-                      color = MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) 1f else .4f),
-                      fontWeight = FontWeight.SemiBold,
-                  )
+              Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                  Box(
+                      Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(18.dp))
+                          .background(MaterialTheme.colorScheme.primary.copy(alpha = if (canDelete) .14f else .05f))
+                          .clickable(enabled = canDelete) { exportSelected() },
+                      contentAlignment = Alignment.Center,
+                  ) {
+                      Text("导出已选", color = MaterialTheme.colorScheme.primary.copy(alpha = if (canDelete) 1f else .4f), fontWeight = FontWeight.SemiBold)
+                  }
+                  Box(
+                      Modifier.weight(1f).height(48.dp).clip(RoundedCornerShape(18.dp))
+                          .background(MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) .14f else .05f))
+                          .clickable(enabled = canDelete) {
+                              downloads.removeMany(selectedIds)
+                              selectedIds = emptySet()
+                              selecting = false
+                          },
+                      contentAlignment = Alignment.Center,
+                  ) {
+                      Text(
+                          if (canDelete) "删除 ${selectedIds.size} 首" else "请选择歌曲",
+                          color = MaterialTheme.colorScheme.error.copy(alpha = if (canDelete) 1f else .4f),
+                          fontWeight = FontWeight.SemiBold,
+                      )
+                  }
               }
           }
       }
@@ -792,6 +885,7 @@ private fun formatDownloadSpeed(bytesPerSecond: Long): String = when {
 private fun MeloXLibraryLoginUnavailable(
     onLogin: (() -> Unit)?,
     source: MusicSource,
+    forcedPageName: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -847,9 +941,10 @@ private fun MeloXLibrarySegmentedPicker(
     selected: MeloXLibraryPage,
     onSelected: (MeloXLibraryPage) -> Unit,
     source: MusicSource,
+    forcedPageName: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val pages = MeloXLibraryPage.entries.filter { it.isEnabled(source) }
+    val pages = MeloXLibraryPage.entries.filter { it.isEnabled(source) || it.name == forcedPageName }
     val panelShape = MeloXShapes.compact
     val lensShape = RoundedCornerShape(15.dp)
     val panelBackdrop = rememberLayerBackdrop()
@@ -1178,6 +1273,32 @@ private fun MeloXInsetDivider(leading: androidx.compose.ui.unit.Dp) {
     )
 }
 
+/** Canonical playlist detail used by Library, Home, Explore, Search and account entry points. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+internal fun MeloXUnifiedPlaylistDetailScreen(
+    playlist: NeteasePlaylistSummary,
+    onBack: () -> Unit,
+    onModalVisibilityChanged: (Boolean) -> Unit = {},
+) {
+    val context = LocalContext.current.applicationContext
+    val client = remember(context) {
+        NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
+    }
+    SharedTransitionLayout(Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = true) {
+            MeloXPlaylistDetailScreen(
+                initialPlaylist = playlist,
+                client = client,
+                onBack = onBack,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                animatedVisibilityScope = this,
+                onModalVisibilityChanged = onModalVisibilityChanged,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun MeloXPlaylistDetailScreen(
@@ -1192,7 +1313,6 @@ private fun MeloXPlaylistDetailScreen(
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
     val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
-    val downloadStore = remember(appContext) { MeloXDownloadStore.get(appContext) }
     val accountClient = remember(appContext) {
         NeteaseSearchClient(cookieProvider = { NeteaseSessionStore.readCookie(appContext) })
     }
@@ -1211,13 +1331,15 @@ private fun MeloXPlaylistDetailScreen(
     var errorMessage by remember(initialPlaylist.id) { mutableStateOf<String?>(null) }
     var searchQuery by remember(initialPlaylist.id) { mutableStateOf("") }
     var showPlaylistActions by remember(initialPlaylist.id) { mutableStateOf(false) }
+    var showBatchDownload by remember(initialPlaylist.id) { mutableStateOf(false) }
     var selectedTrackAction by remember(initialPlaylist.id) { mutableStateOf<SearchSong?>(null) }
     var isSaved by remember(initialPlaylist.id) { mutableStateOf<Boolean?>(null) }
+    var currentUserId by remember(initialPlaylist.id) { mutableStateOf<Long?>(null) }
     var savingPlaylist by remember(initialPlaylist.id) { mutableStateOf(false) }
     var palette by remember(initialPlaylist.coverUrl) { mutableStateOf(MeloXDetailPalette.LightFallback) }
 
-    DisposableEffect(showPlaylistActions, selectedTrackAction) {
-        val visible = !isProviderPlaylist && (showPlaylistActions || selectedTrackAction != null)
+    DisposableEffect(showPlaylistActions, showBatchDownload, selectedTrackAction) {
+        val visible = !isProviderPlaylist && (showPlaylistActions || showBatchDownload || selectedTrackAction != null)
         onModalVisibilityChanged(visible)
         onDispose {
             if (visible) onModalVisibilityChanged(false)
@@ -1236,6 +1358,7 @@ private fun MeloXPlaylistDetailScreen(
         }
         runCatching {
             val profile = accountClient.accountProfile(cookie)
+            currentUserId = profile.userId
             withContext(Dispatchers.IO) {
                 client.userPlaylistsBlocking(profile.userId)
             }.any { it.id == initialPlaylist.id }
@@ -1388,15 +1511,7 @@ private fun MeloXPlaylistDetailScreen(
                         showDownloadAction = !isProviderPlaylist,
                         onDownloadAll = {
                             if (!isProviderPlaylist) {
-                                val quality = MusicQualityPreferences.read(appContext)
-                                val downloadSource = MeloXDownloadPlaylistRef(
-                                    id = displayed.id,
-                                    name = displayed.name,
-                                    artworkUrl = displayed.coverUrl,
-                                )
-                                songs.forEach { song ->
-                                    downloadStore.start(song, quality, downloadSource)
-                                }
+                                showBatchDownload = true
                             }
                         },
                         onToggleSaved = {
@@ -1507,6 +1622,16 @@ private fun MeloXPlaylistDetailScreen(
                 onDismiss = { showPlaylistActions = false },
                 onRefresh = { scope.launch { refreshPlaylist() } },
             )
+            MeloXBatchDownloadSheet(
+                songs = songs,
+                sourcePlaylist = MeloXDownloadPlaylistRef(
+                    id = displayed.id,
+                    name = displayed.name,
+                    artworkUrl = displayed.coverUrl,
+                ),
+                visible = showBatchDownload,
+                onDismiss = { showBatchDownload = false },
+            )
             val actionSong = selectedTrackAction
             if (actionSong != null) {
                 MeloXSongActionsOverlay(
@@ -1519,6 +1644,13 @@ private fun MeloXPlaylistDetailScreen(
                         name = displayed.name,
                         artworkUrl = displayed.coverUrl,
                     ),
+                    sourceOwnedPlaylistId = displayed.id.takeIf {
+                        displayed.creatorUserId != null && displayed.creatorUserId == currentUserId
+                    },
+                    onSourcePlaylistChanged = {
+                        selectedTrackAction = null
+                        scope.launch { refreshPlaylist() }
+                    },
                 )
             }
         }

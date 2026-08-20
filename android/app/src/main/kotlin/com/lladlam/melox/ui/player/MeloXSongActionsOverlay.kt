@@ -82,6 +82,7 @@ private enum class SongActionPage {
     Main,
     Sleep,
     AddToPlaylist,
+    CreatePlaylist,
     Comments,
     CommentReplies,
     ShareContacts,
@@ -99,6 +100,8 @@ fun MeloXSongActionsOverlay(
     playbackState: MeloXPlaybackUiState? = null,
     onNavigateSearch: ((String, MeloXSearchKind) -> Unit)? = null,
     sourcePlaylist: MeloXDownloadPlaylistRef? = null,
+    sourceOwnedPlaylistId: Long? = null,
+    onSourcePlaylistChanged: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -115,6 +118,8 @@ fun MeloXSongActionsOverlay(
     var message by remember(song.id, visible) { mutableStateOf<String?>(null) }
     var liked by remember(song.id, visible) { mutableStateOf<Boolean?>(null) }
     var writablePlaylists by remember(song.id, visible) { mutableStateOf<List<NeteasePlaylistSummary>>(emptyList()) }
+    var newPlaylistName by remember(song.id, visible) { mutableStateOf("") }
+    var newPlaylistPrivate by remember(song.id, visible) { mutableStateOf(false) }
     var hotComments by remember(song.id, visible) { mutableStateOf<List<MeloXMusicComment>>(emptyList()) }
     var comments by remember(song.id, visible) { mutableStateOf<List<MeloXMusicComment>>(emptyList()) }
     var commentsPage by remember(song.id, visible) { mutableStateOf<com.lladlam.melox.core.network.MeloXCommentsPage?>(null) }
@@ -229,6 +234,7 @@ fun MeloXSongActionsOverlay(
                                 SongActionPage.Main -> "歌曲操作"
                                 SongActionPage.Sleep -> "定时关闭"
                                 SongActionPage.AddToPlaylist -> "添加到歌单"
+                                SongActionPage.CreatePlaylist -> "创建歌单"
                                 SongActionPage.Comments -> "评论"
                                 SongActionPage.CommentReplies -> "评论回复"
                                 SongActionPage.ShareContacts -> "发送给网易云好友"
@@ -283,6 +289,22 @@ fun MeloXSongActionsOverlay(
                                     page = SongActionPage.AddToPlaylist
                                     scope.launch { loadOwnedPlaylists() }
                                 }
+                                sourceOwnedPlaylistId?.let { playlistId ->
+                                    ActionItem("从当前歌单移除", "−") {
+                                        if (!busy) {
+                                            busy = true
+                                            scope.launch {
+                                                runCatching { ops.removeSongFromPlaylist(song.id, playlistId) }
+                                                    .onSuccess {
+                                                        onSourcePlaylistChanged?.invoke()
+                                                        onDismiss()
+                                                    }
+                                                    .onFailure { message = it.message ?: "移除歌曲失败" }
+                                                busy = false
+                                            }
+                                        }
+                                    }
+                                }
                                 ActionItem(if (liked == true) "取消喜爱" else "喜爱", if (liked == true) "♥" else "♡") {
                                     val desired = liked != true
                                     busy = true
@@ -333,6 +355,10 @@ fun MeloXSongActionsOverlay(
 
                             SongActionPage.AddToPlaylist -> {
                                 if (busy) LoadingRow("正在读取歌单")
+                                ActionItem("新建歌单", "+") {
+                                    message = null
+                                    page = SongActionPage.CreatePlaylist
+                                }
                                 writablePlaylists.forEach { playlist ->
                                     Row(
                                         Modifier.fillMaxWidth().height(58.dp).clickable(enabled = !busy) {
@@ -363,6 +389,58 @@ fun MeloXSongActionsOverlay(
                                     Text("没有可写入的自建歌单。", color = Color.White.copy(alpha = .55f), modifier = Modifier.padding(12.dp))
                                 }
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
+                            }
+
+                            SongActionPage.CreatePlaylist -> {
+                                Text(
+                                    "创建歌单",
+                                    color = Color.White,
+                                    fontSize = 21.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .background(Color.White.copy(alpha = .10f), RoundedCornerShape(14.dp))
+                                        .padding(horizontal = 14.dp),
+                                    contentAlignment = Alignment.CenterStart,
+                                ) {
+                                    if (newPlaylistName.isBlank()) {
+                                        Text("歌单名称", color = Color.White.copy(alpha = .42f), fontSize = 16.sp)
+                                    }
+                                    BasicTextField(
+                                        value = newPlaylistName,
+                                        onValueChange = { newPlaylistName = it.take(40) },
+                                        enabled = !busy,
+                                        singleLine = true,
+                                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                                ActionItem(
+                                    if (newPlaylistPrivate) "私密歌单" else "公开歌单",
+                                    if (newPlaylistPrivate) "▣" else "◎",
+                                ) { newPlaylistPrivate = !newPlaylistPrivate }
+                                ActionItem("创建并添加歌曲", "✓") {
+                                    if (!busy && newPlaylistName.isNotBlank()) {
+                                        busy = true
+                                        message = null
+                                        scope.launch {
+                                            runCatching {
+                                                val created = ops.createPlaylist(newPlaylistName, newPlaylistPrivate)
+                                                ops.addSongToPlaylist(song.id, created.id)
+                                                created
+                                            }.onSuccess {
+                                                onSourcePlaylistChanged?.invoke()
+                                                onDismiss()
+                                            }.onFailure { message = it.message ?: "歌单创建失败" }
+                                            busy = false
+                                        }
+                                    }
+                                }
+                                ActionItem("返回歌单列表", "‹") { page = SongActionPage.AddToPlaylist }
                             }
 
                             SongActionPage.Comments -> {

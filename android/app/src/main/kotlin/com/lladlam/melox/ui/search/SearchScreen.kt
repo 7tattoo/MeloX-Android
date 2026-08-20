@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,6 +90,8 @@ import com.lladlam.melox.ui.glass.MeloXSearchBackMorphIcon
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.glass.MeloXSystemColors
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.library.MeloXUnifiedPlaylistDetailScreen
+import com.lladlam.melox.core.music.provider.MeloXLegacyUiBridge
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -201,8 +204,8 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
         }
     }
 
-    var query by remember(source) { mutableStateOf("") }
-    var kind by remember(source) { mutableStateOf(MeloXSearchKind.Songs) }
+    var query by rememberSaveable(source.name) { mutableStateOf("") }
+    var kind by rememberSaveable(source.name) { mutableStateOf(MeloXSearchKind.Songs) }
     var songs by remember(source) { mutableStateOf<List<SearchSong>>(emptyList()) }
     var providerSongs by remember(source) { mutableStateOf<List<MusicTrack>>(emptyList()) }
     var providerPlaylists by remember(source) { mutableStateOf<List<MusicPlaylistSummary>>(emptyList()) }
@@ -333,7 +336,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
                         .onFailure { error = it.message ?: "搜索失败" }
                 } else {
                     val capability = providerCatalog
-                    if (capability == null) error = "${source.displayName} 当前没有歌单搜索能力"
+                    if (capability == null || currentProvider !is PlaylistCapability) error = "${source.displayName} 当前没有可用的歌单详情能力"
                     else runCatching {
                         withContext(Dispatchers.IO) { capability.searchPlaylists(keyword, page = 1, pageSize = 40).items }
                     }.onSuccess { providerPlaylists = it }
@@ -349,7 +352,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
                         .onFailure { error = it.message ?: "搜索失败" }
                 } else {
                     val capability = providerCatalog
-                    if (capability == null) error = "${source.displayName} 当前没有专辑搜索能力"
+                    if (capability == null || currentProvider !is AlbumCapability) error = "${source.displayName} 当前没有可用的专辑详情能力"
                     else runCatching {
                         withContext(Dispatchers.IO) { capability.searchAlbums(keyword, page = 1, pageSize = 40).items }
                     }.onSuccess { providerAlbums = it }
@@ -365,7 +368,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
                         .onFailure { error = it.message ?: "搜索失败" }
                 } else {
                     val capability = providerCatalog
-                    if (capability == null) error = "${source.displayName} 当前没有歌手搜索能力"
+                    if (capability == null || currentProvider !is ArtistCapability) error = "${source.displayName} 当前没有可用的歌手详情能力"
                     else runCatching {
                         withContext(Dispatchers.IO) { capability.searchArtists(keyword, page = 1, pageSize = 40).items }
                     }.onSuccess { providerArtists = it }
@@ -859,6 +862,29 @@ private fun SearchCollectionDetail(
     providerRegistry: com.lladlam.melox.core.music.provider.MusicProviderRegistry,
     onBack: () -> Unit,
 ) {
+    when (destination) {
+        is SearchDetailDestination.Netease -> if (destination.value.kind == MeloXSearchKind.Playlists) {
+            val value = destination.value
+            MeloXUnifiedPlaylistDetailScreen(
+                playlist = com.lladlam.melox.core.library.NeteasePlaylistSummary(
+                    id = value.id,
+                    name = value.title,
+                    coverUrl = value.artworkUrl,
+                    trackCount = value.trackCount,
+                    creatorName = value.subtitle,
+                ),
+                onBack = onBack,
+            )
+            return
+        }
+        is SearchDetailDestination.Provider -> {
+            val value = destination.value
+            if (value is ProviderSearchDestination.Playlist) {
+                MeloXUnifiedPlaylistDetailScreen(MeloXLegacyUiBridge.playlist(value.value), onBack)
+                return
+            }
+        }
+    }
     val context = LocalContext.current
     var songs by remember(destination.key) { mutableStateOf<List<SearchSong>>(emptyList()) }
     var providerTracks by remember(destination.key) { mutableStateOf<List<MusicTrack>>(emptyList()) }

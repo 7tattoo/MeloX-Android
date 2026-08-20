@@ -1419,6 +1419,24 @@ private fun MeloXGlyphLyricText(
             // line flash before the first syllable started revealing.
             val unplayedAlpha = MeloXSettingsRuntime.lyricInactiveOpacity
 
+            if (renderingQuality != MeloXLyricsRenderingQuality.High || reduceMotion) {
+                // Low/Balanced render the complete shaped row twice and reveal
+                // it with one row mask. This preserves ligatures and reduces a
+                // CJK line from dozens of native drawText/clip calls to two.
+                drawText(layout, color = Color.White.copy(alpha = unplayedAlpha))
+                val first = line.syllables.minOfOrNull { it.startTimeMs } ?: line.timeMs
+                val last = line.syllables.maxOfOrNull { it.endTimeMs }
+                    ?: (line.timeMs + (line.durationMs ?: 2_000L))
+                val rowReveal = ((playbackTimeMs - first).toFloat() / (last - first).coerceAtLeast(1L))
+                    .coerceIn(0f, 1f)
+                if (rowReveal > 0f) {
+                    clipRect(right = size.width * rowReveal) {
+                        drawText(layout, color = Color.White)
+                    }
+                }
+                return@Canvas
+            }
+
             for (glyph in drawableGlyphs) {
                 val bounds = glyph.bounds
                 val fx = glyphTimings.getOrNull(glyph.textOffset)?.let { timing ->

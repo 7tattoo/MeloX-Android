@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.Build
 import android.os.Handler
@@ -28,6 +29,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.core.app.NotificationCompat
 import com.lladlam.melox.MainActivity
+import com.lladlam.melox.MeloXAppVisibility
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
@@ -506,12 +508,16 @@ class MeloXPlaybackService : MediaSessionService() {
         systemLyricsLastIndex = index
         systemLyricsLastPlaying = active.isPlaying
         systemLyricsLastDispatchRealtimeMs = now
-        val line = document.lines.getOrNull(index)?.text?.trim().orEmpty()
+        var line = document.lines.getOrNull(index)?.text?.trim().orEmpty()
         val nextLine = document.lines.getOrNull(index + 1)?.text?.trim().orEmpty()
-        if (line.isBlank()) return
         val original = systemLyricsOriginalMetadata ?: currentItem.mediaMetadata.also {
             systemLyricsOriginalMetadata = it
         }
+        if (line.isBlank()) {
+            line = renderNotificationTemplate(MeloXSettingsRuntime.lyricNotificationFallback, "", original)
+                .ifBlank { original.title?.toString().orEmpty() }
+        }
+        if (line.isBlank()) return
         if (metadataEnabled && lineChanged) {
             val originalExtras = Bundle(original.extras ?: Bundle()).apply {
                 putString(SYSTEM_ORIGINAL_TITLE_KEY, original.title?.toString().orEmpty())
@@ -537,7 +543,10 @@ class MeloXPlaybackService : MediaSessionService() {
         } else if (!metadataEnabled) {
             restoreSystemLyricsMetadata(active)
         }
-        if (notificationEnabled) postLyricsNotification(line, nextLine, original) else {
+        val notificationAllowedByScene =
+            (!MeloXSettingsRuntime.lyricNotificationBackgroundOnly || !MeloXAppVisibility.isForeground) &&
+                (!MeloXSettingsRuntime.lyricNotificationDismissWhenPaused || active.isPlaying)
+        if (notificationEnabled && notificationAllowedByScene) postLyricsNotification(line, nextLine, original) else {
             getSystemService(NotificationManager::class.java).cancel(LYRICS_NOTIFICATION_ID)
         }
     }
@@ -605,23 +614,27 @@ class MeloXPlaybackService : MediaSessionService() {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val titleMode = runCatching {
-            MeloXSettingsRuntime.systemLyricTitleMode
-        }.getOrDefault(MeloXSystemLyricTitleMode.LyricFirst)
-        val songLabel = listOf(metadata.title?.toString(), metadata.artist?.toString())
-            .filter { !it.isNullOrBlank() }.joinToString(" · ")
         val showNext = MeloXSettingsRuntime.lyricNotificationShowNextLine
-        val detail = if (showNext && nextLine.isNotBlank()) "$songLabel\n$nextLine" else songLabel
+        val title = renderNotificationTemplate(MeloXSettingsRuntime.lyricNotificationTitleTemplate, line, metadata)
+            .ifBlank { line }
+        val subtitle = renderNotificationTemplate(MeloXSettingsRuntime.lyricNotificationSubtitleTemplate, line, metadata)
+        val detail = listOf(subtitle, nextLine.takeIf { showNext && it.isNotBlank() })
+            .filterNotNull().filter(String::isNotBlank).joinToString("\n")
         val builder = NotificationCompat.Builder(this, LYRICS_NOTIFICATION_CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(if (titleMode == MeloXSystemLyricTitleMode.LyricFirst) line else metadata.title)
-            .setContentText(if (titleMode == MeloXSystemLyricTitleMode.LyricFirst) detail else line)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(if (titleMode == MeloXSystemLyricTitleMode.LyricFirst) detail else listOf(line, nextLine.takeIf { showNext }).filterNotNull().joinToString("\n")))
+            .setContentTitle(title)
+            .setContentText(detail)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             .setContentIntent(pendingIntent)
             .setSilent(true)
             .setOnlyAlertOnce(true)
             .setOngoing(player?.isPlaying == true)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+        if (MeloXSettingsRuntime.lyricNotificationShowArtwork) {
+            metadata.artworkData?.let { bytes ->
+                runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()?.let(builder::setLargeIcon)
+            }
+        }
         if (MeloXSettingsRuntime.lyricNotificationShowProgress) {
             val duration = player?.duration?.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L
             if (duration > 0L) builder.setProgress(1_000, ((player?.currentPosition ?: 0L) * 1_000L / duration).toInt().coerceIn(0, 1_000), false)
@@ -638,6 +651,14 @@ class MeloXPlaybackService : MediaSessionService() {
         )?.let { HyperOsFocusBridge.attachFocusParams(notification, it) }
         getSystemService(NotificationManager::class.java).notify(LYRICS_NOTIFICATION_ID, notification)
     }
+
+    private fun renderNotificationTemplate(template: String, lyric: String, metadata: MediaMetadata): String =
+        template
+            .replace("{lyric}", lyric)
+            .replace("{song}", metadata.title?.toString().orEmpty())
+            .replace("{artist}", metadata.artist?.toString().orEmpty())
+            .replace("{album}", metadata.albumTitle?.toString().orEmpty())
+            .trim().trim('·').trim()
 
     private fun updateAutoMixEnvelope(active: ExoPlayer, incoming: ExoPlayer) {
         val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L }

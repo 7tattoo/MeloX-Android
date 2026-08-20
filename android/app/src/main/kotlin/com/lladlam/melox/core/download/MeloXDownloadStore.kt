@@ -1,8 +1,12 @@
 package com.lladlam.melox.core.download
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.os.SystemClock
+import android.provider.MediaStore
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.core.content.FileProvider
@@ -56,6 +60,12 @@ data class MeloXDownloadedSong(
 data class MeloXDownloadedPlaylist(
     val playlist: MeloXDownloadPlaylistRef,
     val songs: List<MeloXDownloadedSong>,
+)
+
+data class MeloXStorageRepairResult(
+    val missingRecordsRemoved: Int,
+    val orphanFilesRemoved: Int,
+    val recoveredBytes: Long,
 )
 
 data class MeloXActiveDownload(
@@ -263,8 +273,110 @@ class MeloXDownloadStore private constructor(private val context: Context) {
         storageCommands.trySend(StorageCommand.Reset)
     }
 
+    fun exportToMusicLibrary(songIds: Set<Long>, onComplete: (Result<Int>) -> Unit = {}) {
+        if (songIds.isEmpty()) return
+        storageScope.launch {
+            val result = runCatching {
+                songIds.mapNotNull(downloadsBySongId::get).count { record ->
+                    exportRecordToMediaStore(record)
+                    true
+                }
+            }
+            withContext(Dispatchers.Main) {
+                result.exceptionOrNull()?.let { errorMessage = it.message ?: "导出到系统音乐库失败" }
+                onComplete(result)
+            }
+        }
+    }
+
+    fun repairStorage(onComplete: (Result<MeloXStorageRepairResult>) -> Unit = {}) {
+        storageScope.launch {
+            val result = runCatching {
+                val snapshot = downloadsBySongId.values.toList()
+                val valid = snapshot.mapNotNull { record ->
+                    val audio = File(directory, record.fileName)
+                    record.takeIf { audio.isFile && audio.length() > 0L }
+                        ?.copy(byteCount = audio.length())
+                }
+                val usedNames = valid.flatMap { record ->
+                    listOfNotNull(record.fileName, record.artworkFileName, record.lyricsFileName)
+                }.toMutableSet().apply {
+                    add(indexFile.name)
+                    valid.flatMap(MeloXDownloadedSong::sourcePlaylists)
+                        .forEach { add(playlistArtworkFileName(it.id)) }
+                }
+                var orphanCount = 0
+                var recoveredBytes = 0L
+                directory.listFiles().orEmpty().forEach { file ->
+                    if (file.name !in usedNames) {
+                        recoveredBytes += file.length()
+                        if (file.delete()) orphanCount++
+                    }
+                }
+                writeIndex(valid.sortedByDescending(MeloXDownloadedSong::downloadedAt))
+                MeloXStorageRepairResult(
+                    missingRecordsRemoved = snapshot.size - valid.size,
+                    orphanFilesRemoved = orphanCount,
+                    recoveredBytes = recoveredBytes,
+                ) to valid.sortedByDescending(MeloXDownloadedSong::downloadedAt)
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess { (_, valid) ->
+                    downloads.clear()
+                    downloads.addAll(valid)
+                    downloadsBySongId.clear()
+                    valid.forEach { downloadsBySongId[it.song.id] = it }
+                }.onFailure { errorMessage = it.message ?: "下载存储修复失败" }
+                onComplete(result.map { it.first })
+            }
+        }
+    }
+
     fun clearError() {
         errorMessage = null
+    }
+
+    private fun exportRecordToMediaStore(record: MeloXDownloadedSong): Uri {
+        val source = File(directory, record.fileName)
+        if (!source.isFile) throw IOException("《${record.song.name}》的本地文件已丢失")
+        val extension = source.extension.lowercase().ifBlank { record.format.orEmpty().lowercase() }
+        val mimeType = when (extension) {
+            "mp3" -> "audio/mpeg"
+            "flac" -> "audio/flac"
+            "m4a", "mp4", "aac" -> "audio/mp4"
+            "ogg", "opus" -> "audio/ogg"
+            "wav" -> "audio/wav"
+            else -> "audio/*"
+        }
+        val safeTitle = record.song.name.replace(Regex("[\\/:*?\"<>|]"), "_").ifBlank { record.song.id.toString() }
+        val displayName = "${safeTitle}_${record.song.id}.${extension.ifBlank { "audio" }}"
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
+            put(MediaStore.Audio.Media.TITLE, record.song.name)
+            put(MediaStore.Audio.Media.ARTIST, record.song.artists)
+            put(MediaStore.Audio.Media.ALBUM, record.song.album)
+            put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/MeloX")
+                put(MediaStore.Audio.Media.IS_PENDING, 1)
+            }
+        }
+        val resolver = app.contentResolver
+        val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val target = resolver.insert(collection, values)
+            ?: throw IOException("系统音乐库拒绝创建《${record.song.name}》")
+        try {
+            resolver.openOutputStream(target, "w")?.use { output ->
+                source.inputStream().buffered().use { input -> input.copyTo(output) }
+            } ?: throw IOException("无法写入系统音乐库")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolver.update(target, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+            }
+            return target
+        } catch (error: Throwable) {
+            resolver.delete(target, null, null)
+            throw error
+        }
     }
 
     private suspend fun download(song: SearchSong, quality: MusicQuality) {

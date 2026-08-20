@@ -2,9 +2,6 @@ package com.lladlam.melox.ui.player
 
 import android.graphics.Bitmap
 import android.os.SystemClock
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -29,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.lladlam.melox.playback.MeloXAudioReactiveRuntime
 import com.lladlam.melox.ui.settings.MeloXLyricsRenderingQuality
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
@@ -44,9 +42,13 @@ internal fun MeloXBlurredArtworkBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val artworkModel = remember(context, artworkUrl) {
+        ImageRequest.Builder(context).data(artworkUrl).size(320, 320).build()
+    }
     androidx.compose.foundation.layout.Box(modifier.fillMaxSize()) {
         AsyncImage(
-            model = artworkUrl,
+            model = artworkModel,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.18f; scaleY = 1.18f }.blur(38.dp),
@@ -73,6 +75,7 @@ internal fun MeloXLyricsArtworkBackdrop(
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val quality = MeloXSettingsRuntime.lyricRenderingQuality
     val planeCount = when (quality) {
         MeloXLyricsRenderingQuality.Low -> 1
@@ -86,6 +89,9 @@ internal fun MeloXLyricsArtworkBackdrop(
     }
     val latestIsPlaying by rememberUpdatedState(isPlaying)
     val elapsedWhilePlayingMs = remember(artworkUrl) { mutableLongStateOf(0L) }
+    val artworkModel = remember(context, artworkUrl) {
+        ImageRequest.Builder(context).data(artworkUrl).size(384, 384).build()
+    }
 
     // The source implementation invalidates its Canvas roughly every 42ms
     // (~24fps). Throttling here is intentional: three blurred planes at 60fps
@@ -106,20 +112,11 @@ internal fun MeloXLyricsArtworkBackdrop(
     }
 
     androidx.compose.foundation.layout.Box(modifier.fillMaxSize()) {
-        // The source fades the old and new cover over about one second. Keep
-        // the crossfade outside the plane loop so a track change only creates
-        // one extra three-plane pass during the transition.
-        Crossfade(
-            targetState = artworkUrl,
-            animationSpec = tween(
-                durationMillis = 1_000,
-                easing = CubicBezierEasing(0f, 0f, .3f, 1f),
-            ),
-            label = "lyrics-artwork-crossfade",
-        ) { coverUrl ->
-            repeat(planeCount) { index ->
-                AsyncImage(
-                    model = coverUrl,
+        // Compose keeps only one bitmap generation and one set of full-screen
+        // blur nodes alive during artwork changes.
+        repeat(planeCount) { index ->
+            AsyncImage(
+                    model = artworkModel,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     colorFilter = artworkColorFilter,
@@ -142,7 +139,6 @@ internal fun MeloXLyricsArtworkBackdrop(
                         }
                         .blur(if (quality == MeloXLyricsRenderingQuality.High) 30.dp else 24.dp),
                 )
-            }
         }
         Canvas(Modifier.fillMaxSize()) {
             drawRect(Color.Black.copy(alpha = .34f))

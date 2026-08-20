@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         consumePlaybackIntent(intent)
-        MeloXSettingsPreferences.initialize(this)
+        MeloXSettingsPreferences.initializeCritical(this)
 
         setContent {
             MeloXTheme {
@@ -41,6 +41,11 @@ class MainActivity : ComponentActivity() {
                     onClipboardLinkConsumed = { clipboardLinkRequest = null },
                 )
             }
+        }
+
+        lifecycleScope.launch {
+            delay(350L)
+            MeloXSettingsPreferences.initialize(this@MainActivity)
         }
 
         // Lyricon registers a cross-process provider. Starting it before

@@ -64,6 +64,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.MeloXLegacyUiBridge
 import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.RankingCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
@@ -85,6 +86,7 @@ import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
+import com.lladlam.melox.ui.library.MeloXUnifiedPlaylistDetailScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -173,16 +175,19 @@ private sealed interface HomeBlock {
 }
 
 @Composable
-fun MeloXHomeScreen(source: MusicSource = MusicSource.Netease) {
+fun MeloXHomeScreen(
+    source: MusicSource = MusicSource.Netease,
+    onOpenTool: (String) -> Unit = {},
+) {
     if (source == MusicSource.Netease) {
-        NeteaseHomeDataScreen()
+        NeteaseHomeDataScreen(onOpenTool)
     } else {
-        ProviderHomeDataScreen(source)
+        ProviderHomeDataScreen(source, onOpenTool)
     }
 }
 
 @Composable
-private fun NeteaseHomeDataScreen() {
+private fun NeteaseHomeDataScreen(onOpenTool: (String) -> Unit) {
     val context = LocalContext.current.applicationContext
     val cache = remember(context) { NeteaseLibraryCache(context) }
     val client = remember(context) { NeteaseLibraryClient({ NeteaseSessionStore.readCookie(context) }) }
@@ -248,7 +253,11 @@ private fun NeteaseHomeDataScreen() {
             if (value.regionalSongs.isNotEmpty()) add(HomeBlock.Tracks("${MeloXSettingsRuntime.musicArea}最近热门", "地区推荐", value.regionalSongs.map { DiscoveryTrack.Netease(it) }))
             if (value.roamingSongs.isNotEmpty()) add(HomeBlock.Tracks("私人漫游", "探索更多", value.roamingSongs.map { DiscoveryTrack.Netease(it) }))
             if (value.similarSongs.isNotEmpty()) add(HomeBlock.Tracks("相似歌曲", "根据当前播放", value.similarSongs.map { DiscoveryTrack.Netease(it) }))
-            if (value.podcasts.isNotEmpty() && MeloXSettingsRuntime.podcastsEnabled) add(HomeBlock.Podcasts(value.podcasts))
+            if (
+                value.podcasts.isNotEmpty() &&
+                MeloXSettingsRuntime.podcastsEnabled &&
+                MeloXSettingsRuntime.podcastsHomePlacement
+            ) add(HomeBlock.Podcasts(value.podcasts))
         }
     }
 
@@ -271,7 +280,29 @@ private fun NeteaseHomeDataScreen() {
         error = error,
         onRefresh = { refresh(true) },
         activeAction = activeAction,
-        onQuickAction = { action ->
+        onQuickAction = quickAction@ { action ->
+            when (action) {
+                "听歌识曲" -> {
+                    onOpenTool("Recognition")
+                    return@quickAction
+                }
+                "私信" -> {
+                    onOpenTool("Messages")
+                    return@quickAction
+                }
+                "播客" -> {
+                    onOpenTool("Podcasts")
+                    return@quickAction
+                }
+                "下载" -> {
+                    onOpenTool("Downloads")
+                    return@quickAction
+                }
+                "云盘" -> {
+                    onOpenTool("Cloud")
+                    return@quickAction
+                }
+            }
             activeAction = action
             scope.launch {
                 runCatching {
@@ -310,7 +341,7 @@ private fun NeteaseHomeDataScreen() {
 }
 
 @Composable
-private fun ProviderHomeDataScreen(source: MusicSource) {
+private fun ProviderHomeDataScreen(source: MusicSource, onOpenTool: (String) -> Unit) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val registry = remember(source) { MeloXMusicProviders.create(context) }
@@ -351,13 +382,13 @@ private fun ProviderHomeDataScreen(source: MusicSource) {
 
     val blocks = feed?.let { value ->
         buildList<HomeBlock> {
-            if (value.recommendedPlaylists.isNotEmpty()) {
+            if (provider is PlaylistCapability && value.recommendedPlaylists.isNotEmpty()) {
                 add(HomeBlock.Collections("每日推荐", source.displayName, value.recommendedPlaylists.map { DiscoveryCollection.ProviderPlaylist(it) }))
             }
             if (value.newSongs.isNotEmpty()) {
                 add(HomeBlock.Tracks("为你推荐", "新歌", value.newSongs.map { DiscoveryTrack.Provider(it) }))
             }
-            if (value.rankings.isNotEmpty()) {
+            if (provider is RankingCapability && value.rankings.isNotEmpty()) {
                 add(HomeBlock.Collections("排行榜", source.displayName, value.rankings.map { DiscoveryCollection.ProviderRanking(it) }))
             }
         }
@@ -382,7 +413,15 @@ private fun ProviderHomeDataScreen(source: MusicSource) {
         error = if (home == null) "${source.displayName} 暂未提供首页数据" else error,
         onRefresh = ::refresh,
         activeAction = null,
-        onQuickAction = {},
+        onQuickAction = { action ->
+            when (action) {
+                "听歌识曲" -> onOpenTool("Recognition")
+                "私信" -> onOpenTool("Messages")
+                "播客" -> onOpenTool("Podcasts")
+                "下载" -> onOpenTool("Downloads")
+                "云盘" -> onOpenTool("Cloud")
+            }
+        },
         onCollection = { selectedCollection = it },
     )
 }
@@ -427,7 +466,7 @@ private fun MeloXHomeLayout(
                 }
                 blocks.forEach { block ->
                     when (block) {
-                        HomeBlock.QuickActions -> item { HomeQuickActions(activeAction, onQuickAction) }
+                        HomeBlock.QuickActions -> item { HomeQuickActions(source, activeAction, onQuickAction) }
                         is HomeBlock.Collections -> {
                             item { SectionTitle(block.title, block.trailing) }
                             item { CollectionRow(block.values, onCollection) }
@@ -440,8 +479,13 @@ private fun MeloXHomeLayout(
                         }
                         is HomeBlock.Podcasts -> item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                items(block.values, key = { "podcast-${it.id}" }) { podcast ->
-                                    Column(Modifier.width(150.dp).clickable { MeloXCollectionDetailActivity.launchPodcast(context, podcast.id) }) {
+                                items(block.values, key = { "podcast-${it.programId ?: it.id}" }) { podcast ->
+                                    Column(
+                                        Modifier.width(150.dp).clickable {
+                                            podcast.programId?.let { MeloXCollectionDetailActivity.launchPodcastProgram(context, it) }
+                                                ?: MeloXCollectionDetailActivity.launchPodcast(context, podcast.id)
+                                        },
+                                    ) {
                                         AsyncImage(
                                             podcast.artworkUrl,
                                             null,
@@ -503,7 +547,7 @@ private fun HomeAccountButton(account: HomeAccountUi) {
 }
 
 @Composable
-private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
+private fun HomeQuickActions(source: MusicSource, active: String?, perform: (String) -> Unit) {
     data class Action(
         val title: String,
         val eyebrow: String,
@@ -511,14 +555,27 @@ private fun HomeQuickActions(active: String?, perform: (String) -> Unit) {
         val symbol: MeloXSymbol,
         val colors: List<Color>,
     )
-    val actions = listOf(
-        Action("每日推荐", "每日更新", "为你定制的歌曲", MeloXSymbol.Calendar, listOf(Color(0xFFFF5B8A), Color(0xFFFF3147))),
-        Action("热歌榜", "全站热门", "大家都在听", MeloXSymbol.Flame, listOf(Color(0xFFFFA14A), Color(0xFFFF5A36))),
-        Action("心动模式", "为你心动", "喜欢与惊喜交替播放", MeloXSymbol.Heart, listOf(Color(0xFFFF6EAC), Color(0xFF9B5DE5))),
-        Action("私人雷达", "持续发现", "发现符合你口味的歌单", MeloXSymbol.RadioWaves, listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF))),
-        Action("私人漫游", "探索模式", "漫游到新的好音乐", MeloXSymbol.Walk, listOf(Color(0xFF26C6DA), Color(0xFF4285F4))),
-        Action("相似歌曲", "从当前歌曲出发", "播放更多相似歌曲", MeloXSymbol.List, listOf(Color(0xFF58C9A3), Color(0xFF159D9A))),
-    )
+    val actions = buildList {
+        if (source == MusicSource.Netease) {
+            add(Action("每日推荐", "每日更新", "为你定制的歌曲", MeloXSymbol.Calendar, listOf(Color(0xFFFF5B8A), Color(0xFFFF3147))))
+            add(Action("热歌榜", "全站热门", "大家都在听", MeloXSymbol.Flame, listOf(Color(0xFFFFA14A), Color(0xFFFF5A36))))
+            add(Action("心动模式", "为你心动", "喜欢与惊喜交替播放", MeloXSymbol.Heart, listOf(Color(0xFFFF6EAC), Color(0xFF9B5DE5))))
+            add(Action("私人雷达", "持续发现", "发现符合你口味的歌单", MeloXSymbol.RadioWaves, listOf(Color(0xFF6B7BFF), Color(0xFF8C52FF))))
+            add(Action("私人漫游", "探索模式", "漫游到新的好音乐", MeloXSymbol.Walk, listOf(Color(0xFF26C6DA), Color(0xFF4285F4))))
+            add(Action("相似歌曲", "从当前歌曲出发", "播放更多相似歌曲", MeloXSymbol.List, listOf(Color(0xFF58C9A3), Color(0xFF159D9A))))
+        }
+        add(Action("听歌识曲", "快捷工具", "识别环境中正在播放的歌曲", MeloXSymbol.Microphone, listOf(Color(0xFF7B61FF), Color(0xFF36C5F0))))
+        if (source == MusicSource.Netease) add(Action("私信", "网易云社交", "查看联系人和私信会话", MeloXSymbol.Mail, listOf(Color(0xFFFF6B8B), Color(0xFFFF3B30))))
+        if (source == MusicSource.Netease && MeloXSettingsRuntime.podcastsEnabled && MeloXSettingsRuntime.podcastsHomePlacement) {
+            add(Action("播客", "首页页面", "浏览播客与节目", MeloXSymbol.RadioWaves, listOf(Color(0xFF8B5CF6), Color(0xFFEC4899))))
+        }
+        if (MeloXSettingsRuntime.downloadsEnabled && MeloXSettingsRuntime.downloadsHomePlacement) {
+            add(Action("下载", "本地音乐", "浏览已下载的歌曲", MeloXSymbol.Download, listOf(Color(0xFF0EA5E9), Color(0xFF14B8A6))))
+        }
+        if (source == MusicSource.Netease && MeloXSettingsRuntime.cloudMusicEnabled && MeloXSettingsRuntime.cloudHomePlacement) {
+            add(Action("云盘", "个人音乐", "打开网易云音乐云盘", MeloXSymbol.Storage, listOf(Color(0xFF64748B), Color(0xFF6366F1))))
+        }
+    }
     LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         items(actions, key = { it.title }) { action ->
             Column(
@@ -859,6 +916,17 @@ private fun DiscoveryCollectionDetail(
     collection: DiscoveryCollection,
     onBack: () -> Unit,
 ) {
+    when (collection) {
+        is DiscoveryCollection.Netease -> {
+            MeloXUnifiedPlaylistDetailScreen(collection.playlist, onBack)
+            return
+        }
+        is DiscoveryCollection.ProviderPlaylist -> {
+            MeloXUnifiedPlaylistDetailScreen(MeloXLegacyUiBridge.playlist(collection.playlist), onBack)
+            return
+        }
+        is DiscoveryCollection.ProviderRanking -> Unit
+    }
     val context = LocalContext.current.applicationContext
     var tracks by remember(collection.key) { mutableStateOf<List<DiscoveryTrack>?>(null) }
     var error by remember(collection.key) { mutableStateOf<String?>(null) }
@@ -867,26 +935,12 @@ private fun DiscoveryCollectionDetail(
     LaunchedEffect(collection.key) {
         runCatching {
             withContext(Dispatchers.IO) {
-                when (collection) {
-                    is DiscoveryCollection.Netease -> {
-                        val client = NeteaseLibraryClient(cookieProvider = { NeteaseSessionStore.readCookie(context) })
-                        client.playlistDetail(collection.playlist.id).songs.map { DiscoveryTrack.Netease(it) }
-                    }
-                    is DiscoveryCollection.ProviderPlaylist -> {
-                        val provider = MeloXMusicProviders.create(context).require(collection.playlist.id.source)
-                        val capability = provider as? PlaylistCapability
-                            ?: throw IllegalStateException("${collection.playlist.id.source.displayName} 尚未实现歌单详情")
-                        capability.playlistDetail(collection.playlist, page = 1, pageSize = 150)
-                            .tracks.map { DiscoveryTrack.Provider(it) }
-                    }
-                    is DiscoveryCollection.ProviderRanking -> {
-                        val provider = MeloXMusicProviders.create(context).require(collection.ranking.id.source)
-                        val capability = provider as? RankingCapability
-                            ?: throw IllegalStateException("${collection.ranking.id.source.displayName} 尚未实现排行榜详情")
-                        capability.rankingTracks(collection.ranking, page = 1, pageSize = 150)
-                            .items.map { DiscoveryTrack.Provider(it) }
-                    }
-                }
+                val ranking = (collection as DiscoveryCollection.ProviderRanking).ranking
+                val provider = MeloXMusicProviders.create(context).require(ranking.id.source)
+                val capability = provider as? RankingCapability
+                    ?: throw IllegalStateException("${ranking.id.source.displayName} 尚未实现排行榜详情")
+                capability.rankingTracks(ranking, page = 1, pageSize = 150)
+                    .items.map { DiscoveryTrack.Provider(it) }
             }
         }.onSuccess { tracks = it }
             .onFailure { error = it.message ?: "内容加载失败" }

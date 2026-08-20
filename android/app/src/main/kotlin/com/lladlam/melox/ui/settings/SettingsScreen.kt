@@ -1,6 +1,8 @@
 package com.lladlam.melox.ui.settings
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -24,6 +26,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationCompat
 import coil3.compose.AsyncImage
 import com.lladlam.melox.BuildConfig
 import com.lladlam.melox.core.account.NeteaseSessionStore
@@ -68,6 +73,7 @@ import com.lladlam.melox.core.update.MeloXRelease
 import com.lladlam.melox.core.update.MeloXUpdateClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.MeloXAutoMixFadeCurve
+import com.lladlam.melox.playback.MeloXAutoMixDiagnostics
 import com.lladlam.melox.playback.MeloXAutoMixFallback
 import com.lladlam.melox.playback.MeloXAutoMixMode
 import com.lladlam.melox.playback.MeloXAutoMixSettings
@@ -151,6 +157,8 @@ fun SettingsScreen(
     session: NeteaseSessionStore,
     onLogin: () -> Unit,
     onOpenServices: (() -> Unit)? = null,
+    initialRouteRequest: String? = null,
+    onInitialRouteConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var route by remember { mutableStateOf<SettingsRoute?>(null) }
@@ -160,6 +168,12 @@ fun SettingsScreen(
     val rootScrollState = rememberScrollState()
 
     LaunchedEffect(Unit) { MeloXSettingsPreferences.initialize(context) }
+    LaunchedEffect(initialRouteRequest) {
+        initialRouteRequest?.let { requested ->
+            route = SettingsRoute.entries.firstOrNull { it.name == requested }
+            onInitialRouteConsumed()
+        }
+    }
     LaunchedEffect(session.cookie) {
         if (session.isLoggedIn) session.refreshProfile()
     }
@@ -193,7 +207,9 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 0.dp),
             contentPadding = PaddingValues(horizontal = 0.dp),
         )
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(14.dp))
+        SettingsSearchField(value = search, onValueChange = { search = it })
+        Spacer(Modifier.height(20.dp))
 
         if (normalized.isBlank() || "网易云账号 登录 cookie 用户".contains(normalized)) {
             SettingsAccountCard(
@@ -407,6 +423,53 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
     ) { if (it == MeloXSystemLyricTitleMode.LyricFirst.name) "歌词作为标题" else "歌曲作为标题" }
     SettingsToggleRow(context, "通知显示下一句", "lyrics_notification_next_line", false)
     SettingsToggleRow(context, "通知显示播放进度", "lyrics_notification_progress", true)
+    SettingsToggleRow(context, "通知显示封面", "lyrics_notification_artwork", true)
+    SettingsToggleRow(context, "仅在后台显示歌词通知", "lyrics_notification_background_only", false)
+    SettingsToggleRow(context, "暂停时撤回歌词通知", "lyrics_notification_dismiss_paused", true)
+    NotificationTemplateField(context, "标题模板", "lyrics_notification_title_template", "{lyric}")
+    NotificationTemplateField(context, "副标题模板", "lyrics_notification_subtitle_template", "{song} · {artist}")
+    NotificationTemplateField(context, "无歌词回退", "lyrics_notification_fallback", "{song} · {artist}")
+    Text(
+        "可用变量：{lyric}、{song}、{artist}、{album}",
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .46f),
+        fontSize = 11.sp,
+        modifier = Modifier.padding(bottom = 10.dp),
+    )
+    SettingsActionButton("发送测试歌词通知") {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(NotificationChannel("melox_lyrics", "歌词", NotificationManager.IMPORTANCE_LOW))
+        manager.notify(
+            10_043,
+            NotificationCompat.Builder(context, "melox_lyrics")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setContentTitle("这是测试歌词")
+                .setContentText("MeloX · 通知模板预览")
+                .setStyle(NotificationCompat.BigTextStyle().bigText("这是测试歌词\n下一句歌词预览"))
+                .setSilent(true)
+                .build(),
+        )
+    }
+}
+
+@Composable
+private fun NotificationTemplateField(
+    context: android.content.Context,
+    title: String,
+    key: String,
+    default: String,
+) {
+    var value by remember(key) { mutableStateOf(MeloXSettingsPreferences.string(context, key, default)) }
+    Text(title, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f), modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+    MeloXGlassTextField(
+        value = value,
+        onValueChange = {
+            value = it.take(80)
+            MeloXSettingsPreferences.setString(context, key, value)
+        },
+        modifier = Modifier.fillMaxWidth(),
+        textStyle = androidx.compose.ui.text.TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp),
+    )
+    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
@@ -626,7 +689,7 @@ private fun PlaybackSettings(context: android.content.Context) {
 private fun EqualizerSettings(context: android.content.Context) {
     var enabled by remember { mutableStateOf(MeloXSettingsPreferences.boolean(context, "equalizer_enabled", false)) }
     var preset by remember { mutableStateOf(MeloXSettingsPreferences.string(context, "equalizer_preset", "Flat")) }
-    var preamp by remember { mutableStateOf(MeloXSettingsPreferences.int(context, "equalizer_preamp_db", 0)) }
+    var preamp by remember { mutableStateOf(MeloXSettingsPreferences.number(context, "equalizer_preamp_db", 0f)) }
     SettingsExternalToggleRow("均衡器", enabled, "使用 Android 原生多频段 DSP，直接作用于当前播放器音频会话。") {
         enabled = it
         MeloXSettingsPreferences.setBoolean(context, "equalizer_enabled", it)
@@ -636,7 +699,10 @@ private fun EqualizerSettings(context: android.content.Context) {
     Spacer(Modifier.height(8.dp))
     SettingsGlassGroup {
         MeloXEqualizerController.PRESETS.keys.forEach { value ->
-            val label = mapOf("Flat" to "平直", "Bass" to "低频增强", "Vocal" to "人声", "Treble" to "高频增强", "Electronic" to "电子", "Custom" to "自定义").getValue(value)
+            val label = mapOf(
+                "Flat" to "平直", "Bass" to "低频增强", "Vocal" to "人声", "Treble" to "高频增强",
+                "Electronic" to "电子", "Rock" to "摇滚", "Classical" to "古典", "Custom" to "自定义",
+            ).getValue(value)
             SettingsChoiceRow(label, preset == value) {
                 preset = value
                 MeloXSettingsPreferences.setString(context, "equalizer_preset", value)
@@ -645,26 +711,29 @@ private fun EqualizerSettings(context: android.content.Context) {
     }
     if (preset == "Custom") {
         Spacer(Modifier.height(12.dp))
-        listOf("60 Hz", "230 Hz", "910 Hz", "3.6 kHz", "14 kHz").forEachIndexed { index, label ->
-            LyricsChoiceSetting(
-                context,
-                label,
-                "equalizer_custom_band_$index",
-                0,
-                listOf(-6, -3, 0, 3, 6),
-            ) { if (it > 0) "+$it dB" else "$it dB" }
+        listOf("31 Hz", "62 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz")
+            .forEachIndexed { index, label ->
+                var gain by remember(index) {
+                    mutableStateOf(MeloXSettingsPreferences.number(context, "equalizer_custom_band_$index", 0f))
+                }
+                SettingsFloatSlider(label, gain, -12f..12f, 47, { value ->
+                    val rounded = kotlin.math.round(value * 2f) / 2f
+                    if (rounded > 0f) "+%.1f dB".format(rounded) else "%.1f dB".format(rounded)
+                }) { value ->
+                    gain = kotlin.math.round(value * 2f) / 2f
+                    MeloXSettingsPreferences.setFloat(context, "equalizer_custom_band_$index", gain)
+                }
         }
     }
     Spacer(Modifier.height(12.dp))
     Text("前级", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
     Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(-6, -3, 0, 3, 6).forEach { value ->
-            SettingsChoiceRow(if (value > 0) "+$value dB" else "$value dB", preamp == value) {
-                preamp = value
-                MeloXSettingsPreferences.setInt(context, "equalizer_preamp_db", value)
-            }
-        }
+    SettingsFloatSlider("输入增益", preamp, -12f..12f, 47, { value ->
+        val rounded = kotlin.math.round(value * 2f) / 2f
+        if (rounded > 0f) "+%.1f dB".format(rounded) else "%.1f dB".format(rounded)
+    }) { value ->
+        preamp = kotlin.math.round(value * 2f) / 2f
+        MeloXSettingsPreferences.setFloat(context, "equalizer_preamp_db", preamp)
     }
 }
 
@@ -1193,8 +1262,8 @@ private fun MessagesSettings(context: android.content.Context) {
             Text("正在读取私信", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
-        SettingsGlassGroup {
-            contacts.take(100).forEach { contact ->
+        LazyColumn(Modifier.fillMaxWidth().height(440.dp)) {
+            items(contacts.take(100), key = MeloXMessageContact::id) { contact ->
                 Row(
                     Modifier.fillMaxWidth().clickable { selected = contact }.padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1226,20 +1295,22 @@ private fun MessagesSettings(context: android.content.Context) {
     Spacer(Modifier.height(14.dp))
     if (busy && messages.isEmpty()) CircularProgressIndicator(Modifier.size(24.dp))
     error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp)) }
-    messages.takeLast(60).forEach { message ->
-        val outgoing = message.fromUserId == currentUserId
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            if (outgoing) Spacer(Modifier.weight(.2f))
-            Text(
-                message.text,
-                modifier = Modifier.background(
-                    if (outgoing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = .08f),
-                    RoundedCornerShape(16.dp),
-                ).padding(horizontal = 12.dp, vertical = 9.dp).weight(.8f, fill = false),
-                color = if (outgoing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                fontSize = 14.sp,
-            )
-            if (!outgoing) Spacer(Modifier.weight(.2f))
+    LazyColumn(Modifier.fillMaxWidth().height(420.dp)) {
+        items(messages.takeLast(60), key = MeloXPrivateMessage::id) { message ->
+            val outgoing = message.fromUserId == currentUserId
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                if (outgoing) Spacer(Modifier.weight(.2f))
+                Text(
+                    message.text,
+                    modifier = Modifier.background(
+                        if (outgoing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = .08f),
+                        RoundedCornerShape(16.dp),
+                    ).padding(horizontal = 12.dp, vertical = 9.dp).weight(.8f, fill = false),
+                    color = if (outgoing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                )
+                if (!outgoing) Spacer(Modifier.weight(.2f))
+            }
         }
     }
     Spacer(Modifier.height(12.dp))
@@ -1298,6 +1369,7 @@ private fun ContentSettings(context: android.content.Context) {
 @Composable
 private fun StorageSettings(context: android.content.Context) {
     var cacheSize by remember { mutableStateOf("计算中…") }
+    var maintenanceMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val downloads = remember(context) { MeloXDownloadStore.get(context) }
     suspend fun refresh() {
@@ -1351,18 +1423,8 @@ private fun StorageSettings(context: android.content.Context) {
     }
 
     if (downloads.downloads.isNotEmpty()) {
-        Text("已下载", modifier = Modifier.padding(top=18.dp,bottom=8.dp), fontWeight=FontWeight.SemiBold)
-        SettingsGlassGroup {
-            downloads.downloads.forEach { item ->
-                Row(Modifier.fillMaxWidth().clickable { PlaybackCommands.playQueue(context, downloads.downloadedSongs, item.song.id) }.padding(14.dp), verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(item.song.name, maxLines=1, overflow=TextOverflow.Ellipsis)
-                        Text("${item.quality.title} · ${formatBytes(item.byteCount)}", color=MaterialTheme.colorScheme.onSurface.copy(alpha=.5f), fontSize=11.sp)
-                    }
-                    Text("删除", color=MaterialTheme.colorScheme.error, modifier=Modifier.clickable { downloads.remove(item.song.id) }.padding(8.dp))
-                }
-            }
-        }
+        Spacer(Modifier.height(12.dp))
+        SettingsInfoCard("下载管理", "请在音乐库 → 下载中按歌曲、艺术家、专辑或文件夹浏览、批量导出和删除。")
         Spacer(Modifier.height(12.dp))
         SettingsDangerButton("删除全部已下载歌曲") { downloads.removeAll() }
     } else if (downloads.activeDownloads.isEmpty()) {
@@ -1370,10 +1432,24 @@ private fun StorageSettings(context: android.content.Context) {
     }
 
     downloads.errorMessage?.let { Text(it, color=MaterialTheme.colorScheme.error, fontSize=12.sp, modifier=Modifier.padding(top=10.dp)) }
+    maintenanceMessage?.let { Text(it, color=MaterialTheme.colorScheme.primary, fontSize=12.sp, modifier=Modifier.padding(top=10.dp)) }
     Spacer(Modifier.height(14.dp))
+    SettingsActionButton("检查并修复下载存储") {
+        downloads.repairStorage { result ->
+            maintenanceMessage = result.fold(
+                onSuccess = {
+                    "已移除 ${it.missingRecordsRemoved} 条缺失记录、${it.orphanFilesRemoved} 个孤立文件，回收 ${formatBytes(it.recoveredBytes)}；索引已压缩。"
+                },
+                onFailure = { it.message ?: "修复失败" },
+            )
+        }
+    }
+    Spacer(Modifier.height(10.dp))
     SettingsActionButton("清理临时缓存") {
         scope.launch {
             withContext(Dispatchers.IO) { context.cacheDir.listFiles()?.forEach { it.deleteRecursively() } }
+            context.getSharedPreferences("melox_cache_stats", android.content.Context.MODE_PRIVATE).edit().clear().apply()
+            maintenanceMessage = "临时缓存与缓存统计已重置"
             refresh()
         }
     }
@@ -1391,6 +1467,20 @@ private fun TabLayoutSettings(context: android.content.Context) {
     SettingsToggleRow(context, "首页", "tab_home", true)
     SettingsToggleRow(context, "发现", "tab_explore", true)
     SettingsToggleRow(context, "音乐库", "tab_library", true)
+    Spacer(Modifier.height(18.dp))
+    Text("页面放置", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
+    Text("播客、下载和云盘可同时出现在多个位置。", modifier = Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .46f))
+    Spacer(Modifier.height(8.dp))
+    listOf(
+        Triple("播客", "podcasts", MeloXSettingsRuntime.podcastsEnabled),
+        Triple("下载", "downloads", MeloXSettingsRuntime.downloadsEnabled),
+        Triple("云盘", "cloud", MeloXSettingsRuntime.cloudMusicEnabled),
+    ).forEach { (title, key, enabled) ->
+        Text(title, modifier = Modifier.padding(top = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        SettingsToggleRow(context, "首页快捷入口", "placement_${key}_home", key == "podcasts", if (enabled) null else "请先在内容功能中启用$title。")
+        SettingsToggleRow(context, "独立标签页", "placement_${key}_tab", false)
+        SettingsToggleRow(context, "音乐库子页", "placement_${key}_library", true)
+    }
     Spacer(Modifier.height(14.dp))
     var order by remember { mutableStateOf(MeloXSettingsRuntime.tabOrder) }
     Text("标签栏顺序", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
@@ -1398,7 +1488,7 @@ private fun TabLayoutSettings(context: android.content.Context) {
     SettingsGlassGroup {
         order.forEachIndexed { index, page ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(when (page) { "Home" -> "首页"; "Explore" -> "发现"; "Library" -> "音乐库"; else -> "设置" }, Modifier.weight(1f))
+                Text(when (page) { "Home" -> "首页"; "Explore" -> "发现"; "Library" -> "音乐库"; "Podcasts" -> "播客"; "Downloads" -> "下载"; "Cloud" -> "云盘"; else -> "设置" }, Modifier.weight(1f))
                 MeloXActionIcon("↑", Modifier.size(18.dp).clickable(enabled = index > 0) {
                     order = order.toMutableList().apply { add(index - 1, removeAt(index)) }
                     MeloXSettingsPreferences.setString(context, "tab_order", order.joinToString(","))
@@ -1443,9 +1533,12 @@ private fun TabLayoutSettings(context: android.content.Context) {
         listOf("Songs" to "歌曲", "Playlists" to "歌单", "Podcasts" to "播客", "Cloud" to "云盘", "History" to "最近播放", "Downloads" to "下载")
             .filter { (value, _) ->
                 (value != "Podcasts" || MeloXSettingsRuntime.podcastsEnabled) &&
+                    (value != "Podcasts" || MeloXSettingsRuntime.podcastsLibraryPlacement) &&
                     (value != "Cloud" || MeloXSettingsRuntime.cloudMusicEnabled) &&
+                    (value != "Cloud" || MeloXSettingsRuntime.cloudLibraryPlacement) &&
                     (value != "History" || MeloXSettingsRuntime.listeningHistoryEnabled) &&
-                    (value != "Downloads" || MeloXSettingsRuntime.downloadsEnabled)
+                    (value != "Downloads" || MeloXSettingsRuntime.downloadsEnabled) &&
+                    (value != "Downloads" || MeloXSettingsRuntime.downloadsLibraryPlacement)
             }.forEach { (value, title) ->
             SettingsChoiceRow(title, libraryPage == value) {
                 libraryPage = value
@@ -1660,6 +1753,18 @@ private fun AboutSettings(context: android.content.Context) {
         }
     }
     Spacer(Modifier.height(14.dp))
+    SettingsInfoCard(
+        "内置更新日志 · 0.2.0—0.4.0-Beta",
+        "0.4.0-Beta：歌单写操作、本地音乐导出与分类、统一详情、批量下载、十段均衡器、通知歌词模板、性能与包体治理。\n" +
+            "0.3.4：歌词样式、播放器过渡、多音乐源与下载体验修正。\n" +
+            "0.2.x：网易云音乐库、搜索、评论、AutoMix 与系统歌词能力。",
+    )
+    Spacer(Modifier.height(10.dp))
+    SettingsActionButton("恢复推荐的播放器设置") {
+        MeloXSettingsPreferences.resetRecommendedPlayerSettings(context)
+        updateStatus = "已恢复推荐播放器、歌词与 AutoMix 配置"
+    }
+    Spacer(Modifier.height(14.dp))
     SettingsGlassGroup {
         Column(Modifier.padding(16.dp)) {
             Text("项目与许可", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
@@ -1696,6 +1801,10 @@ private fun AboutSettings(context: android.content.Context) {
 @Composable
 private fun DeveloperSettings() {
     val context = LocalContext.current
+    var diagnosticsVisible by remember {
+        mutableStateOf(BuildConfig.DEBUG && MeloXSettingsPreferences.boolean(context, "developer_automix_diagnostics", false))
+    }
+    var diagnostics by remember { mutableStateOf(MeloXAutoMixDiagnostics.snapshot()) }
     if (BuildConfig.DEBUG) {
         SettingsToggleRow(
             context = context,
@@ -1704,6 +1813,23 @@ private fun DeveloperSettings() {
             default = false,
             note = "仅 Debug 构建可用；每 5 秒写入一次 melox_perf.log。",
         )
+        SettingsExternalToggleRow(
+            title = "AutoMix / Beat 分析诊断",
+            value = diagnosticsVisible,
+            note = "仅 Debug 构建显示分析数量、缓存与最近状态，不记录音频内容。",
+        ) {
+            diagnosticsVisible = it
+            MeloXSettingsPreferences.setBoolean(context, "developer_automix_diagnostics", it)
+        }
+        if (diagnosticsVisible) {
+            SettingsInfoCard(
+                "分析状态",
+                "进行中 ${diagnostics.activeAnalyses} · 已完成 ${diagnostics.completedAnalyses} · 失败 ${diagnostics.failedAnalyses} · 缓存 ${diagnostics.memoryCacheEntries}/4\n${diagnostics.lastStatus}",
+            )
+            Spacer(Modifier.height(8.dp))
+            SettingsActionButton("刷新分析状态") { diagnostics = MeloXAutoMixDiagnostics.snapshot() }
+            Spacer(Modifier.height(10.dp))
+        }
     }
     SettingsInfoCard("AutoMix 分析", "Android 原生 MediaCodec 整曲解码，生成节拍、重拍、乐句、能量和频谱时间轴；分析失败时才使用所选降级策略。")
     Spacer(Modifier.height(10.dp))

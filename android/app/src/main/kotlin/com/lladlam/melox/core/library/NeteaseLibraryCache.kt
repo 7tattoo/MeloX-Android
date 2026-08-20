@@ -210,7 +210,34 @@ private fun decodeSongs(values: JSONArray) = buildList {
     }
 }
 
-private fun encodeHomePodcasts(values: List<NeteaseHomePodcast>) = JSONArray().apply { values.forEach { put(JSONObject().put("id", it.id).put("name", it.name).put("artworkUrl", it.artworkUrl)) } }
-private fun decodeHomePodcasts(values: JSONArray) = buildList { for (index in 0 until values.length()) { val value = values.optJSONObject(index) ?: continue; val id = value.optLong("id", -1L); if (id > 0L) add(NeteaseHomePodcast(id, value.optString("name").ifBlank { "播客" }, value.optNullableString("artworkUrl"))) } }
+private fun encodeHomePodcasts(values: List<NeteaseHomePodcast>) = JSONArray().apply {
+    values.forEach { podcast ->
+        put(
+            JSONObject()
+                .put("id", podcast.id)
+                .put("name", podcast.name)
+                .put("artworkUrl", podcast.artworkUrl)
+                .put("programId", podcast.programId ?: JSONObject.NULL)
+                .put("playbackSong", podcast.playbackSong?.let { encodeSongs(listOf(it)).optJSONObject(0) } ?: JSONObject.NULL),
+        )
+    }
+}
+private fun decodeHomePodcasts(values: JSONArray) = buildList {
+    for (index in 0 until values.length()) {
+        val value = values.optJSONObject(index) ?: continue
+        val id = value.optLong("id", -1L)
+        if (id <= 0L) continue
+        val song = value.optJSONObject("playbackSong")?.let { decodeSongs(JSONArray().put(it)).firstOrNull() }
+        add(
+            NeteaseHomePodcast(
+                id,
+                value.optString("name").ifBlank { "播客节目" },
+                value.optNullableString("artworkUrl"),
+                value.optLong("programId", 0L).takeIf { it > 0L },
+                song,
+            ),
+        )
+    }
+}
 private fun safeCacheKey(value: String): String = value.hashCode().toUInt().toString(16)
 private fun JSONObject.optNullableString(name: String): String? = if (isNull(name)) null else optString(name).takeIf(String::isNotBlank)
