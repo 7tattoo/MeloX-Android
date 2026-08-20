@@ -45,6 +45,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -77,6 +80,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +88,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lladlam.melox.R
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
@@ -117,6 +122,7 @@ import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.player.MeloXFlowingLightBackdrop
 import com.lladlam.melox.ui.player.MeloXSongActionsOverlay
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.layout.rememberMeloXWindowInfo
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
@@ -162,6 +168,7 @@ fun LibraryScreen(
     onModalVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val window = rememberMeloXWindowInfo()
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
     val client = remember(appContext) {
@@ -343,10 +350,11 @@ fun LibraryScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .statusBarsPadding(),
+                        .statusBarsPadding()
+                        .padding(horizontal = if (window.supportsTwoPane) window.gutter else 0.dp),
                 ) {
                     MeloXIosTopBar(
-                        title = "音乐库",
+                        title = stringResource(R.string.tab_library),
                     )
 
                     MeloXLibrarySegmentedPicker(
@@ -895,7 +903,7 @@ private fun MeloXLibraryLoginUnavailable(
             .padding(horizontal = 20.dp),
     ) {
         MeloXIosTopBar(
-            title = "音乐库",
+            title = stringResource(R.string.tab_library),
             contentPadding = PaddingValues(horizontal = 0.dp),
         )
         Box(
@@ -1310,6 +1318,7 @@ private fun MeloXPlaylistDetailScreen(
     onModalVisibilityChanged: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val detailWindow = rememberMeloXWindowInfo()
     val appContext = context.applicationContext
     val scope = rememberCoroutineScope()
     val cache = remember(appContext) { NeteaseLibraryCache(appContext) }
@@ -1474,11 +1483,16 @@ private fun MeloXPlaylistDetailScreen(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
             )
 
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(if (detailWindow.supportsTwoPane) 2 else 1),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
+                contentPadding = PaddingValues(
+                    start = if (detailWindow.supportsTwoPane) detailWindow.gutter else 0.dp,
+                    end = if (detailWindow.supportsTwoPane) detailWindow.gutter else 0.dp,
+                    bottom = MeloXBottomContentClearance,
+                ),
             ) {
-                item {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                     MeloXStandardPlaylistHero(
                         playlist = displayed,
                         tracks = songs,
@@ -1584,7 +1598,7 @@ private fun MeloXPlaylistDetailScreen(
                             Text("暂无歌曲", color = secondary)
                         }
                     }
-                    else -> itemsIndexed(
+                    else -> gridItemsIndexed(
                         items = filteredSongs,
                         key = { _, song -> song.id },
                     ) { index, song ->

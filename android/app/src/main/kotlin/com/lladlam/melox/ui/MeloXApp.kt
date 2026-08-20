@@ -2,6 +2,7 @@ package com.lladlam.melox.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
@@ -63,6 +64,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -77,6 +79,7 @@ import androidx.compose.ui.zIndex
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.BuildConfig
+import com.lladlam.melox.R
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.provider.MusicProviderSelectionStore
 import com.lladlam.melox.ui.account.NeteaseLoginScreen
@@ -128,16 +131,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-enum class AppTab(val title: String) {
-    Home("首页"),
-    Explore("发现"),
-    Library("音乐库"),
-    Podcasts("播客"),
-    Downloads("下载"),
-    Cloud("云盘"),
-    Settings("设置"),
-    Services("音乐服务"),
-    Search("搜索"),
+enum class AppTab(@StringRes val titleRes: Int) {
+    Home(R.string.tab_home),
+    Explore(R.string.tab_explore),
+    Library(R.string.tab_library),
+    Podcasts(R.string.tab_podcasts),
+    Downloads(R.string.tab_downloads),
+    Cloud(R.string.tab_cloud),
+    Settings(R.string.tab_settings),
+    Services(R.string.tab_services),
+    Search(R.string.tab_search),
 }
 
 
@@ -954,6 +957,7 @@ private fun MeloXBottomChrome(
                 }
             }
 
+            val searchContentDescription = stringResource(R.string.tab_search)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -969,7 +973,7 @@ private fun MeloXBottomChrome(
                     )
                     .clickable(role = Role.Button) { onSelect(AppTab.Search) }
                     .semantics {
-                        contentDescription = AppTab.Search.title
+                        contentDescription = searchContentDescription
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -1060,8 +1064,9 @@ private fun RowScope.RootTabButton(
 
 private enum class RootGlyph { Home, Explore, Library, Podcasts, Downloads, Cloud, Settings, Search }
 
+@Composable
 @Suppress("UNUSED_PARAMETER")
-private fun AppTab.titleFor(source: MusicSource): String = title
+private fun AppTab.titleFor(source: MusicSource): String = stringResource(titleRes)
 
 private fun AppTab.rootGlyph(): RootGlyph = when (this) {
     AppTab.Home -> RootGlyph.Home

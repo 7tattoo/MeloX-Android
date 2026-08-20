@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lladlam.melox.R
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
@@ -93,6 +95,7 @@ import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.library.MeloXUnifiedPlaylistDetailScreen
 import com.lladlam.melox.core.music.provider.MeloXLegacyUiBridge
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.layout.rememberMeloXWindowInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -422,13 +425,15 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
         return
     }
 
+    val window = rememberMeloXWindowInfo()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(top = 26.dp),
+            .padding(top = 26.dp)
+            .padding(horizontal = if (window.supportsTwoPane) window.gutter else 0.dp),
     ) {
-        MeloXIosTopBar(title = "搜索")
+        MeloXIosTopBar(title = stringResource(R.string.tab_search))
         Spacer(Modifier.height(16.dp))
         SearchField(query, { query = it }, source)
         if (query.isNotBlank()) {
@@ -509,6 +514,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
 @Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit, source: MusicSource) {
     var focused by remember { mutableStateOf(false) }
+    val clearDescription = stringResource(R.string.search_clear)
     MeloXGlassTextField(
         value = value,
         onValueChange = onValueChange,
@@ -519,11 +525,12 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, source: 
                 focused = focused,
                 modifier = Modifier.size(21.dp),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f),
+                contentDescription = stringResource(if (focused) R.string.action_back else R.string.tab_search),
             )
         },
         placeholder = {
             Text(
-                if (source == MusicSource.Netease) "音乐内容或网易云链接" else "搜索音乐内容",
+                stringResource(R.string.search_placeholder),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
                 fontSize = 17.sp,
             )
@@ -535,7 +542,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, source: 
                         .size(44.dp)
                         .clickable(role = Role.Button) { onValueChange("") }
                         .semantics {
-                            contentDescription = "清除搜索内容"
+                            contentDescription = clearDescription
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -596,6 +603,8 @@ private fun SearchDiscovery(
     onPlaylist: (NeteasePlaylistSummary) -> Unit,
     onCategory: (String) -> Unit,
 ) {
+    val window = rememberMeloXWindowInfo()
+    val categoryColumns = window.gridColumns.coerceIn(2, 4)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
@@ -614,10 +623,10 @@ private fun SearchDiscovery(
             }
         }
         item { Text("浏览类别", modifier = Modifier.padding(start = 20.dp, top = 26.dp, bottom = 12.dp), fontSize = 24.sp, fontWeight = FontWeight.Bold) }
-        items(SearchCategories.filter { it != "播客" || MeloXSettingsRuntime.podcastsEnabled }.chunked(2)) { pair ->
+        items(SearchCategories.filter { it != "播客" || MeloXSettingsRuntime.podcastsEnabled }.chunked(categoryColumns)) { pair ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 pair.forEach { category -> SearchCategoryCard(category, Modifier.weight(1f)) { onCategory(category) } }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                repeat(categoryColumns - pair.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }

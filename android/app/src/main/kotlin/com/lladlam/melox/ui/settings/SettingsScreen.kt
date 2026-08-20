@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import coil3.compose.AsyncImage
+import com.lladlam.melox.R
 import com.lladlam.melox.BuildConfig
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.audio.MusicQuality
@@ -203,7 +205,7 @@ fun SettingsScreen(
             .padding(top = 18.dp, bottom = MeloXBottomContentClearance),
     ) {
         MeloXIosTopBar(
-            title = "设置",
+            title = stringResource(R.string.tab_settings),
             modifier = Modifier.padding(horizontal = 0.dp),
             contentPadding = PaddingValues(horizontal = 0.dp),
         )
@@ -868,6 +870,19 @@ private fun AutoMixSettings(context: android.content.Context) {
 
 @Composable
 private fun PlayerAppearanceSettings(context: android.content.Context) {
+    LyricsStringChoiceSetting(
+        context,
+        "播放器外观",
+        "player_shell",
+        MeloXSettingsRuntime.playerShell.name,
+        com.lladlam.melox.ui.settings.MeloXPlayerShell.entries.map { it.name },
+    ) {
+        when (com.lladlam.melox.ui.settings.MeloXPlayerShell.valueOf(it)) {
+            com.lladlam.melox.ui.settings.MeloXPlayerShell.AppleMusic -> "Apple Music"
+            com.lladlam.melox.ui.settings.MeloXPlayerShell.Classic -> "经典播放器（手机 / 平板 / 横屏）"
+        }
+    }
+    Spacer(Modifier.height(14.dp))
     SettingsToggleRow(context, "流动光影背景", "player_flowing_backdrop", true, "关闭后使用模糊封面背景。")
     SettingsToggleRow(context, "封面播放动效", "player_artwork_motion", true)
     LyricsStringChoiceSetting(

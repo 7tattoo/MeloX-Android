@@ -367,140 +367,185 @@ internal fun MeloXTextPVLyricsPanel(
     }
 }
 
+private enum class TextPVPattern {
+    BlueRays, SplitSlash, PlaneBlocks, Grunge, Geometry, Rain, Hud, Film,
+    Radial, Web, Ink, Villain, Clouds, Gingham, Stars, Pixels, CrimeTape, Petals,
+}
+
+private data class TextPVVisualSpec(
+    val pattern: TextPVPattern,
+    val background: Color,
+    val accent: Color,
+    val secondary: Color,
+    val foreground: Color,
+    val alignment: Alignment,
+    val textAlign: TextAlign,
+    val fontSize: Float,
+    val lineHeight: Float,
+    val weight: FontWeight,
+    val rotation: Float,
+    val letterSpacing: Float,
+    val uppercase: Boolean,
+    val marker: String?,
+    val nextOpacity: Float,
+    val motionX: Float,
+    val motionY: Float,
+    val pulse: Float,
+)
+
+private fun MeloXTextPVStyle.visualSpec(): TextPVVisualSpec = when (this) {
+    MeloXTextPVStyle.BlueBold -> TextPVVisualSpec(TextPVPattern.BlueRays, Color(0xFF123A91), Color(0xFF8CC8FF), Color.White, Color.White, Alignment.CenterStart, TextAlign.Start, 50f, 54f, FontWeight.Black, -2f, -.4f, false, null, .18f, 16f, 0f, .018f)
+    MeloXTextPVStyle.KineticSplit -> TextPVVisualSpec(TextPVPattern.SplitSlash, Color(0xFFF0E6D5), Color(0xFF8E1832), Color.Black, Color(0xFF15110F), Alignment.CenterEnd, TextAlign.End, 47f, 51f, FontWeight.ExtraBold, -5f, -.8f, false, null, .28f, -22f, 8f, .012f)
+    MeloXTextPVStyle.BluePlane -> TextPVVisualSpec(TextPVPattern.PlaneBlocks, Color(0xFF0C2B68), Color(0xFF46A8FF), Color(0xFFBBD9FF), Color.White, Alignment.TopStart, TextAlign.Start, 44f, 48f, FontWeight.Bold, 0f, 1.2f, true, "PLANE", .24f, 28f, 18f, .008f)
+    MeloXTextPVStyle.CyberGrunge -> TextPVVisualSpec(TextPVPattern.Grunge, Color(0xFF071318), Color(0xFF76E8FF), Color(0xFFFF4B89), Color(0xFFDBFAFF), Alignment.BottomStart, TextAlign.Start, 43f, 47f, FontWeight.Black, -1f, 1.4f, true, "GRUNGE", .16f, 12f, -10f, .022f)
+    MeloXTextPVStyle.Geometric -> TextPVVisualSpec(TextPVPattern.Geometry, Color(0xFFF5C928), Color.Black, Color.White, Color.Black, Alignment.Center, TextAlign.Center, 39f, 44f, FontWeight.Black, 0f, -.6f, false, null, .30f, 0f, -16f, .026f)
+    MeloXTextPVStyle.RainCity -> TextPVVisualSpec(TextPVPattern.Rain, Color(0xFF05131B), Color(0xFF3DFFB5), Color(0xFF8BE9FD), Color(0xFFD7FFF0), Alignment.BottomCenter, TextAlign.Center, 40f, 45f, FontWeight.Medium, 0f, 2.1f, false, "CITY RAIN", .13f, 0f, 22f, .004f)
+    MeloXTextPVStyle.CyberpunkHUD -> TextPVVisualSpec(TextPVPattern.Hud, Color(0xFF090C15), Color(0xFFFFD23F), Color(0xFF00E5FF), Color(0xFFFFF1A8), Alignment.CenterEnd, TextAlign.End, 38f, 43f, FontWeight.Bold, 0f, 1.8f, true, "HUD", .20f, -18f, 0f, .010f)
+    MeloXTextPVStyle.EmotionCinema -> TextPVVisualSpec(TextPVPattern.Film, Color(0xFF24334A), Color(0xFF9CC8FF), Color(0xFFF1C9AE), Color.White, Alignment.BottomStart, TextAlign.Start, 41f, 49f, FontWeight.SemiBold, 0f, .1f, false, "SCENE", .34f, 0f, -12f, .006f)
+    MeloXTextPVStyle.HystericNight -> TextPVVisualSpec(TextPVPattern.Radial, Color(0xFF180A25), Color(0xFFE46CFF), Color(0xFFFF477E), Color.White, Alignment.Center, TextAlign.Center, 46f, 48f, FontWeight.Black, 4f, -.9f, true, null, .14f, 18f, 18f, .040f)
+    MeloXTextPVStyle.SpiderWeb -> TextPVVisualSpec(TextPVPattern.Web, Color(0xFF07090F), Color(0xFFE7ECFF), Color(0xFF8C52FF), Color.White, Alignment.TopEnd, TextAlign.End, 42f, 47f, FontWeight.ExtraBold, 2f, .6f, false, "WEB", .17f, -14f, 12f, .014f)
+    MeloXTextPVStyle.StaggeredText -> TextPVVisualSpec(TextPVPattern.Ink, Color(0xFFEBE7DD), Color(0xFF151515), Color(0xFFE84A5F), Color(0xFF151515), Alignment.CenterStart, TextAlign.Start, 54f, 56f, FontWeight.Black, -7f, -1.2f, false, null, .38f, 32f, -12f, .030f)
+    MeloXTextPVStyle.CalmVillain -> TextPVVisualSpec(TextPVPattern.Villain, Color(0xFF17202A), Color(0xFFC6A15B), Color(0xFF66788A), Color(0xFFF1E9DC), Alignment.CenterStart, TextAlign.Start, 39f, 47f, FontWeight.Light, 0f, 2.8f, true, "ACT I", .26f, 5f, 0f, .002f)
+    MeloXTextPVStyle.GirlyClouds -> TextPVVisualSpec(TextPVPattern.Clouds, Color(0xFFF3A9C3), Color.White, Color(0xFFFFE4EF), Color.White, Alignment.Center, TextAlign.Center, 38f, 43f, FontWeight.Bold, -1f, .3f, false, null, .32f, 12f, -12f, .020f)
+    MeloXTextPVStyle.SweetPink -> TextPVVisualSpec(TextPVPattern.Gingham, Color(0xFFFFD0E1), Color(0xFFFF5E91), Color.White, Color(0xFF9B2851), Alignment.Center, TextAlign.Center, 37f, 42f, FontWeight.Black, 0f, .8f, false, "SWEET", .28f, -8f, 8f, .016f)
+    MeloXTextPVStyle.FlyMeToTheMoon -> TextPVVisualSpec(TextPVPattern.Stars, Color(0xFF080D24), Color(0xFFBFCBFF), Color(0xFF6F81C7), Color.White, Alignment.Center, TextAlign.Center, 36f, 45f, FontWeight.Light, 0f, 3.2f, true, "ORBIT", .24f, 0f, -24f, .008f)
+    MeloXTextPVStyle.KawaiiPixel -> TextPVVisualSpec(TextPVPattern.Pixels, Color(0xFFB8F1EA), Color(0xFFFF79AE), Color.White, Color(0xFF285A64), Alignment.BottomEnd, TextAlign.End, 40f, 42f, FontWeight.Black, 0f, 0f, false, "READY!", .30f, -16f, -6f, .012f)
+    MeloXTextPVStyle.CrimeScene -> TextPVVisualSpec(TextPVPattern.CrimeTape, Color(0xFFE3D8C1), Color(0xFFB1182B), Color.Black, Color(0xFF17110D), Alignment.CenterStart, TextAlign.Start, 45f, 49f, FontWeight.Black, -3f, -.5f, true, "EVIDENCE", .22f, 24f, 6f, .018f)
+    MeloXTextPVStyle.Haruhikage -> TextPVVisualSpec(TextPVPattern.Petals, Color(0xFFB9CAE3), Color(0xFFFFEFF7), Color(0xFF6D7FA0), Color(0xFF26364F), Alignment.BottomStart, TextAlign.Start, 37f, 46f, FontWeight.Medium, 0f, .4f, false, "春日影", .35f, 8f, -18f, .003f)
+    MeloXTextPVStyle.Dynamic -> MeloXTextPVStyle.BlueBold.visualSpec()
+    MeloXTextPVStyle.Minimal -> MeloXTextPVStyle.CalmVillain.visualSpec()
+    MeloXTextPVStyle.Cyber -> MeloXTextPVStyle.CyberGrunge.visualSpec()
+}
+
+internal fun MeloXTextPVStyle.visualSignature(): String = visualSpec().run {
+    listOf(pattern, background, accent, secondary, foreground, alignment, textAlign, fontSize, lineHeight, weight, rotation, letterSpacing, uppercase, marker, nextOpacity, motionX, motionY, pulse).joinToString("|")
+}
+
 @Composable
-private fun TextPVBackground(
-    style: MeloXTextPVStyle,
-    phaseProvider: () -> Float,
-    motionIntensity: Float,
-) {
+private fun TextPVBackground(style: MeloXTextPVStyle, phaseProvider: () -> Float, motionIntensity: Float) {
+    val spec = remember(style) { style.visualSpec() }
     Canvas(Modifier.fillMaxSize()) {
-        if (!size.width.isFinite() || !size.height.isFinite() || size.width <= 0f || size.height <= 0f) {
-            return@Canvas
-        }
+        if (!size.width.isFinite() || !size.height.isFinite() || size.width <= 0f || size.height <= 0f) return@Canvas
         val phase = phaseProvider()
-        when (style) {
-            MeloXTextPVStyle.BlueBold, MeloXTextPVStyle.BluePlane, MeloXTextPVStyle.Dynamic -> {
-                drawRect(Color(0xFF123A91).copy(alpha = .56f))
-                repeat(7) { index ->
-                    val x = size.width * ((index * .19f + phase * .12f * motionIntensity) % 1.15f - .08f)
-                    drawLine(Color.White.copy(alpha = .05f), Offset(x, 0f), Offset(x - size.height * .18f, size.height), 2f)
-                }
-                drawCircle(Color.White.copy(alpha = .08f), radius = size.minDimension * .28f, center = Offset(size.width * .78f, size.height * .22f), style = Stroke(3f))
+        val motion = phase * motionIntensity
+        drawRect(spec.background.copy(alpha = .78f))
+        when (spec.pattern) {
+            TextPVPattern.BlueRays -> repeat(8) { index ->
+                val x = size.width * ((index * .17f + motion * .12f) % 1.2f - .1f)
+                drawLine(spec.accent.copy(alpha = .12f), Offset(x, 0f), Offset(x - size.height * .22f, size.height), 3f)
             }
-            MeloXTextPVStyle.KineticSplit, MeloXTextPVStyle.CrimeScene -> {
-                drawRect(Color(0xFFF0E6D5).copy(alpha = .72f))
-                drawLine(Color(0xFF8E1832).copy(alpha = .72f), Offset(-size.width * .1f, size.height * (.72f - phase * .12f * motionIntensity)), Offset(size.width * 1.1f, size.height * (.28f + phase * .12f * motionIntensity)), size.minDimension * .055f)
+            TextPVPattern.SplitSlash -> {
+                drawLine(spec.accent.copy(alpha = .85f), Offset(-size.width * .1f, size.height * (.75f - motion * .12f)), Offset(size.width * 1.1f, size.height * (.25f + motion * .12f)), size.minDimension * .07f)
+                drawLine(spec.secondary.copy(alpha = .22f), Offset(0f, size.height * .28f), Offset(size.width, size.height * .08f), 5f)
             }
-            MeloXTextPVStyle.Geometric -> {
-                drawRect(Color(0xFFF5C928).copy(alpha = .76f))
-                repeat(4) { index ->
-                    drawRect(Color.Black.copy(alpha = .06f + index * .018f), topLeft = Offset(size.width * (.08f + index * .07f), size.height * (.12f + index * .07f)), size = androidx.compose.ui.geometry.Size(size.minDimension * (.74f - index * .1f), size.minDimension * (.74f - index * .1f)), style = Stroke(3f))
-                }
+            TextPVPattern.PlaneBlocks -> repeat(5) { index ->
+                val width = size.width * (.18f + index * .045f)
+                drawRect(spec.accent.copy(alpha = .07f + index * .025f), Offset(size.width * (.06f + index * .18f), size.height * ((index * .14f + motion * .08f) % .8f)), androidx.compose.ui.geometry.Size(width, size.height * .28f))
             }
-            MeloXTextPVStyle.CyberGrunge, MeloXTextPVStyle.RainCity, MeloXTextPVStyle.CyberpunkHUD,
-            MeloXTextPVStyle.SpiderWeb, MeloXTextPVStyle.Cyber -> {
-                drawRect(Color(0xFF061018).copy(alpha = .52f))
-                val spacing = (size.minDimension / 12f).coerceAtLeast(8f)
-                val xCount = (size.width / spacing).toInt().coerceIn(0, 96) + 3
-                repeat(xCount) { index ->
-                    val x = -spacing + phase * spacing * motionIntensity + index * spacing
-                    drawLine(Color(0xFF76E8FF).copy(alpha = .10f), Offset(x, 0f), Offset(x, size.height), 1f)
-                }
-                val yCount = (size.height / spacing).toInt().coerceIn(0, 160) + 3
-                repeat(yCount) { index ->
-                    val y = -spacing + phase * spacing * motionIntensity + index * spacing
-                    drawLine(Color(0xFFFF4B89).copy(alpha = .08f), Offset(0f, y), Offset(size.width, y), 1f)
-                }
+            TextPVPattern.Grunge -> repeat(22) { index ->
+                val y = size.height * ((index * .071f + motion * .09f) % 1f)
+                drawLine(if (index % 2 == 0) spec.accent.copy(alpha = .11f) else spec.secondary.copy(alpha = .09f), Offset(0f, y), Offset(size.width * (.35f + (index % 7) * .1f), y + (index % 3 - 1) * 7f), 1f + index % 4)
             }
-            MeloXTextPVStyle.EmotionCinema, MeloXTextPVStyle.CalmVillain, MeloXTextPVStyle.Haruhikage,
-            MeloXTextPVStyle.Minimal -> {
-                drawRect(Color(0xFF24334A).copy(alpha = .38f))
-                repeat(5) { index ->
-                    val y = size.height * (.18f + index * .15f)
-                    drawLine(Color(0xFF9CC8FF).copy(alpha = .05f), Offset(0f, y), Offset(size.width, y + sin(phase * 6.28f + index) * 24f * motionIntensity), 2f)
-                }
+            TextPVPattern.Geometry -> repeat(5) { index ->
+                val inset = size.minDimension * (.08f + index * .07f)
+                drawRect(spec.accent.copy(alpha = .08f + index * .025f), Offset(inset, inset), androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f), style = Stroke(3f))
             }
-            MeloXTextPVStyle.HystericNight -> {
-                drawRect(Color(0xFF180A25).copy(alpha = .58f))
+            TextPVPattern.Rain -> repeat(32) { index ->
+                val x = size.width * ((index * .137f) % 1f)
+                val y = size.height * ((index * .221f + motion * .45f) % 1.15f - .1f)
+                drawLine(spec.accent.copy(alpha = .16f), Offset(x, y), Offset(x - 7f, y + 46f + index % 5 * 8f), 2f)
+            }
+            TextPVPattern.Hud -> {
+                drawRect(spec.accent.copy(alpha = .18f), Offset(size.width * .06f, size.height * .08f), androidx.compose.ui.geometry.Size(size.width * .88f, size.height * .84f), style = Stroke(3f))
+                repeat(7) { index -> drawLine(spec.secondary.copy(alpha = .12f), Offset(size.width * .58f, size.height * (.16f + index * .09f)), Offset(size.width * (.92f - motion * .03f), size.height * (.16f + index * .09f)), 2f) }
+            }
+            TextPVPattern.Film -> {
+                drawRect(Color.Black.copy(alpha = .24f), Offset.Zero, androidx.compose.ui.geometry.Size(size.width, size.height * .11f))
+                drawRect(Color.Black.copy(alpha = .24f), Offset(0f, size.height * .89f), androidx.compose.ui.geometry.Size(size.width, size.height * .11f))
+                drawCircle(spec.accent.copy(alpha = .10f), size.minDimension * .34f, Offset(size.width * (.28f + motion * .05f), size.height * .48f))
+            }
+            TextPVPattern.Radial -> repeat(12) { index ->
+                val angle = index * PI.toFloat() / 6f + motion * .45f
+                drawLine(spec.accent.copy(alpha = .075f), center, Offset(center.x + kotlin.math.cos(angle) * size.maxDimension, center.y + sin(angle) * size.maxDimension), size.minDimension * .022f)
+            }
+            TextPVPattern.Web -> {
                 repeat(10) { index ->
-                    val angle = index * PI.toFloat() / 5f + phase * .35f * motionIntensity
-                    val end = Offset(size.width / 2f + kotlin.math.cos(angle) * size.maxDimension, size.height / 2f + sin(angle) * size.maxDimension)
-                    drawLine(Color(0xFFE46CFF).copy(alpha = .055f), center, end, size.minDimension * .025f)
+                    val angle = index * PI.toFloat() / 5f + motion * .08f
+                    drawLine(spec.accent.copy(alpha = .12f), Offset(size.width, 0f), Offset(size.width + kotlin.math.cos(angle) * size.maxDimension, sin(angle) * size.maxDimension), 1.5f)
                 }
+                repeat(4) { index -> drawCircle(spec.secondary.copy(alpha = .10f), size.minDimension * (.16f + index * .12f), Offset(size.width, 0f), style = Stroke(2f)) }
             }
-            MeloXTextPVStyle.StaggeredText -> drawRect(Color.Black.copy(alpha = .14f))
-            MeloXTextPVStyle.GirlyClouds, MeloXTextPVStyle.SweetPink -> {
-                drawRect(Color(0xFFF3A9C3).copy(alpha = .55f))
-                repeat(7) { index ->
-                    val x = size.width * ((index * .22f + phase * .08f * motionIntensity) % 1.2f - .1f)
-                    drawLine(Color.White.copy(alpha = .11f), Offset(x, 0f), Offset(x - size.height * .25f, size.height), size.minDimension * .018f)
-                }
-                drawCircle(Color.White.copy(alpha = .12f), size.minDimension * .22f, Offset(size.width * .12f, size.height * .15f))
+            TextPVPattern.Ink -> repeat(6) { index ->
+                val y = size.height * (.17f + index * .13f)
+                drawLine(spec.accent.copy(alpha = .09f), Offset(size.width * .04f, y), Offset(size.width * (.58f + index * .05f), y - 18f + motion * 8f), 8f - index * .7f)
             }
-            MeloXTextPVStyle.FlyMeToTheMoon -> {
-                drawRect(Color(0xFF080D24).copy(alpha = .74f))
-                repeat(18) { index -> drawCircle(Color.White.copy(alpha = .1f), 1.5f + index % 3, Offset(size.width * ((index * .173f) % 1f), size.height * ((index * .317f) % 1f))) }
-                drawCircle(Color(0xFFBFCBFF).copy(alpha = .16f), size.minDimension * .24f, Offset(size.width * .78f, size.height * .22f))
+            TextPVPattern.Villain -> repeat(5) { index ->
+                val y = size.height * (.20f + index * .14f)
+                drawLine(spec.accent.copy(alpha = .08f + index * .018f), Offset(size.width * .08f, y), Offset(size.width * (.88f - index * .05f), y), 1f)
             }
-            MeloXTextPVStyle.KawaiiPixel -> {
-                drawRect(Color(0xFFB8F1EA).copy(alpha = .52f))
-                val spacing = (size.minDimension / 14f).coerceAtLeast(8f)
-                val xCount = (size.width / spacing).toInt().coerceIn(0, 96) + 1
-                repeat(xCount) { index ->
-                    val x = index * spacing
-                    drawLine(Color(0xFFFF79AE).copy(alpha = .08f), Offset(x, 0f), Offset(x, size.height), 2f)
-                }
-                val yCount = (size.height / spacing).toInt().coerceIn(0, 160) + 1
-                repeat(yCount) { index ->
-                    val y = index * spacing
-                    drawLine(Color.White.copy(alpha = .09f), Offset(0f, y), Offset(size.width, y), 2f)
-                }
+            TextPVPattern.Clouds -> repeat(7) { index ->
+                val x = size.width * ((index * .2f + motion * .08f) % 1.2f - .1f)
+                drawCircle(spec.accent.copy(alpha = .15f), size.minDimension * (.10f + index % 3 * .035f), Offset(x, size.height * (.18f + index % 4 * .18f)))
+            }
+            TextPVPattern.Gingham -> {
+                val spacing = size.minDimension / 9f
+                repeat(14) { index -> drawLine(spec.accent.copy(alpha = .09f), Offset(index * spacing, 0f), Offset(index * spacing, size.height), spacing * .32f) }
+                repeat(22) { index -> drawLine(spec.secondary.copy(alpha = .13f), Offset(0f, index * spacing), Offset(size.width, index * spacing), spacing * .28f) }
+            }
+            TextPVPattern.Stars -> {
+                repeat(28) { index -> drawCircle(spec.accent.copy(alpha = .12f + index % 4 * .03f), 1.5f + index % 3, Offset(size.width * ((index * .173f + motion * .015f) % 1f), size.height * ((index * .317f) % 1f))) }
+                drawCircle(spec.accent.copy(alpha = .18f), size.minDimension * .24f, Offset(size.width * .78f, size.height * .22f))
+            }
+            TextPVPattern.Pixels -> {
+                val spacing = (size.minDimension / 13f).coerceAtLeast(8f)
+                repeat((size.width / spacing).toInt().coerceAtMost(80) + 1) { index -> drawLine(spec.accent.copy(alpha = .09f), Offset(index * spacing, 0f), Offset(index * spacing, size.height), 2f) }
+                repeat((size.height / spacing).toInt().coerceAtMost(120) + 1) { index -> drawLine(spec.secondary.copy(alpha = .12f), Offset(0f, index * spacing), Offset(size.width, index * spacing), 2f) }
+            }
+            TextPVPattern.CrimeTape -> repeat(3) { index ->
+                val y = size.height * (.22f + index * .27f + motion * .025f)
+                drawLine(spec.accent.copy(alpha = .76f), Offset(-size.width * .15f, y + size.height * .08f), Offset(size.width * 1.15f, y - size.height * .08f), size.minDimension * .045f)
+            }
+            TextPVPattern.Petals -> repeat(18) { index ->
+                val x = size.width * ((index * .113f + motion * .05f) % 1.1f)
+                val y = size.height * ((index * .179f + motion * .10f) % 1.1f)
+                drawOval(spec.accent.copy(alpha = .18f), Offset(x, y), androidx.compose.ui.geometry.Size(8f + index % 4 * 3f, 16f + index % 5 * 3f))
             }
         }
     }
 }
 
 @Composable
-private fun TextPVComposition(
-    line: LyricLine,
-    next: LyricLine?,
-    style: MeloXTextPVStyle,
-    phaseProvider: () -> Float,
-    motionIntensity: Float,
-    onSeek: () -> Unit,
-) {
-    val centered = style in setOf(MeloXTextPVStyle.Geometric, MeloXTextPVStyle.GirlyClouds, MeloXTextPVStyle.SweetPink, MeloXTextPVStyle.FlyMeToTheMoon, MeloXTextPVStyle.Minimal)
-    val bottom = style in setOf(MeloXTextPVStyle.CyberGrunge, MeloXTextPVStyle.RainCity, MeloXTextPVStyle.CyberpunkHUD, MeloXTextPVStyle.SpiderWeb, MeloXTextPVStyle.Cyber)
-    val alignment = if (centered) Alignment.Center else if (bottom) Alignment.BottomStart else Alignment.CenterStart
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = alignment) {
-        Column(Modifier.fillMaxWidth().clickable(onClick = onSeek)) {
-            if (bottom) {
-                val marker = ((line.timeMs / 10L) % 1000L).toString().padStart(3, '0')
-                Text("LYRIC // $marker", color = Color(0xFF76E8FF), fontSize = 11.sp, letterSpacing = 2.sp)
+private fun TextPVComposition(line: LyricLine, next: LyricLine?, style: MeloXTextPVStyle, phaseProvider: () -> Float, motionIntensity: Float, onSeek: () -> Unit) {
+    val spec = remember(style) { style.visualSpec() }
+    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = spec.alignment) {
+        Column(Modifier.fillMaxWidth(.94f).clickable(onClick = onSeek), horizontalAlignment = when (spec.textAlign) {
+            TextAlign.Center -> Alignment.CenterHorizontally
+            TextAlign.End -> Alignment.End
+            else -> Alignment.Start
+        }) {
+            spec.marker?.let { marker ->
+                Text("$marker // ${((line.timeMs / 10L) % 1000L).toString().padStart(3, '0')}", color = spec.accent, fontSize = 11.sp, letterSpacing = 2.sp)
             }
             Text(
-                line.text,
-                color = Color.White,
-                fontSize = when {
-                    centered -> 38.sp
-                    bottom -> 42.sp
-                    style == MeloXTextPVStyle.StaggeredText -> 52.sp
-                    else -> 48.sp
-                },
-                lineHeight = 52.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = if (centered) TextAlign.Center else TextAlign.Start,
-                modifier = Modifier.graphicsLayer {
-                    val phase = phaseProvider()
-                    val scale = 1f + sin(phase * 2f * PI.toFloat()) * .012f * motionIntensity
-                    scaleX = scale
-                    scaleY = scale
+                if (spec.uppercase) line.text.uppercase() else line.text,
+                color = spec.foreground,
+                fontSize = spec.fontSize.sp,
+                lineHeight = spec.lineHeight.sp,
+                fontWeight = spec.weight,
+                letterSpacing = spec.letterSpacing.sp,
+                textAlign = spec.textAlign,
+                modifier = Modifier.rotate(spec.rotation).graphicsLayer {
+                    val wave = sin(phaseProvider() * 2f * PI.toFloat()) * motionIntensity
+                    translationX = wave * spec.motionX
+                    translationY = wave * spec.motionY
+                    scaleX = 1f + wave * spec.pulse
+                    scaleY = 1f + wave * spec.pulse
                 },
             )
             if (MeloXSettingsRuntime.showLyricTranslation && !line.translation.isNullOrBlank()) {
-                Text(line.translation.orEmpty(), color = Color.White.copy(alpha = .62f), fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
+                Text(line.translation.orEmpty(), color = spec.foreground.copy(alpha = .62f), fontSize = 15.sp, textAlign = spec.textAlign, modifier = Modifier.padding(top = 12.dp))
             }
-            next?.let { Text(it.text, color = Color.White.copy(alpha = .20f), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 26.dp)) }
+            next?.let { Text(it.text, color = spec.foreground.copy(alpha = spec.nextOpacity), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = spec.textAlign, modifier = Modifier.padding(top = 24.dp)) }
         }
     }
 }

@@ -12,6 +12,7 @@ enum class MeloXLyricAnnotationDisplayMode { FocusedLine, AllLines }
 enum class MeloXLyricsStyle { AppleMusic, Eva, TextPV }
 enum class MeloXLyricsRenderingQuality { Low, Balanced, High }
 enum class MeloXPlayerBackgroundMode { FlowingLight, AppleLyrics, BlurredArtwork }
+enum class MeloXPlayerShell { AppleMusic, Classic }
 enum class MeloXTextPVStyle {
     BlueBold, KineticSplit, BluePlane, CyberGrunge, Geometric, RainCity,
     CyberpunkHUD, EmotionCinema, HystericNight, SpiderWeb, StaggeredText,
@@ -76,6 +77,8 @@ object MeloXSettingsRuntime {
     var flowingBackdropEnabled by mutableStateOf(true)
         internal set
     var playerBackgroundMode by mutableStateOf(MeloXPlayerBackgroundMode.FlowingLight)
+        internal set
+    var playerShell by mutableStateOf(MeloXPlayerShell.AppleMusic)
         internal set
     var artworkMotionEnabled by mutableStateOf(true)
         internal set
@@ -368,6 +371,9 @@ object MeloXSettingsRuntime {
                 MeloXPlayerBackgroundMode.BlurredArtwork
             }
         flowingBackdropEnabled = playerBackgroundMode != MeloXPlayerBackgroundMode.BlurredArtwork
+        playerShell = runCatching {
+            MeloXPlayerShell.valueOf(MeloXSettingsPreferences.string(app, "player_shell", MeloXPlayerShell.AppleMusic.name))
+        }.getOrDefault(MeloXPlayerShell.AppleMusic)
         artworkMotionEnabled = MeloXSettingsPreferences.boolean(app, "player_artwork_motion", true)
         playerTransitionDurationMs = MeloXSettingsPreferences.int(app, "player_transition_duration_ms", 575)
             .coerceIn(200, 1_200)
@@ -723,8 +729,8 @@ object MeloXSettingsPreferences {
             }.getOrDefault(MeloXThemeMode.System)
             "music_area" -> MeloXSettingsRuntime.musicArea = value
             "tab_order" -> MeloXSettingsRuntime.tabOrder = value.split(',')
-                .filter { it in setOf("Home", "Explore", "Library", "Settings") }.distinct()
-                .let { order -> (order + listOf("Home", "Explore", "Library", "Settings")).distinct() }
+                .filter { it in setOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings") }.distinct()
+                .let { order -> (order + listOf("Home", "Explore", "Library", "Podcasts", "Downloads", "Cloud", "Settings")).distinct() }
             "home_section_order" -> MeloXSettingsRuntime.homeSectionOrder = value.split(',')
                 .filter { it in setOf("QuickActions", "Playlists", "NewSongs") }.distinct()
                 .let { order -> (order + listOf("QuickActions", "Playlists", "NewSongs")).distinct() }
@@ -749,6 +755,9 @@ object MeloXSettingsPreferences {
                 MeloXSettingsRuntime.flowingBackdropEnabled =
                     MeloXSettingsRuntime.playerBackgroundMode != MeloXPlayerBackgroundMode.BlurredArtwork
             }
+            "player_shell" -> MeloXSettingsRuntime.playerShell = runCatching {
+                MeloXPlayerShell.valueOf(value)
+            }.getOrDefault(MeloXPlayerShell.AppleMusic)
             "lyrics_text_pv_style" -> {
                 MeloXSettingsRuntime.textPVStyle = runCatching {
                     MeloXTextPVStyle.valueOf(value)
@@ -794,6 +803,7 @@ object MeloXSettingsPreferences {
     fun resetRecommendedPlayerSettings(context: Context) {
         prefs(context).edit()
             .remove("player_background_mode")
+            .remove("player_shell")
             .remove("player_flowing_backdrop")
             .remove("player_artwork_motion")
             .remove("player_background_isolation")

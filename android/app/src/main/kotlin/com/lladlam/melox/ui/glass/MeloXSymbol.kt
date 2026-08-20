@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.R
@@ -70,6 +72,7 @@ enum class MeloXSymbol(
     Microphone("mic", "mic"),
     Storage("internaldrive", "storage"),
     Bug("ladybug", "bug_report"),
+    Unknown("questionmark.circle", "help"),
 }
 
 enum class MeloXSymbolVariant {
@@ -92,6 +95,7 @@ fun MeloXSymbolIcon(
     color: Color,
     variant: MeloXSymbolVariant = MeloXSymbolVariant.Regular,
     iconSize: TextUnit = 24.sp,
+    contentDescription: String? = null,
 ) {
     // Material Symbols uses a taller font box than SF Symbols. Rendering the
     // glyph at a slightly smaller em size leaves a real optical inset inside
@@ -100,7 +104,9 @@ fun MeloXSymbolIcon(
     val glyphSize = iconSize * 0.86f
     Text(
         text = symbol.materialLigature,
-        modifier = modifier,
+        modifier = if (contentDescription == null) modifier else modifier.semantics {
+            this.contentDescription = contentDescription
+        },
         color = color,
         fontFamily = if (variant == MeloXSymbolVariant.Fill) {
             MeloXSymbolsFilledFont
@@ -134,7 +140,7 @@ fun MeloXSearchBackMorphIcon(
         animationSpec = tween(300, easing = LinearOutSlowInEasing),
         label = "search-back-morph",
     )
-    Canvas(modifier) {
+    Canvas(if (contentDescription == null) modifier else modifier.semantics { this.contentDescription = contentDescription }) {
         val strokeWidth = size.minDimension * 0.095f
         val magnifierAlpha = (1f - progress).coerceIn(0f, 1f)
         val arrowAlpha = progress.coerceIn(0f, 1f)
@@ -172,6 +178,7 @@ fun MeloXActionIcon(
     modifier: Modifier = Modifier,
     color: Color,
     enabled: Boolean = true,
+    contentDescription: String? = null,
 ) {
     val symbol = when (token) {
         "◷" -> MeloXSymbol.Clock
@@ -203,12 +210,45 @@ fun MeloXActionIcon(
         "•••", "…" -> MeloXSymbol.Ellipsis
         "×" -> MeloXSymbol.Xmark
         "↻" -> MeloXSymbol.Refresh
-        else -> MeloXSymbol.Info
+        else -> MeloXSymbol.Unknown
+    }
+    val semanticLabel = contentDescription ?: when (symbol) {
+        MeloXSymbol.Clock -> "历史记录"
+        MeloXSymbol.Plus -> "添加"
+        MeloXSymbol.Download -> "下载"
+        MeloXSymbol.Share -> "分享"
+        MeloXSymbol.Mail -> "私信"
+        MeloXSymbol.Message -> "消息"
+        MeloXSymbol.Info -> "信息"
+        MeloXSymbol.Heart -> "收藏"
+        MeloXSymbol.List -> "列表"
+        MeloXSymbol.Check -> "完成"
+        MeloXSymbol.MusicNote -> "音乐"
+        MeloXSymbol.Sparkles -> "智能功能"
+        MeloXSymbol.Quote -> "引用"
+        MeloXSymbol.Devices -> "设备"
+        MeloXSymbol.Landscape -> "横屏"
+        MeloXSymbol.PictureInPicture -> "画中画"
+        MeloXSymbol.Apps -> "页面布局"
+        MeloXSymbol.Microphone -> "听歌识曲"
+        MeloXSymbol.Storage -> "存储"
+        MeloXSymbol.Settings -> "设置"
+        MeloXSymbol.Bug -> "诊断"
+        MeloXSymbol.ArrowUp -> "上移"
+        MeloXSymbol.ArrowDown -> "下移"
+        MeloXSymbol.ChevronLeft -> "返回"
+        MeloXSymbol.ChevronRight -> "打开"
+        MeloXSymbol.Ellipsis -> "更多操作"
+        MeloXSymbol.Xmark -> "关闭"
+        MeloXSymbol.Refresh -> "刷新"
+        MeloXSymbol.Unknown -> "未知操作图标 $token"
+        else -> symbol.sfSymbolName
     }
     MeloXSymbolIcon(
         symbol = symbol,
         modifier = modifier,
         color = color.copy(alpha = if (enabled) color.alpha else color.alpha * 0.38f),
         variant = if (token == "♥") MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
+        contentDescription = semanticLabel,
     )
 }

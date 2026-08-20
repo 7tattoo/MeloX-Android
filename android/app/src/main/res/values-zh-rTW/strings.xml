@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MeloX</string>
+    <string name="tab_home">首頁</string>
+    <string name="tab_explore">發現</string>
+    <string name="tab_library">音樂庫</string>
+    <string name="tab_podcasts">播客</string>
+    <string name="tab_downloads">下載</string>
+    <string name="tab_cloud">雲端</string>
+    <string name="tab_settings">設定</string>
+    <string name="tab_services">音樂服務</string>
+    <string name="tab_search">搜尋</string>
+    <string name="home_greeting">下午好</string>
+    <string name="action_back">返回</string>
+    <string name="action_close">關閉</string>
+    <string name="action_more">更多操作</string>
+    <string name="action_refresh">更新</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_done">完成</string>
+    <string name="action_play">播放</string>
+    <string name="action_pause">暫停</string>
+    <string name="action_download">下載</string>
+    <string name="action_share">分享</string>
+    <string name="search_placeholder">歌曲、歌手、專輯或歌單</string>
+    <string name="search_clear">清除搜尋內容</string>
+    <string name="state_loading">正在載入…</string>
+    <string name="state_empty">暫無內容</string>
+    <string name="player_style_apple">Apple Music</string>
+    <string name="player_style_classic">經典</string>
+    <string name="page_placement">頁面放置</string>
+    <string name="accessibility_account">帳號</string>
+    <string name="accessibility_now_playing">正在播放</string>
+</resources>

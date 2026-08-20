@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,12 +45,18 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lladlam.melox.core.account.NeteaseAccountProfile
+import com.lladlam.melox.R
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.account.rememberNeteaseSessionStore
 import com.lladlam.melox.core.library.NeteaseHomeContent
@@ -88,6 +96,7 @@ import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.library.MeloXUnifiedPlaylistDetailScreen
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.layout.rememberMeloXWindowInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -439,18 +448,23 @@ private fun MeloXHomeLayout(
     onCollection: (DiscoveryCollection) -> Unit,
 ) {
     val context = LocalContext.current.applicationContext
+    val window = rememberMeloXWindowInfo()
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         if (blocks == null) {
             EmptyOrLoading(refreshing, error)
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().statusBarsPadding(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 146.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .widthIn(max = window.maxContentWidth)
+                    .align(Alignment.TopCenter),
+                contentPadding = PaddingValues(start = window.gutter, end = window.gutter, top = 18.dp, bottom = 146.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 item {
                     MeloXIosTopBar(
-                        title = "首页",
+                        title = stringResource(R.string.tab_home),
                         contentPadding = PaddingValues(horizontal = 0.dp),
                         actions = {
                             account?.let { HomeAccountButton(it) }
@@ -459,7 +473,7 @@ private fun MeloXHomeLayout(
                 }
                 item {
                     Text(
-                        text = "下午好",
+                        text = stringResource(R.string.home_greeting),
                         style = MeloXTypography.headline,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.58f),
                     )
@@ -473,9 +487,7 @@ private fun MeloXHomeLayout(
                         }
                         is HomeBlock.Tracks -> {
                             item { SectionTitle(block.title, block.trailing) }
-                            items(block.values, key = DiscoveryTrack::key) { track ->
-                                SongRow(track) { playDiscoveryQueue(context, block.values, track) }
-                            }
+                            item { ThreeLineSongCarousel(block.values) { track -> playDiscoveryQueue(context, block.values, track) } }
                         }
                         is HomeBlock.Podcasts -> item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -516,6 +528,7 @@ private fun MeloXHomeLayout(
 
 @Composable
 private fun HomeAccountButton(account: HomeAccountUi) {
+    val accountDescription = stringResource(R.string.accessibility_account)
     Box(
         modifier = Modifier
             .size(42.dp)
@@ -525,6 +538,10 @@ private fun HomeAccountButton(account: HomeAccountUi) {
                 tint = MeloXSystemColors.Red.copy(alpha = 0.12f),
                 surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.18f),
             )
+            .semantics {
+                contentDescription = accountDescription
+                role = Role.Button
+            }
             .clickable(enabled = account.onClick != null, onClick = { account.onClick?.invoke() }),
         contentAlignment = Alignment.Center,
     ) {
@@ -746,7 +763,7 @@ private fun MeloXExploreLayout(
 ) {
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(top = 18.dp)) {
         MeloXIosTopBar(
-            title = "发现",
+            title = stringResource(R.string.tab_explore),
             // Explore is not inside a horizontally padded LazyColumn like
             // Home, so give the large title the same 20dp safe inset.
             contentPadding = PaddingValues(horizontal = 20.dp),
@@ -810,22 +827,62 @@ private fun SectionTitle(title: String, trailing: String) = Row(
 @Composable
 private fun CollectionRow(values: List<DiscoveryCollection>, onSelect: (DiscoveryCollection) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        items(values, key = DiscoveryCollection::key) { collection ->
-            CollectionCard(collection, Modifier.width(174.dp)) { onSelect(collection) }
+        itemsIndexed(values, key = { _, value -> value.key }) { index, collection ->
+            CollectionCard(collection, Modifier.width(if (index == 0) 246.dp else 174.dp)) { onSelect(collection) }
+        }
+    }
+}
+
+@Composable
+private fun ThreeLineSongCarousel(values: List<DiscoveryTrack>, onSelect: (DiscoveryTrack) -> Unit) {
+    val window = rememberMeloXWindowInfo()
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        items(values.chunked(3), key = { group -> group.joinToString("-") { it.key } }) { group ->
+            Column(
+                modifier = Modifier.width(if (window.supportsTwoPane) 390.dp else 320.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                group.forEach { track -> SongRow(track) { onSelect(track) } }
+            }
         }
     }
 }
 
 @Composable
 private fun CollectionGrid(values: List<DiscoveryCollection>, onSelect: (DiscoveryCollection) -> Unit) {
+    val window = rememberMeloXWindowInfo()
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 146.dp),
+        columns = GridCells.Fixed(window.gridColumns),
+        contentPadding = PaddingValues(start = window.gutter, end = window.gutter, bottom = 146.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        items(values, key = DiscoveryCollection::key) { collection ->
+        values.firstOrNull()?.let { hero ->
+            item(key = "hero-${hero.key}", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                HeroCollectionCard(hero) { onSelect(hero) }
+            }
+        }
+        items(values.drop(1), key = DiscoveryCollection::key) { collection ->
             CollectionCard(collection, Modifier.fillMaxWidth()) { onSelect(collection) }
+        }
+    }
+}
+
+@Composable
+private fun HeroCollectionCard(value: DiscoveryCollection, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(if (rememberMeloXWindowInfo().supportsTwoPane) 2.9f else 1.75f)
+            .clip(MeloXShapes.largeCard)
+            .clickable(onClick = onClick),
+    ) {
+        AsyncImage(value.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .82f)))))
+        Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
+            Text("本周主推", color = Color.White.copy(alpha = .72f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(value.title, color = Color.White, fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            (value.description ?: value.creatorName).takeIf(String::isNotBlank)?.let { Text(it, color = Color.White.copy(alpha = .72f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     }
 }

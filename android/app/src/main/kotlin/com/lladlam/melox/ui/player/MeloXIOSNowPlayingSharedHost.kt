@@ -62,6 +62,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.lladlam.melox.ui.glass.LocalMeloXBackdrop
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXPlayerBackgroundMode
+import com.lladlam.melox.ui.settings.MeloXPlayerShell
 import com.lladlam.melox.ui.settings.MeloXScreenAwakeMode
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.core.network.MeloXSearchKind
@@ -344,7 +345,19 @@ fun MeloXIOSNowPlayingSharedHost(
                             .fillMaxSize()
                             .graphicsLayer { alpha = fullPlayerAlpha },
                     ) {
-                        MeloXIOSNowPlayingScene(
+                        if (MeloXSettingsRuntime.playerShell == MeloXPlayerShell.Classic && page == MeloXNowPlayingPage.Artwork) {
+                            MeloXClassicNowPlayingScene(
+                                state = state,
+                                page = page,
+                                onPageChanged = { destination ->
+                                    transitionSourcePage = page
+                                    page = destination
+                                },
+                                onDismiss = onDismiss,
+                                onShowActions = { showActions = true },
+                                onShowQuality = { showQuality = true },
+                            )
+                        } else MeloXIOSNowPlayingScene(
                             state = state,
                             page = page,
                             transitionSourcePage = transitionSourcePage,
@@ -379,12 +392,14 @@ fun MeloXIOSNowPlayingSharedHost(
                     }
                 }
 
-                SharedArtworkDestination(
-                    state = state,
-                    page = page,
-                    expansionProgress = expansionProgress,
-                    hidden = showLandscapeSkyline,
-                )
+                if (!(MeloXSettingsRuntime.playerShell == MeloXPlayerShell.Classic && page == MeloXNowPlayingPage.Artwork)) {
+                    SharedArtworkDestination(
+                        state = state,
+                        page = page,
+                        expansionProgress = expansionProgress,
+                        hidden = showLandscapeSkyline,
+                    )
+                }
             }
         }
 

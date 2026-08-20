@@ -144,12 +144,8 @@ fun MeloXGlassIconButton(
         enabled = enabled,
         shape = CircleShape,
         contentPadding = PaddingValues(10.dp),
-        modifier = if (contentDescription == null) {
-            modifier
-        } else {
-            modifier.semantics {
-                this.contentDescription = contentDescription
-            }
+        modifier = modifier.semantics {
+            this.contentDescription = contentDescription ?: symbol.sfSymbolName
         },
     ) {
         MeloXSymbolIcon(
