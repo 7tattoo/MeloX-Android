@@ -25,10 +25,9 @@ import androidx.compose.ui.unit.sp
 import com.lladlam.melox.R
 
 /**
- * Semantic icon inventory aligned with SF Symbols names. Apple does not
- * license SF Symbols for redistribution in Android APKs, so the Android build
- * maps each semantic name to the license-compatible Material Symbols Rounded
- * font shipped with the app.
+ * Semantic icon inventory aligned with SF Symbols names. The personal-use
+ * distribution bundles the matching glyph font in res/font/sf_pro.ttf; any
+ * unknown symbol falls back to Material Symbols rather than rendering a blank.
  */
 enum class MeloXSymbol(
     val sfSymbolName: String,
@@ -98,6 +97,50 @@ private val MeloXSymbolsFilledFont = FontFamily(
     Font(R.font.material_symbols_rounded_filled, weight = FontWeight.Medium),
 )
 
+private val MeloXSfSymbolsFont = FontFamily(
+    Font(R.font.sf_pro, weight = FontWeight.Normal),
+)
+
+private val MeloXSfSymbolCodePoints = mapOf(
+    "house" to 0x10039E,
+    "safari" to 0x1003AC,
+    "music.note.list" to 0x10046C,
+    "gearshape" to 0x1008CB,
+    "person.crop.circle" to 0x10026D,
+    "magnifyingglass" to 0x1002AB,
+    "chevron.left" to 0x100189,
+    "chevron.right" to 0x10018A,
+    "xmark" to 0x100184,
+    "ellipsis" to 0x100360,
+    "clock" to 0x10042B,
+    "plus" to 0x10017C,
+    "square.and.arrow.up" to 0x100202,
+    "message" to 0x100324,
+    "info.circle" to 0x100174,
+    "heart" to 0x1002B4,
+    "list.bullet" to 0x1002F2,
+    "checkmark" to 0x100185,
+    "arrow.clockwise" to 0x100148,
+    "music.note" to 0x10046A,
+    "calendar" to 0x100249,
+    "flame.fill" to 0x10066D,
+    "dot.radiowaves.left.and.right" to 0x100319,
+    "figure.walk.motion" to 0x101411,
+    "sparkles" to 0x1001BF,
+    "rectangle.on.rectangle" to 0x10089A,
+    "rectangle.landscape.rotate" to 0x101EEF,
+    "mic" to 0x1002B0,
+    "internaldrive" to 0x10097E,
+    "ladybug" to 0x100BD4,
+    "play.fill" to 0x100284,
+    "pause.fill" to 0x100286,
+    "backward.fill" to 0x10028A,
+    "forward.fill" to 0x10028C,
+    "shuffle" to 0x10029D,
+    "repeat" to 0x10029E,
+    "checkmark.circle.fill" to 0x100063,
+)
+
 @Composable
 fun MeloXSymbolIcon(
     symbol: MeloXSymbol,
@@ -112,13 +155,16 @@ fun MeloXSymbolIcon(
     // callers' 18/20/24dp icon boxes, instead of clipping the gear and arrows
     // at their ascender/descender edges.
     val glyphSize = iconSize * 0.86f
+    val sfCodePoint = MeloXSfSymbolCodePoints[symbol.sfSymbolName]
     Text(
-        text = symbol.materialLigature,
+        text = sfCodePoint?.let { String(Character.toChars(it)) } ?: symbol.materialLigature,
         modifier = if (contentDescription == null) modifier else modifier.semantics {
             this.contentDescription = contentDescription
         },
         color = color,
-        fontFamily = if (variant == MeloXSymbolVariant.Fill) {
+        fontFamily = if (sfCodePoint != null) {
+            MeloXSfSymbolsFont
+        } else if (variant == MeloXSymbolVariant.Fill) {
             MeloXSymbolsFilledFont
         } else {
             MeloXSymbolsFont
