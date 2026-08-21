@@ -979,13 +979,11 @@ private fun LyricsSettings(context: android.content.Context) {
             }
         }
         Spacer(Modifier.height(10.dp))
-        SettingsGlassGroup {
-            SettingsFloatSlider("动效强度", pvMotionIntensity, 0f..2f, 19) {
-                pvMotionIntensity = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_motion_intensity", it)
-            }
-            SettingsFloatSlider("动画速度", pvAnimationSpeed, 0f..4f, 39) {
-                pvAnimationSpeed = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_animation_speed", it)
-            }
+        SettingsFloatSlider("动效强度", pvMotionIntensity, 0f..2f, 19) {
+            pvMotionIntensity = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_motion_intensity", it)
+        }
+        SettingsFloatSlider("动画速度", pvAnimationSpeed, 0f..4f, 39) {
+            pvAnimationSpeed = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_animation_speed", it)
         }
         Spacer(Modifier.height(10.dp))
         SettingsActionButton("恢复文字 PV 默认设置") {
@@ -1079,44 +1077,34 @@ private fun LyricsSettings(context: android.content.Context) {
 
     // Group 7: 最大回弹弹性-回弹强度梯度-升格回弹弹性
     Spacer(Modifier.height(10.dp))
-    SettingsGlassGroup {
-        PreferenceFloatSlider(context, "最大回弹弹性", "lyrics_cascade_bounce", .26f, 0f..8f / 10f, 79) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "回弹强度梯度", "lyrics_cascade_bounce_gradient", .85f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "升格回弹弹性", "lyrics_scale_bounce", .32f, 0f..5f / 10f, 49) { "${(it * 100).toInt()}%" }
-    }
+    PreferenceFloatSlider(context, "最大回弹弹性", "lyrics_cascade_bounce", .26f, 0f..8f / 10f, 79) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "回弹强度梯度", "lyrics_cascade_bounce_gradient", .85f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "升格回弹弹性", "lyrics_scale_bounce", .32f, 0f..5f / 10f, 49) { "${(it * 100).toInt()}%" }
 
     // Group 8: 高光渐变宽度-渐变削减程度
     Spacer(Modifier.height(10.dp))
-    SettingsGlassGroup {
-        PreferenceFloatSlider(context, "高光渐变宽度", "lyrics_highlight_gradient_width", .7f, .4f..3f, 25) { "%.1f 字宽".format(it) }
-        PreferenceFloatSlider(context, "渐变削减程度", "lyrics_highlight_gradient_reduction", .65f, 0f..1f, 19) { "${(it * 100).toInt()}%" }
-    }
+    PreferenceFloatSlider(context, "高光渐变宽度", "lyrics_highlight_gradient_width", .7f, .4f..3f, 25) { "%.1f 字宽".format(it) }
+    PreferenceFloatSlider(context, "渐变削减程度", "lyrics_highlight_gradient_reduction", .65f, 0f..1f, 19) { "${(it * 100).toInt()}%" }
 
     // Group 9: 焦点垂直位置-默认逐句模糊加强-隐藏UI逐句模糊加强-非焦点歌词变暗
     Spacer(Modifier.height(10.dp))
-    SettingsGlassGroup {
-        PreferenceFloatSlider(context, "焦点垂直位置", "lyrics_focus_position", .25f, .05f..8f / 10f, 74) { "距顶部 ${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "默认逐句模糊加强", "lyrics_distance_blur_scale", 1.05f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "隐藏 UI 逐句模糊加强", "lyrics_hidden_blur_scale", .85f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 49) { "${(it * 100).toInt()}%" }
-    }
+    PreferenceFloatSlider(context, "焦点垂直位置", "lyrics_focus_position", .25f, .05f..8f / 10f, 74) { "距顶部 ${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "默认逐句模糊加强", "lyrics_distance_blur_scale", 1.05f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "隐藏 UI 逐句模糊加强", "lyrics_hidden_blur_scale", .85f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 49) { "${(it * 100).toInt()}%" }
 
     // Group 10: 基础拖尾延迟-逐句拖尾增量-后续歌词启动延迟-拖尾追赶节奏-追赶速度梯度-位移收束时长
     Spacer(Modifier.height(10.dp))
-    SettingsGlassGroup {
-        PreferenceFloatSlider(context, "基础拖尾延迟", "lyrics_cascade_delay_ms", 21f, 0f..100f, 99) { "${it.toInt()} ms" }
-        PreferenceFloatSlider(context, "逐句拖尾增量", "lyrics_cascade_delay_increase_ms", 5f, 0f..100f, 99) { "${it.toInt()} ms/句" }
-        PreferenceFloatSlider(context, "后续歌词启动延迟", "lyrics_cascade_following_delay_ms", 30f, 0f..200f, 199) { "${it.toInt()} ms" }
-        PreferenceFloatSlider(context, "拖尾追赶节奏", "lyrics_cascade_catch_up_ratio", .97f, .5f..1f, 49) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "追赶速度梯度", "lyrics_cascade_chase_gradient", .70f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
-        PreferenceFloatSlider(context, "位移收束时长", "lyrics_cascade_duration_ms", 740f, 200f..1_200f, 99) { "%.2f 秒".format(it / 1_000f) }
-    }
+    PreferenceFloatSlider(context, "基础拖尾延迟", "lyrics_cascade_delay_ms", 21f, 0f..100f, 99) { "${it.toInt()} ms" }
+    PreferenceFloatSlider(context, "逐句拖尾增量", "lyrics_cascade_delay_increase_ms", 5f, 0f..100f, 99) { "${it.toInt()} ms/句" }
+    PreferenceFloatSlider(context, "后续歌词启动延迟", "lyrics_cascade_following_delay_ms", 30f, 0f..200f, 199) { "${it.toInt()} ms" }
+    PreferenceFloatSlider(context, "拖尾追赶节奏", "lyrics_cascade_catch_up_ratio", .97f, .5f..1f, 49) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "追赶速度梯度", "lyrics_cascade_chase_gradient", .70f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
+    PreferenceFloatSlider(context, "位移收束时长", "lyrics_cascade_duration_ms", 740f, 200f..1_200f, 99) { "%.2f 秒".format(it / 1_000f) }
 
     // Group 11: 瞬移阈值
     Spacer(Modifier.height(10.dp))
-    SettingsGlassGroup {
-        PreferenceFloatSlider(context, "瞬移阈值", "lyrics_snap_threshold_ms", 260f, 50f..500f, 89) { "${it.toInt()} ms" }
-    }
+    PreferenceFloatSlider(context, "瞬移阈值", "lyrics_snap_threshold_ms", 260f, 50f..500f, 89) { "${it.toInt()} ms" }
 }
 
 @Composable
@@ -1844,7 +1832,7 @@ private fun DeveloperSettings() {
 }
 
 private val LocalSettingsGroupedRows = staticCompositionLocalOf { false }
-private val LocalSettingsGroupRowIndex = staticCompositionLocalOf { mutableIntStateOf(0) }
+internal val LocalSettingsGroupRowIndex = staticCompositionLocalOf { mutableIntStateOf(0) }
 
 @Composable
 private fun SettingsToggleRow(

@@ -20,6 +20,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.lladlam.melox.ui.settings.LocalSettingsGroupRowIndex
+import com.lladlam.melox.ui.settings.LocalSettingsGroupRowIndex
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -105,6 +110,8 @@ fun <T> MeloXSettingsDropdown(
     grouped: Boolean = false,
     showTopSeparator: Boolean = false,
 ) {
+    val groupRowIndex = LocalSettingsGroupRowIndex.current
+    val effectiveSeparator = if (grouped) groupRowIndex.intValue++.let { it > 0 } else showTopSeparator
     val selectedLabel = items.firstOrNull { it.first == selected }?.second.orEmpty()
     val row = @Composable {
         MeloXIosListRow(
@@ -118,7 +125,7 @@ fun <T> MeloXSettingsDropdown(
                     enabled = enabled,
                 )
             },
-            showTopSeparator = showTopSeparator,
+            showTopSeparator = effectiveSeparator,
         )
     }
     if (grouped) {
