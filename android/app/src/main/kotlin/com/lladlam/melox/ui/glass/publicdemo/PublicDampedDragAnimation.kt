@@ -77,7 +77,8 @@ class PublicDampedDragAnimation(
                 press()
             },
             onDragEnd = {
-                if (movedDuringGesture) onDragStopped() else onTap(downPosition)
+                onDragStopped()
+                if (!movedDuringGesture) onTap(downPosition)
                 release()
             },
             onDragCancel = { onDragStopped(); release() },
