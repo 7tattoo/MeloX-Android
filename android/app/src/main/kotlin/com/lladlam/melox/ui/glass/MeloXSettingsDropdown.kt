@@ -103,6 +103,7 @@ fun <T> MeloXSettingsDropdown(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     grouped: Boolean = false,
+    showTopSeparator: Boolean = false,
 ) {
     val selectedLabel = items.firstOrNull { it.first == selected }?.second.orEmpty()
     val row = @Composable {
@@ -117,7 +118,7 @@ fun <T> MeloXSettingsDropdown(
                     enabled = enabled,
                 )
             },
-            showTopSeparator = false,
+            showTopSeparator = showTopSeparator,
         )
     }
     if (grouped) {
@@ -172,11 +173,11 @@ private fun <T> MeloXPopupSelector(
                 .padding(horizontal = 2.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(value, style = MeloXTypography.body, color = MeloXSystemColors.Red)
-            MeloXSymbolIcon(
-                MeloXSymbol.ChevronUpDown,
-                Modifier.size(15.dp).padding(start = 7.dp),
-                MeloXSystemColors.Red,
+                Text(value, style = MeloXTypography.body, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                MeloXSymbolIcon(
+                    MeloXSymbol.ChevronUpDown,
+                    Modifier.size(15.dp).padding(start = 7.dp),
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             )
         }
 
@@ -332,7 +333,8 @@ fun MeloXSettingsDropdown(
     default: String,
     items: List<Pair<String, String>>,
     grouped: Boolean = false,
+    showTopSeparator: Boolean = false,
 ) {
     var selected by remember { mutableStateOf(MeloXSettingsPreferences.string(context, prefKey, default)) }
-    MeloXSettingsDropdown(title, selected, items, { selected = it; MeloXSettingsPreferences.setString(context, prefKey, it) }, grouped = grouped)
+    MeloXSettingsDropdown(title, selected, items, { selected = it; MeloXSettingsPreferences.setString(context, prefKey, it) }, grouped = grouped, showTopSeparator = showTopSeparator)
 }
