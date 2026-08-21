@@ -40,11 +40,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -419,11 +421,13 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
         ),
         onSelected = { MeloXSettingsPreferences.setString(context, "system_lyrics_title_mode", it.name) },
     )
-    SettingsToggleRow(context, "通知显示下一句", "lyrics_notification_next_line", false)
-    SettingsToggleRow(context, "通知显示播放进度", "lyrics_notification_progress", true)
-    SettingsToggleRow(context, "通知显示封面", "lyrics_notification_artwork", true)
-    SettingsToggleRow(context, "仅在后台显示歌词通知", "lyrics_notification_background_only", false)
-    SettingsToggleRow(context, "暂停时撤回歌词通知", "lyrics_notification_dismiss_paused", true)
+    SettingsToggleGroup {
+        SettingsToggleRow(context, "通知显示下一句", "lyrics_notification_next_line", false, grouped = true)
+        SettingsToggleRow(context, "通知显示播放进度", "lyrics_notification_progress", true, grouped = true)
+        SettingsToggleRow(context, "通知显示封面", "lyrics_notification_artwork", true, grouped = true)
+        SettingsToggleRow(context, "仅在后台显示歌词通知", "lyrics_notification_background_only", false, grouped = true)
+        SettingsToggleRow(context, "暂停时撤回歌词通知", "lyrics_notification_dismiss_paused", true, grouped = true)
+    }
     NotificationTemplateField(context, "标题模板", "lyrics_notification_title_template", "{lyric}")
     NotificationTemplateField(context, "副标题模板", "lyrics_notification_subtitle_template", "{song} · {artist}")
     NotificationTemplateField(context, "无歌词回退", "lyrics_notification_fallback", "{song} · {artist}")
@@ -624,7 +628,11 @@ private fun PlaybackSettings(context: android.content.Context) {
         onSelected = { quality = it; PlaybackCommands.changeQuality(context, it) },
     )
     Spacer(Modifier.height(22.dp))
-    SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true)
+    SettingsToggleGroup {
+        SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true, grouped = true)
+        SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true, grouped = true)
+        SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false, grouped = true)
+    }
     LyricsChoiceSetting(
         context,
         "播放器展开/收回时长",
@@ -632,8 +640,6 @@ private fun PlaybackSettings(context: android.content.Context) {
         575,
         listOf(300, 400, 575, 700, 900),
     ) { "${it}ms" }
-    SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true)
-    SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false)
     Spacer(Modifier.height(10.dp))
     var volumeMode by remember { mutableStateOf(MeloXSettingsRuntime.volumeControlMode) }
     Text("音量滑杆控制", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
@@ -986,8 +992,10 @@ private fun LyricsSettings(context: android.content.Context) {
         ),
         onSelected = { MeloXSettingsPreferences.setString(context, "lyrics_rendering_quality", it.name) },
     )
-    SettingsToggleRow(context, "显示翻译", "lyrics_translation", true)
-    SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true)
+    SettingsToggleGroup {
+        SettingsToggleRow(context, "显示翻译", "lyrics_translation", true, grouped = true)
+        SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true, grouped = true)
+    }
     LyricsStringChoiceSetting(
         context,
         "罗马音显示范围",
@@ -1006,13 +1014,15 @@ private fun LyricsSettings(context: android.content.Context) {
         MeloXLyricAnnotationDisplayMode.FocusedLine.name,
         MeloXLyricAnnotationDisplayMode.entries.map { it.name },
     ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
-    SettingsToggleRow(context, "逐字歌词（YRC）", "lyrics_word_by_word", true)
-    SettingsToggleRow(context, "普通 LRC 生成逐字时间", "lyrics_pseudo_timing", true, "按 Unicode 字素分配行时长，不覆盖真实 YRC。")
-    SettingsToggleRow(context, "点击歌词跳转进度", "lyrics_tap_seek", true)
-    SettingsToggleRow(context, "长按歌词分享", "lyrics_long_press_share", true)
-    SettingsToggleRow(context, "间奏倒计时", "lyrics_interlude_countdown", true, "歌词间隔至少 4 秒时显示三点倒计时。")
-    SettingsToggleRow(context, "自动跟随当前歌词", "lyrics_auto_follow", true)
-    SettingsToggleRow(context, "减弱歌词动画", "lyrics_reduce_motion", false, "保留逐字高亮，关闭弹性、抬升与光晕。")
+    SettingsToggleGroup {
+        SettingsToggleRow(context, "逐字歌词（YRC）", "lyrics_word_by_word", true, grouped = true)
+        SettingsToggleRow(context, "普通 LRC 生成逐字时间", "lyrics_pseudo_timing", true, "按 Unicode 字素分配行时长，不覆盖真实 YRC。", grouped = true)
+        SettingsToggleRow(context, "点击歌词跳转进度", "lyrics_tap_seek", true, grouped = true)
+        SettingsToggleRow(context, "长按歌词分享", "lyrics_long_press_share", true, grouped = true)
+        SettingsToggleRow(context, "间奏倒计时", "lyrics_interlude_countdown", true, "歌词间隔至少 4 秒时显示三点倒计时。", grouped = true)
+        SettingsToggleRow(context, "自动跟随当前歌词", "lyrics_auto_follow", true, grouped = true)
+        SettingsToggleRow(context, "减弱歌词动画", "lyrics_reduce_motion", false, "保留逐字高亮，关闭弹性、抬升与光晕。", grouped = true)
+    }
 
     LyricsChoiceSetting(context, "歌词提前量", "lyrics_advance_ms", 0, listOf(-1_000, -500, -200, 0, 200, 500, 1_000, 2_000, 5_000)) { value ->
         if (value == 0) "同步" else if (value > 0) "提前 ${value}ms" else "延后 ${-value}ms"
@@ -1198,10 +1208,12 @@ private fun PreferenceFloatSlider(
 
 @Composable
 private fun ContentFeatureSettings(context: android.content.Context) {
-    SettingsToggleRow(context, "播客", "feature_podcasts", true)
-    SettingsToggleRow(context, "最近播放", "feature_history", true)
-    SettingsToggleRow(context, "下载", "feature_downloads", true, "控制音乐库下载入口；已下载文件不会被删除。")
-    SettingsToggleRow(context, "音乐云盘", "feature_cloud_music", true, "读取、搜索、上传、播放和删除网易云云盘歌曲。")
+    SettingsToggleGroup {
+        SettingsToggleRow(context, "播客", "feature_podcasts", true, grouped = true)
+        SettingsToggleRow(context, "最近播放", "feature_history", true, grouped = true)
+        SettingsToggleRow(context, "下载", "feature_downloads", true, "控制音乐库下载入口；已下载文件不会被删除。", grouped = true)
+        SettingsToggleRow(context, "音乐云盘", "feature_cloud_music", true, "读取、搜索、上传、播放和删除网易云云盘歌曲。", grouped = true)
+    }
 }
 
 @Composable
@@ -1794,6 +1806,8 @@ private fun DeveloperSettings() {
     Spacer(Modifier.height(10.dp))
 }
 
+private val LocalSettingsGroupedRows = staticCompositionLocalOf { false }
+
 @Composable
 private fun SettingsToggleRow(
     context: android.content.Context,
@@ -1801,9 +1815,11 @@ private fun SettingsToggleRow(
     key: String,
     default: Boolean,
     note: String? = null,
+    grouped: Boolean = false,
+    showTopSeparator: Boolean = false,
 ) {
     var value by remember(key) { mutableStateOf(MeloXSettingsPreferences.boolean(context, key, default)) }
-    SettingsGlassGroup {
+    @Composable fun row() {
         MeloXIosListRow(
             title = title,
             subtitle = note,
@@ -1813,8 +1829,19 @@ private fun SettingsToggleRow(
                     MeloXSettingsPreferences.setBoolean(context, key, it)
                 })
             },
-            showTopSeparator = false,
+            showTopSeparator = showTopSeparator,
         )
+    }
+    if (grouped || LocalSettingsGroupedRows.current) row() else {
+        SettingsGlassGroup { row() }
+        Spacer(Modifier.height(10.dp))
+    }
+}
+
+@Composable
+private fun SettingsToggleGroup(content: @Composable ColumnScope.() -> Unit) {
+    SettingsGlassGroup {
+        CompositionLocalProvider(LocalSettingsGroupedRows provides true) { content() }
     }
     Spacer(Modifier.height(10.dp))
 }
