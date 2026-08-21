@@ -389,39 +389,45 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
         MeloXSettingsPreferences.setBoolean(context, "lyrics_notifications_enabled", granted)
     }
 
-    SettingsExternalToggleRow(
-        title = "系统媒体信息显示歌词",
-        value = systemLyrics,
-        note = "播放时把当前歌词同步到 Media3 元数据；应用内仍显示原歌曲名和歌手。",
-    ) {
-        systemLyrics = it
-        MeloXSettingsPreferences.setBoolean(context, "system_lyrics_enabled", it)
-    }
-    SettingsExternalToggleRow(
-        title = "独立歌词通知",
-        value = notifications,
-        note = "在通知栏和锁屏持续更新当前歌词；Android 13 及以上需要通知权限。",
-    ) { enabled ->
-        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "系统媒体信息显示歌词",
+            value = systemLyrics,
+            note = "播放时把当前歌词同步到 Media3 元数据；应用内仍显示原歌曲名和歌手。",
+            grouped = true,
         ) {
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            notifications = enabled
-            MeloXSettingsPreferences.setBoolean(context, "lyrics_notifications_enabled", enabled)
+            systemLyrics = it
+            MeloXSettingsPreferences.setBoolean(context, "system_lyrics_enabled", it)
+        }
+        val protocol = remember { HyperOsFocusBridge.protocol(context) }
+        MeloXSettingsDropdown(
+            title = "系统媒体标题格式",
+            selected = MeloXSettingsRuntime.systemLyricTitleMode,
+            items = listOf(
+                MeloXSystemLyricTitleMode.LyricFirst to "歌词作为标题",
+                MeloXSystemLyricTitleMode.SongFirst to "歌曲作为标题",
+            ),
+            onSelected = { MeloXSettingsPreferences.setString(context, "system_lyrics_title_mode", it.name) },
+            grouped = true,
+        )
+        SettingsExternalToggleRow(
+            title = "独立歌词通知",
+            value = notifications,
+            note = "在通知栏和锁屏持续更新当前歌词；Android 13 及以上需要通知权限。",
+            grouped = true,
+        ) { enabled ->
+            if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                notifications = enabled
+                MeloXSettingsPreferences.setBoolean(context, "lyrics_notifications_enabled", enabled)
+            }
         }
     }
-    val protocol = remember { HyperOsFocusBridge.protocol(context) }
-    MeloXSettingsDropdown(
-        title = "系统媒体标题格式",
-        selected = MeloXSettingsRuntime.systemLyricTitleMode,
-        items = listOf(
-            MeloXSystemLyricTitleMode.LyricFirst to "歌词作为标题",
-            MeloXSystemLyricTitleMode.SongFirst to "歌曲作为标题",
-        ),
-        onSelected = { MeloXSettingsPreferences.setString(context, "system_lyrics_title_mode", it.name) },
-    )
-    SettingsToggleGroup {
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
         SettingsToggleRow(context, "通知显示下一句", "lyrics_notification_next_line", false, grouped = true)
         SettingsToggleRow(context, "通知显示播放进度", "lyrics_notification_progress", true, grouped = true)
         SettingsToggleRow(context, "通知显示封面", "lyrics_notification_artwork", true, grouped = true)
@@ -477,23 +483,32 @@ private fun NotificationTemplateField(
 @Composable
 private fun SkylineLyricsSettings(context: android.content.Context) {
     var enabled by remember { mutableStateOf(MeloXSettingsRuntime.skylineEnabled) }
-    SettingsExternalToggleRow(
-        title = "横屏自动启用天际歌词",
-        value = enabled,
-        note = "播放器进入横屏时使用封面、主歌词和环境歌词的宽屏布局。",
-    ) {
-        enabled = it
-        MeloXSettingsPreferences.setBoolean(context, "lyrics_skyline_enabled", it)
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "横屏自动启用天际歌词",
+            value = enabled,
+            note = "播放器进入横屏时使用封面、主歌词和环境歌词的宽屏布局。",
+            grouped = true,
+        ) {
+            enabled = it
+            MeloXSettingsPreferences.setBoolean(context, "lyrics_skyline_enabled", it)
+        }
+        SettingsToggleRow(context, "显示封面与歌曲信息", "lyrics_skyline_song_info", true, grouped = true)
+        SettingsToggleRow(context, "屏幕常亮", "lyrics_skyline_keep_awake", true, "仅在全屏天际歌词可见时阻止自动锁屏。", grouped = true)
+        LyricsChoiceSetting(
+            context,
+            "环境歌词数量",
+            "lyrics_skyline_ambient_lines",
+            2,
+            listOf(0, 1, 2, 3, 4),
+        ) { if (it == 0) "关闭" else "$it 行" }
     }
-    SettingsToggleRow(context, "屏幕常亮", "lyrics_skyline_keep_awake", true, "仅在全屏天际歌词可见时阻止自动锁屏。")
-    SettingsToggleRow(context, "显示封面与歌曲信息", "lyrics_skyline_song_info", true)
-    LyricsChoiceSetting(
-        context,
-        "环境歌词数量",
-        "lyrics_skyline_ambient_lines",
-        2,
-        listOf(0, 1, 2, 3, 4),
-    ) { if (it == 0) "关闭" else "$it 行" }
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        LyricsChoiceSetting(context, "单组最大字数", "lyrics_skyline_ambient_max_characters", 4, listOf(1, 2, 3, 4)) { "$it 个字" }
+        LyricsChoiceSetting(context, "同屏文字上限", "lyrics_skyline_ambient_max_visible", 16, listOf(4, 8, 12, 16, 20, 24)) { "$it 组" }
+    }
+    Spacer(Modifier.height(10.dp))
     var currentFontSize by remember { mutableStateOf(MeloXSettingsRuntime.skylineCurrentFontSize) }
     var currentScale by remember { mutableStateOf(MeloXSettingsRuntime.skylineCurrentMaximumScale) }
     var currentWidth by remember { mutableStateOf(MeloXSettingsRuntime.skylineCurrentWidth) }
@@ -523,8 +538,6 @@ private fun SkylineLyricsSettings(context: android.content.Context) {
     SettingsFloatSlider("中央歌词间距", currentSpacing, 4f..36f, 31, { "${it.toInt()} dp" }) {
         currentSpacing = it; MeloXSettingsPreferences.setFloat(context, "lyrics_skyline_current_spacing", it)
     }
-    LyricsChoiceSetting(context, "单组最大字数", "lyrics_skyline_ambient_max_characters", 4, listOf(1, 2, 3, 4)) { "$it 个字" }
-    LyricsChoiceSetting(context, "同屏文字上限", "lyrics_skyline_ambient_max_visible", 16, listOf(4, 8, 12, 16, 20, 24)) { "$it 组" }
     SettingsFloatSlider("背景字号", ambientFontSize, 24f..72f, 47, { "${it.toInt()} sp" }) {
         ambientFontSize = it; MeloXSettingsPreferences.setFloat(context, "lyrics_skyline_ambient_font_size", it)
     }
@@ -575,105 +588,90 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
         if (permissionGranted) startFloatingLyrics()
     }
 
-    SettingsExternalToggleRow(
-        title = "显示悬浮歌词",
-        value = enabled,
-        note = "在其他应用上方显示当前歌词和翻译/罗马音，可直接拖动位置。",
-    ) { shouldEnable ->
-        if (!shouldEnable) {
-            enabled = false
-            MeloXSettingsPreferences.setBoolean(context, "floating_lyrics_enabled", false)
-            context.stopService(Intent(context, MeloXFloatingLyricsService::class.java))
-        } else if (AndroidSettings.canDrawOverlays(context)) {
-            permissionGranted = true
-            startFloatingLyrics()
-        } else {
-            overlayPermissionLauncher.launch(
-                Intent(
-                    AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:${context.packageName}"),
-                ),
-            )
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "显示悬浮歌词",
+            value = enabled,
+            note = "在其他应用上方显示当前歌词和翻译/罗马音，可直接拖动位置。",
+            grouped = true,
+        ) { shouldEnable ->
+            if (!shouldEnable) {
+                enabled = false
+                MeloXSettingsPreferences.setBoolean(context, "floating_lyrics_enabled", false)
+                context.stopService(Intent(context, MeloXFloatingLyricsService::class.java))
+            } else if (AndroidSettings.canDrawOverlays(context)) {
+                permissionGranted = true
+                startFloatingLyrics()
+            } else {
+                overlayPermissionLauncher.launch(
+                    Intent(
+                        AndroidSettings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}"),
+                    ),
+                )
+            }
         }
+        MeloXSettingsDropdown(
+            title = "副歌词内容",
+            selected = MeloXSettingsRuntime.floatingSecondaryMode,
+            items = listOf(
+                MeloXSecondaryLyricMode.Auto to "自动（翻译/罗马音/下一句）",
+                MeloXSecondaryLyricMode.Translation to "翻译",
+                MeloXSecondaryLyricMode.Romanization to "罗马音",
+                MeloXSecondaryLyricMode.NextLine to "下一句",
+                MeloXSecondaryLyricMode.Hidden to "不显示",
+            ),
+            onSelected = { MeloXSettingsPreferences.setString(context, "floating_lyrics_secondary_mode", it.name) },
+            grouped = true,
+        )
+        LyricsChoiceSetting(
+            context,
+            "主歌词字号",
+            "floating_lyrics_font_size",
+            18,
+            listOf(14, 16, 18, 20, 24, 28),
+        ) { "$it sp" }
+        SettingsToggleRow(context, "高对比背景", "floating_lyrics_high_contrast", true, "重新开启悬浮歌词后生效。", grouped = true)
     }
-    MeloXSettingsDropdown(
-        title = "副歌词内容",
-        selected = MeloXSettingsRuntime.floatingSecondaryMode,
-        items = listOf(
-            MeloXSecondaryLyricMode.Auto to "自动（翻译/罗马音/下一句）",
-            MeloXSecondaryLyricMode.Translation to "翻译",
-            MeloXSecondaryLyricMode.Romanization to "罗马音",
-            MeloXSecondaryLyricMode.NextLine to "下一句",
-            MeloXSecondaryLyricMode.Hidden to "不显示",
-        ),
-        onSelected = { MeloXSettingsPreferences.setString(context, "floating_lyrics_secondary_mode", it.name) },
-    )
-    LyricsChoiceSetting(
-        context,
-        "主歌词字号",
-        "floating_lyrics_font_size",
-        18,
-        listOf(14, 16, 18, 20, 24, 28),
-    ) { "$it sp" }
-    SettingsToggleRow(context, "高对比背景", "floating_lyrics_high_contrast", true, "重新开启悬浮歌词后生效。")
 }
 
 @Composable
 private fun PlaybackSettings(context: android.content.Context) {
     var quality by remember { mutableStateOf(MusicQualityPreferences.read(context)) }
-    MeloXSettingsDropdown(
-        title = "播放音质",
-        selected = quality,
-        items = MusicQuality.entries.map { it to it.title },
-        onSelected = { quality = it; PlaybackCommands.changeQuality(context, it) },
-    )
-    Spacer(Modifier.height(22.dp))
-    SettingsToggleGroup {
-        SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true, grouped = true)
-        SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true, grouped = true)
-        SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false, grouped = true)
-    }
-    LyricsChoiceSetting(
-        context,
-        "播放器展开/收回时长",
-        "player_transition_duration_ms",
-        575,
-        listOf(300, 400, 575, 700, 900),
-    ) { "${it}ms" }
-    Spacer(Modifier.height(10.dp))
     var volumeMode by remember { mutableStateOf(MeloXSettingsRuntime.volumeControlMode) }
-    Text("音量滑杆控制", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
     SettingsGlassGroup {
-        listOf(MeloXVolumeControlMode.System to "系统媒体音量", MeloXVolumeControlMode.Player to "播放器独立音量").forEach { (mode, label) ->
-            SettingsChoiceRow(label, volumeMode == mode) {
-                volumeMode = mode
-                MeloXSettingsPreferences.setString(context, "playback_volume_mode", mode.name)
-            }
-        }
+        MeloXSettingsDropdown(
+            title = "播放音质",
+            selected = quality,
+            items = MusicQuality.entries.map { it to it.title },
+            onSelected = { quality = it; PlaybackCommands.changeQuality(context, it) },
+            grouped = true,
+        )
+        MeloXSettingsDropdown(
+            title = "音量滑杆控制",
+            selected = volumeMode,
+            items = listOf(
+                MeloXVolumeControlMode.System to "系统媒体音量",
+                MeloXVolumeControlMode.Player to "播放器独立音量",
+            ),
+            onSelected = { volumeMode = it; MeloXSettingsPreferences.setString(context, "playback_volume_mode", it.name) },
+            grouped = true,
+        )
+        SettingsToggleRow(context, "记住播放器上次页面", "playback_remember_page", true, grouped = true)
+        SettingsToggleRow(context, "登录后以心动模式开始播放", "playback_heart_mode_on_launch", false, grouped = true)
+        SettingsToggleRow(context, "播放超过 5 秒时上一首先回到开头", "playback_previous_restarts", true, grouped = true)
+        LyricsChoiceSetting(
+            context,
+            "播放器展开/收回时长",
+            "player_transition_duration_ms",
+            575,
+            listOf(300, 400, 575, 700, 900),
+        ) { "${it}ms" }
     }
-    Spacer(Modifier.height(18.dp))
+    Spacer(Modifier.height(10.dp))
     EqualizerSettings(context)
     Spacer(Modifier.height(10.dp))
-    val legacyAutoMix = remember { MeloXSettingsPreferences.boolean(context, "playback_auto_mix", false) }
-    var autoMixEnabled by remember {
-        mutableStateOf(MeloXPlaybackModePreferences.autoMix(context) || legacyAutoMix)
-    }
-    LaunchedEffect(legacyAutoMix) {
-        if (legacyAutoMix) {
-            MeloXPlaybackModePreferences.setAutoMix(context, true)
-            MeloXSettingsPreferences.setBoolean(context, "playback_auto_mix", false)
-        }
-    }
-    SettingsExternalToggleRow(
-        title = "自动混音",
-        value = autoMixEnabled,
-        note = "双播放器预载，20ms 包络更新；分析不可用时按下方策略平滑降级。",
-    ) {
-        autoMixEnabled = it
-        MeloXPlaybackModePreferences.setAutoMix(context, it)
-    }
-    if (autoMixEnabled) AutoMixSettings(context)
+    AutoMixSettings(context)
 }
 
 @Composable
@@ -733,95 +731,117 @@ private fun AutoMixSettings(context: android.content.Context) {
     var settings by remember { mutableStateOf(MeloXAutoMixSettings.read(context)) }
     fun refresh() { settings = MeloXAutoMixSettings.read(context) }
 
-    MeloXSettingsDropdown(
-        title = "混音模式",
-        selected = settings.mode,
-        items = listOf(MeloXAutoMixMode.Smart to "智能", MeloXAutoMixMode.Fixed to "固定时长"),
-        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_mode", it.name); refresh() },
-    )
-    Spacer(Modifier.height(14.dp))
-    if (settings.mode == MeloXAutoMixMode.Smart) {
+    val legacyAutoMix = remember { MeloXSettingsPreferences.boolean(context, "playback_auto_mix", false) }
+    var autoMixEnabled by remember {
+        mutableStateOf(MeloXPlaybackModePreferences.autoMix(context) || legacyAutoMix)
+    }
+    LaunchedEffect(legacyAutoMix) {
+        if (legacyAutoMix) {
+            MeloXPlaybackModePreferences.setAutoMix(context, true)
+            MeloXSettingsPreferences.setBoolean(context, "playback_auto_mix", false)
+        }
+    }
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "自动混音",
+            value = autoMixEnabled,
+            note = "双播放器预载，20ms 包络更新；分析不可用时按下方策略平滑降级。",
+            grouped = true,
+        ) {
+            autoMixEnabled = it
+            MeloXPlaybackModePreferences.setAutoMix(context, it)
+        }
         MeloXSettingsDropdown(
-            title = "智能过渡长度",
-            selected = settings.transitionBars,
-            items = listOf(4, 8, 16).map { it to "$it 小节" },
-            onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_transition_bars", it); refresh() },
+            title = "混音模式",
+            selected = settings.mode,
+            items = listOf(MeloXAutoMixMode.Smart to "智能", MeloXAutoMixMode.Fixed to "固定时长"),
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_mode", it.name); refresh() },
+            grouped = true,
         )
-        Spacer(Modifier.height(14.dp))
+        if (settings.mode == MeloXAutoMixMode.Smart) {
+            SettingsExternalToggleRow("跳过安静开头", settings.skipQuietOpening, "从下一首的首个可听乐句开始交接。", grouped = true) {
+                MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_skip_quiet_opening", it)
+                refresh()
+            }
+            SettingsExternalToggleRow("分析网络歌曲", settings.analyzeStreaming, "提前解码网络音频以生成节拍和频谱时间轴。", grouped = true) {
+                MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_analyze_streaming", it)
+                refresh()
+            }
+            MeloXSettingsDropdown(
+                title = "智能过渡长度",
+                selected = settings.transitionBars,
+                items = listOf(4, 8, 16).map { it to "$it 小节" },
+                onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_transition_bars", it); refresh() },
+                grouped = true,
+            )
+            MeloXSettingsDropdown(
+                title = "上一首结束位置",
+                selected = settings.tailCutBars,
+                items = listOf(0 to "保留至结尾", 2 to "提前 2 小节", 4 to "提前 4 小节", 8 to "提前 8 小节"),
+                onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_tail_cut_bars", it); refresh() },
+                grouped = true,
+            )
+            val confidenceOptions = listOf(.30f, .42f, .55f, .70f)
+            MeloXSettingsDropdown(
+                title = "最低分析置信度",
+                selected = confidenceOptions.minByOrNull { kotlin.math.abs(settings.minimumConfidence - it) } ?: .42f,
+                items = confidenceOptions.map { it to "${(it * 100).toInt()}%" },
+                onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_minimum_confidence", it); refresh() },
+                grouped = true,
+            )
+        }
+        val durationOptions = listOf(3_000L, 6_000L, 8_000L, 12_000L, 16_000L, 20_000L)
         MeloXSettingsDropdown(
-            title = "上一首结束位置",
-            selected = settings.tailCutBars,
-            items = listOf(0 to "保留至结尾", 2 to "提前 2 小节", 4 to "提前 4 小节", 8 to "提前 8 小节"),
-            onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_tail_cut_bars", it); refresh() },
+            title = "交叉淡化时长",
+            selected = durationOptions.minByOrNull { kotlin.math.abs(settings.fixedDurationMs - it) } ?: 6_000L,
+            items = durationOptions.map { it to "${it / 1_000} 秒" },
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_fixed_duration_ms", it); refresh() },
+            grouped = true,
         )
-        Spacer(Modifier.height(14.dp))
-        SettingsExternalToggleRow("跳过安静开头", settings.skipQuietOpening, "从下一首的首个可听乐句开始交接。") {
-            MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_skip_quiet_opening", it)
+        val preloadOptions = listOf(30_000L, 60_000L, 90_000L, 120_000L, 180_000L)
+        MeloXSettingsDropdown(
+            title = "预加载提前量",
+            selected = preloadOptions.minByOrNull { kotlin.math.abs(settings.preloadLeadMs - it) } ?: 60_000L,
+            items = preloadOptions.map { it to "${it / 1_000} 秒" },
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_preload_lead_ms", it); refresh() },
+            grouped = true,
+        )
+        MeloXSettingsDropdown(
+            title = "淡化曲线",
+            selected = settings.fadeCurve,
+            items = listOf(
+                MeloXAutoMixFadeCurve.EqualPower to "等功率",
+                MeloXAutoMixFadeCurve.Smooth to "平滑",
+                MeloXAutoMixFadeCurve.Linear to "线性",
+            ),
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fade_curve", it.name); refresh() },
+            grouped = true,
+        )
+        MeloXSettingsDropdown(
+            title = "分析失败时",
+            selected = settings.fallback,
+            items = listOf(
+                MeloXAutoMixFallback.Crossfade to "使用所选时长",
+                MeloXAutoMixFallback.ShortCrossfade to "短淡化（3 秒）",
+                MeloXAutoMixFallback.Normal to "正常切歌",
+            ),
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fallback", it.name); refresh() },
+            grouped = true,
+        )
+        SettingsExternalToggleRow("速度匹配", settings.tempoMatching, "有可靠 BPM 分析时平滑调整两台播放器速度。", grouped = true) {
+            MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_tempo_matching", it)
             refresh()
         }
-        SettingsExternalToggleRow("分析网络歌曲", settings.analyzeStreaming, "提前解码网络音频以生成节拍和频谱时间轴。") {
-            MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_analyze_streaming", it)
-            refresh()
+        if (settings.tempoMatching) {
+            val adjustmentOptions = listOf(.02f, .05f, .08f)
+            MeloXSettingsDropdown(
+                title = "最大速度调整",
+                selected = adjustmentOptions.minByOrNull { kotlin.math.abs(settings.maxTempoAdjustment - it) } ?: .05f,
+                items = adjustmentOptions.map { it to "${(it * 100).toInt()}%" },
+                onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_max_tempo_adjustment", it); refresh() },
+                grouped = true,
+            )
         }
-        val confidenceOptions = listOf(.30f, .42f, .55f, .70f)
-        MeloXSettingsDropdown(
-            title = "最低分析置信度",
-            selected = confidenceOptions.minByOrNull { kotlin.math.abs(settings.minimumConfidence - it) } ?: .42f,
-            items = confidenceOptions.map { it to "${(it * 100).toInt()}%" },
-            onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_minimum_confidence", it); refresh() },
-        )
-        Spacer(Modifier.height(14.dp))
-    }
-    val durationOptions = listOf(3_000L, 6_000L, 8_000L, 12_000L, 16_000L, 20_000L)
-    MeloXSettingsDropdown(
-        title = "交叉淡化时长",
-        selected = durationOptions.minByOrNull { kotlin.math.abs(settings.fixedDurationMs - it) } ?: 6_000L,
-        items = durationOptions.map { it to "${it / 1_000} 秒" },
-        onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_fixed_duration_ms", it); refresh() },
-    )
-    Spacer(Modifier.height(14.dp))
-    val preloadOptions = listOf(30_000L, 60_000L, 90_000L, 120_000L, 180_000L)
-    MeloXSettingsDropdown(
-        title = "预加载提前量",
-        selected = preloadOptions.minByOrNull { kotlin.math.abs(settings.preloadLeadMs - it) } ?: 60_000L,
-        items = preloadOptions.map { it to "${it / 1_000} 秒" },
-        onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_preload_lead_ms", it); refresh() },
-    )
-    Spacer(Modifier.height(14.dp))
-    MeloXSettingsDropdown(
-        title = "淡化曲线",
-        selected = settings.fadeCurve,
-        items = listOf(
-            MeloXAutoMixFadeCurve.EqualPower to "等功率",
-            MeloXAutoMixFadeCurve.Smooth to "平滑",
-            MeloXAutoMixFadeCurve.Linear to "线性",
-        ),
-        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fade_curve", it.name); refresh() },
-    )
-    Spacer(Modifier.height(14.dp))
-    MeloXSettingsDropdown(
-        title = "分析失败时",
-        selected = settings.fallback,
-        items = listOf(
-            MeloXAutoMixFallback.Crossfade to "使用所选时长",
-            MeloXAutoMixFallback.ShortCrossfade to "短淡化（3 秒）",
-            MeloXAutoMixFallback.Normal to "正常切歌",
-        ),
-        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fallback", it.name); refresh() },
-    )
-    Spacer(Modifier.height(14.dp))
-    SettingsExternalToggleRow("速度匹配", settings.tempoMatching, "有可靠 BPM 分析时平滑调整两台播放器速度。") {
-        MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_tempo_matching", it)
-        refresh()
-    }
-    if (settings.tempoMatching) {
-        val adjustmentOptions = listOf(.02f, .05f, .08f)
-        MeloXSettingsDropdown(
-            title = "最大速度调整",
-            selected = adjustmentOptions.minByOrNull { kotlin.math.abs(settings.maxTempoAdjustment - it) } ?: .05f,
-            items = adjustmentOptions.map { it to "${(it * 100).toInt()}%" },
-            onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_max_tempo_adjustment", it); refresh() },
-        )
     }
 }
 
@@ -839,70 +859,94 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
             com.lladlam.melox.ui.settings.MeloXPlayerShell.Classic -> "经典播放器（手机 / 平板 / 横屏）"
         }
     }
-    Spacer(Modifier.height(14.dp))
-    SettingsToggleRow(context, "流动光影背景", "player_flowing_backdrop", true, "关闭后使用模糊封面背景。")
-    SettingsToggleRow(context, "封面播放动效", "player_artwork_motion", true)
-    MeloXSettingsDropdown(
-        title = "播放器背景",
-        selected = MeloXSettingsRuntime.playerBackgroundMode,
-        items = listOf(
-            MeloXPlayerBackgroundMode.FlowingLight to "取色流动光影（原版）",
-            MeloXPlayerBackgroundMode.AppleLyrics to "Apple 三层歌词背景",
-            MeloXPlayerBackgroundMode.BlurredArtwork to "静态模糊封面",
-        ),
-        onSelected = {
-            MeloXSettingsPreferences.setString(context, "player_background_mode", it.name)
-            MeloXSettingsRuntime.flowingBackdropEnabled = it != MeloXPlayerBackgroundMode.BlurredArtwork
-        },
-    )
-    SettingsToggleRow(
-        context,
-        "播放器背景隔离",
-        "player_background_isolation",
-        true,
-        "开启后播放器独立覆盖首页；关闭后恢复原始透明背景，可能透出下层页面。",
-    )
-    MeloXSettingsDropdown(
-        title = "屏幕常亮范围",
-        selected = MeloXSettingsRuntime.screenAwakeMode,
-        items = listOf(
-            MeloXScreenAwakeMode.Disabled to "关闭",
-            MeloXScreenAwakeMode.Player to "播放器常亮",
-            MeloXScreenAwakeMode.Lyrics to "歌词页常亮",
-            MeloXScreenAwakeMode.HiddenLyricsInterface to "歌词页隐藏 UI 后常亮",
-        ),
-        onSelected = { MeloXSettingsPreferences.setString(context, "player_screen_awake_mode", it.name) },
-    )
-    LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
-        when (value) {
-            15 -> "15 FPS · 省电"
-            24 -> "24 FPS · 推荐"
-            30 -> "30 FPS · 均衡"
-            else -> "$value FPS · 流畅"
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        MeloXSettingsDropdown(
+            title = "播放器背景",
+            selected = MeloXSettingsRuntime.playerBackgroundMode,
+            items = listOf(
+                MeloXPlayerBackgroundMode.FlowingLight to "取色流动光影（原版）",
+                MeloXPlayerBackgroundMode.AppleLyrics to "Apple 三层歌词背景",
+                MeloXPlayerBackgroundMode.BlurredArtwork to "静态模糊封面",
+            ),
+            onSelected = {
+                MeloXSettingsPreferences.setString(context, "player_background_mode", it.name)
+                MeloXSettingsRuntime.flowingBackdropEnabled = it != MeloXPlayerBackgroundMode.BlurredArtwork
+            },
+            grouped = true,
+        )
+        SettingsToggleRow(context, "流动光影背景", "player_flowing_backdrop", true, "关闭后使用模糊封面背景。", grouped = true)
+        SettingsToggleRow(context, "播放器背景隔离", "player_background_isolation", true, "开启后播放器独立覆盖首页；关闭后恢复原始透明背景，可能透出下层页面。", grouped = true)
+        LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
+            when (value) {
+                15 -> "15 FPS · 省电"
+                24 -> "24 FPS · 推荐"
+                30 -> "30 FPS · 均衡"
+                else -> "$value FPS · 流畅"
+            }
         }
+    }
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        SettingsToggleRow(context, "封面播放动效", "player_artwork_motion", true, grouped = true)
+        MeloXSettingsDropdown(
+            title = "屏幕常亮范围",
+            selected = MeloXSettingsRuntime.screenAwakeMode,
+            items = listOf(
+                MeloXScreenAwakeMode.Disabled to "关闭",
+                MeloXScreenAwakeMode.Player to "播放器常亮",
+                MeloXScreenAwakeMode.Lyrics to "歌词页常亮",
+                MeloXScreenAwakeMode.HiddenLyricsInterface to "歌词页隐藏 UI 后常亮",
+            ),
+            onSelected = { MeloXSettingsPreferences.setString(context, "player_screen_awake_mode", it.name) },
+            grouped = true,
+        )
     }
 }
 
 @Composable
 private fun LyricsSettings(context: android.content.Context) {
     var lyricsStyle by remember { mutableStateOf(MeloXSettingsRuntime.lyricsStyle) }
-    MeloXSettingsDropdown(
-        title = "歌词样式",
-        selected = lyricsStyle,
-        items = listOf(
-            MeloXLyricsStyle.AppleMusic to "Apple Music",
-            MeloXLyricsStyle.Eva to "EVA 动态排版",
-            MeloXLyricsStyle.TextPV to "文字 PV",
-        ),
-        onSelected = { lyricsStyle = it; MeloXSettingsPreferences.setString(context, "lyrics_style", it.name) },
-    )
+    // Group 1: 歌词样式-歌词渲染质量-逐字歌词-普通LRC-点击跳转-长按分享-间奏倒计时-自动跟随-手动滚动恢复-减弱动画
+    SettingsGlassGroup {
+        MeloXSettingsDropdown(
+            title = "歌词样式",
+            selected = lyricsStyle,
+            items = listOf(
+                MeloXLyricsStyle.AppleMusic to "Apple Music",
+                MeloXLyricsStyle.Eva to "EVA 动态排版",
+                MeloXLyricsStyle.TextPV to "文字 PV",
+            ),
+            onSelected = { lyricsStyle = it; MeloXSettingsPreferences.setString(context, "lyrics_style", it.name) },
+            grouped = true,
+        )
+        MeloXSettingsDropdown(
+            title = "歌词渲染质量",
+            selected = MeloXSettingsRuntime.lyricRenderingQuality,
+            items = listOf(
+                MeloXLyricsRenderingQuality.Low to "低 · 更省电",
+                MeloXLyricsRenderingQuality.Balanced to "均衡 · 推荐",
+                MeloXLyricsRenderingQuality.High to "高 · 完整 iOS 效果",
+            ),
+            onSelected = { MeloXSettingsPreferences.setString(context, "lyrics_rendering_quality", it.name) },
+            grouped = true,
+        )
+        SettingsToggleRow(context, "逐字歌词（YRC）", "lyrics_word_by_word", true, grouped = true)
+        SettingsToggleRow(context, "普通 LRC 生成逐字时间", "lyrics_pseudo_timing", true, "按 Unicode 字素分配行时长，不覆盖真实 YRC。", grouped = true)
+        SettingsToggleRow(context, "点击歌词跳转进度", "lyrics_tap_seek", true, grouped = true)
+        SettingsToggleRow(context, "长按歌词分享", "lyrics_long_press_share", true, grouped = true)
+        SettingsToggleRow(context, "间奏倒计时", "lyrics_interlude_countdown", true, "歌词间隔至少 4 秒时显示三点倒计时。", grouped = true)
+        SettingsToggleRow(context, "自动跟随当前歌词", "lyrics_auto_follow", true, grouped = true)
+        LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000)) { "${it / 1_000f} 秒" }
+        SettingsToggleRow(context, "减弱歌词动画", "lyrics_reduce_motion", false, "保留逐字高亮，关闭弹性、抬升与光晕。", grouped = true)
+    }
     if (lyricsStyle == MeloXLyricsStyle.TextPV) {
         var pvStyle by remember { mutableStateOf(MeloXSettingsRuntime.textPVStyle) }
         var pvMotionIntensity by remember { mutableStateOf(MeloXSettingsRuntime.textPVMotionIntensity) }
         var pvAnimationSpeed by remember { mutableStateOf(MeloXSettingsRuntime.textPVAnimationSpeed) }
-        Text("文字 PV 风格", modifier = Modifier.padding(top = 14.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         SettingsGlassGroup {
+            Text("文字 PV 风格", modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
             listOf(
                 MeloXTextPVStyle.BlueBold to "蓝色冲击",
                 MeloXTextPVStyle.KineticSplit to "斩击",
@@ -930,137 +974,145 @@ private fun LyricsSettings(context: android.content.Context) {
                 }
             }
         }
-        SettingsFloatSlider(
-            "动效强度",
-            pvMotionIntensity,
-            0f..2f,
-            19,
-        ) {
-            pvMotionIntensity = it
-            MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_motion_intensity", it)
+        Spacer(Modifier.height(10.dp))
+        SettingsGlassGroup {
+            SettingsFloatSlider("动效强度", pvMotionIntensity, 0f..2f, 19) {
+                pvMotionIntensity = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_motion_intensity", it)
+            }
+            SettingsFloatSlider("动画速度", pvAnimationSpeed, 0f..4f, 39) {
+                pvAnimationSpeed = it; MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_animation_speed", it)
+            }
         }
-        SettingsFloatSlider(
-            "动画速度",
-            pvAnimationSpeed,
-            0f..4f,
-            39,
-        ) {
-            pvAnimationSpeed = it
-            MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_animation_speed", it)
-        }
+        Spacer(Modifier.height(10.dp))
         SettingsActionButton("恢复文字 PV 默认设置") {
             MeloXSettingsPreferences.setString(context, "lyrics_text_pv_style", MeloXTextPVStyle.BlueBold.name)
             MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_motion_intensity", 1f)
             MeloXSettingsPreferences.setFloat(context, "lyrics_text_pv_animation_speed", 2f)
-            pvStyle = MeloXTextPVStyle.BlueBold
-            pvMotionIntensity = 1f
-            pvAnimationSpeed = 2f
+            pvStyle = MeloXTextPVStyle.BlueBold; pvMotionIntensity = 1f; pvAnimationSpeed = 2f
         }
     }
-    Spacer(Modifier.height(16.dp))
-    MeloXSettingsDropdown(
-        title = "歌词渲染质量",
-        selected = MeloXSettingsRuntime.lyricRenderingQuality,
-        items = listOf(
-            MeloXLyricsRenderingQuality.Low to "低 · 更省电",
-            MeloXLyricsRenderingQuality.Balanced to "均衡 · 推荐",
-            MeloXLyricsRenderingQuality.High to "高 · 完整 iOS 效果",
-        ),
-        onSelected = { MeloXSettingsPreferences.setString(context, "lyrics_rendering_quality", it.name) },
-    )
-    SettingsToggleGroup {
+
+    // Group 2: 显示翻译-翻译歌词大小-翻译歌词亮度
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
         SettingsToggleRow(context, "显示翻译", "lyrics_translation", true, grouped = true)
+        LyricsFloatChoiceSetting(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
+        LyricsStringChoiceSetting(
+            context, "翻译显示范围", "lyrics_translation_display_mode",
+            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name },
+        ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
         SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true, grouped = true)
-    }
-    LyricsStringChoiceSetting(
-        context,
-        "罗马音显示范围",
-        "lyrics_romanization_display_mode",
-        MeloXLyricAnnotationDisplayMode.FocusedLine.name,
-        MeloXLyricAnnotationDisplayMode.entries.map { it.name },
-    ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
-    LyricsFloatChoiceSetting(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
-    LyricsStringChoiceSetting(
-        context,
-        "翻译显示范围",
-        "lyrics_translation_display_mode",
-        MeloXLyricAnnotationDisplayMode.FocusedLine.name,
-        MeloXLyricAnnotationDisplayMode.entries.map { it.name },
-    ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
-    SettingsToggleGroup {
-        SettingsToggleRow(context, "逐字歌词（YRC）", "lyrics_word_by_word", true, grouped = true)
-        SettingsToggleRow(context, "普通 LRC 生成逐字时间", "lyrics_pseudo_timing", true, "按 Unicode 字素分配行时长，不覆盖真实 YRC。", grouped = true)
-        SettingsToggleRow(context, "点击歌词跳转进度", "lyrics_tap_seek", true, grouped = true)
-        SettingsToggleRow(context, "长按歌词分享", "lyrics_long_press_share", true, grouped = true)
-        SettingsToggleRow(context, "间奏倒计时", "lyrics_interlude_countdown", true, "歌词间隔至少 4 秒时显示三点倒计时。", grouped = true)
-        SettingsToggleRow(context, "自动跟随当前歌词", "lyrics_auto_follow", true, grouped = true)
-        SettingsToggleRow(context, "减弱歌词动画", "lyrics_reduce_motion", false, "保留逐字高亮，关闭弹性、抬升与光晕。", grouped = true)
+        LyricsStringChoiceSetting(
+            context, "罗马音显示范围", "lyrics_romanization_display_mode",
+            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name },
+        ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
+        LyricsFloatChoiceSetting(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
     }
 
-    LyricsChoiceSetting(context, "歌词提前量", "lyrics_advance_ms", 0, listOf(-1_000, -500, -200, 0, 200, 500, 1_000, 2_000, 5_000)) { value ->
-        if (value == 0) "同步" else if (value > 0) "提前 ${value}ms" else "延后 ${-value}ms"
-    }
-    SettingsToggleRow(context, "提前量同时应用于逐字高亮", "lyrics_advance_word_by_word", false)
-    LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120)) { "$it FPS" }
-    LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000)) { "${it / 1_000f} 秒" }
-    LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f)) { "${(it * 100).toInt()}%" }
-    LyricsStringChoiceSetting(
-        context, "歌词字重", "lyrics_font_weight", MeloXLyricsFontWeight.Heavy.name,
-        MeloXLyricsFontWeight.entries.map { it.name },
-    ) { value ->
-        when (MeloXLyricsFontWeight.valueOf(value)) {
-            MeloXLyricsFontWeight.Light -> "细体"
-            MeloXLyricsFontWeight.Regular -> "常规"
-            MeloXLyricsFontWeight.Medium -> "中等"
-            MeloXLyricsFontWeight.SemiBold -> "半粗体"
-            MeloXLyricsFontWeight.Bold -> "粗体"
-            MeloXLyricsFontWeight.Heavy -> "特粗体"
+    // Group 3: 歌词提前量-提前量同时应用于逐字高亮-歌词刷新率-歌词字号-歌词字重-抬升方式
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        LyricsChoiceSetting(context, "歌词提前量", "lyrics_advance_ms", 0, listOf(-1_000, -500, -200, 0, 200, 500, 1_000, 2_000, 5_000)) { value ->
+            if (value == 0) "同步" else if (value > 0) "提前 ${value}ms" else "延后 ${-value}ms"
         }
+        SettingsToggleRow(context, "提前量同时应用于逐字高亮", "lyrics_advance_word_by_word", false, grouped = true)
+        LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120)) { "$it FPS" }
+        LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f)) { "${(it * 100).toInt()}%" }
+        LyricsStringChoiceSetting(
+            context, "歌词字重", "lyrics_font_weight", MeloXLyricsFontWeight.Heavy.name,
+            MeloXLyricsFontWeight.entries.map { it.name },
+        ) { value ->
+            when (MeloXLyricsFontWeight.valueOf(value)) {
+                MeloXLyricsFontWeight.Light -> "细体"
+                MeloXLyricsFontWeight.Regular -> "常规"
+                MeloXLyricsFontWeight.Medium -> "中等"
+                MeloXLyricsFontWeight.SemiBold -> "半粗体"
+                MeloXLyricsFontWeight.Bold -> "粗体"
+                MeloXLyricsFontWeight.Heavy -> "特粗体"
+            }
+        }
+        LyricsStringChoiceSetting(
+            context, "抬升方式", "lyrics_lift_mode", MeloXLyricsGroupingMode.Character.name,
+            MeloXLyricsGroupingMode.entries.map { it.name },
+        ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词抬升" else "按字抬升" }
     }
-    LyricsStringChoiceSetting(
-        context, "抬升方式", "lyrics_lift_mode", MeloXLyricsGroupingMode.Character.name,
-        MeloXLyricsGroupingMode.entries.map { it.name },
-    ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词抬升" else "按字抬升" }
-    PreferenceFloatSlider(context, "高光渐变宽度", "lyrics_highlight_gradient_width", .7f, .4f..3f, 25) { "%.1f 字宽".format(it) }
-    PreferenceFloatSlider(context, "渐变削减程度", "lyrics_highlight_gradient_reduction", .65f, 0f..1f, 19) { "${(it * 100).toInt()}%" }
-    LyricsStringChoiceSetting(
-        context, "长音识别方式", "lyrics_long_tone_detection", MeloXLyricsGroupingMode.Character.name,
-        MeloXLyricsGroupingMode.entries.map { it.name },
-    ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词识别" else "按字识别" }
-    SettingsToggleRow(context, "逐字歌词光效", "lyrics_glow_enabled", true)
-    SettingsToggleRow(context, "仅长音显示光晕", "lyrics_glow_long_tones_only", true)
-    LyricsChoiceSetting(context, "长音判定时长", "lyrics_long_tone_threshold_ms", 950, listOf(300, 500, 700, 950, 1_200, 1_500)) { "${it / 1000f} 秒" }
-    LyricsFloatChoiceSetting(context, "行间距", "lyrics_spacing_scale", 1f, listOf(.8f, 1f, 1.2f, 1.4f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .5f, .8f, 1f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "焦点垂直位置", "lyrics_focus_position", .25f, .05f..8f / 10f, 74) { "距顶部 ${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "默认逐句模糊加强", "lyrics_distance_blur_scale", 1.05f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "隐藏 UI 逐句模糊加强", "lyrics_hidden_blur_scale", .85f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 49) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "当前行放大", "lyrics_focus_scale", 1.02f, listOf(1f, 1.02f, 1.04f, 1.08f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .42f, listOf(.3f, .42f, .5f, .6f)) { "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "逐字光晕", "lyrics_glow_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
-    LyricsFloatChoiceSetting(context, "长音延展", "lyrics_long_tone_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
-    LyricsChoiceSetting(context, "控制栏自动隐藏", "lyrics_interface_auto_hide_ms", 5_000, (3..15).map { it * 1_000 }) { "${it / 1_000} 秒" }
-    LyricsChoiceSetting(context, "滚动隐藏 UI 阈值", "lyrics_scroll_hide_threshold_dp", 200, listOf(40, 80, 120, 160, 200, 240)) { "$it dp" }
 
-    Text("动画与性能", modifier = Modifier.padding(top = 16.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    PreferenceFloatSlider(context, "基础拖尾延迟", "lyrics_cascade_delay_ms", 21f, 0f..100f, 99) { "${it.toInt()} ms" }
-    PreferenceFloatSlider(context, "逐句拖尾增量", "lyrics_cascade_delay_increase_ms", 5f, 0f..100f, 99) { "${it.toInt()} ms/句" }
-    PreferenceFloatSlider(context, "后续歌词启动延迟", "lyrics_cascade_following_delay_ms", 30f, 0f..200f, 199) { "${it.toInt()} ms" }
-    PreferenceFloatSlider(context, "拖尾追赶节奏", "lyrics_cascade_catch_up_ratio", .97f, .5f..1f, 49) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "追赶速度梯度", "lyrics_cascade_chase_gradient", .70f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "位移收束时长", "lyrics_cascade_duration_ms", 740f, 200f..1_200f, 99) { "%.2f 秒".format(it / 1_000f) }
-    PreferenceFloatSlider(context, "瞬移阈值", "lyrics_snap_threshold_ms", 260f, 50f..500f, 89) { "${it.toInt()} ms" }
-    SettingsToggleRow(context, "启用位移回弹", "lyrics_cascade_bounce_enabled", true)
-    PreferenceFloatSlider(context, "最大回弹弹性", "lyrics_cascade_bounce", .26f, 0f..8f / 10f, 79) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "回弹强度梯度", "lyrics_cascade_bounce_gradient", .85f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
-    SettingsToggleRow(context, "启用升格回弹", "lyrics_scale_bounce_enabled", true)
-    PreferenceFloatSlider(context, "升格回弹弹性", "lyrics_scale_bounce", .32f, 0f..5f / 10f, 49) { "${(it * 100).toInt()}%" }
-    LyricsChoiceSetting(context, "升格回弹时长", "lyrics_scale_bounce_duration_ms", 580, listOf(150, 250, 350, 450, 580, 700, 800)) { "${it}ms" }
-    LyricsChoiceSetting(context, "焦点颜色提前", "lyrics_focus_color_lead_ms", 0, listOf(-300, -200, -100, -50, 0, 50, 100, 200, 300)) { if (it == 0) "同步" else "${it}ms" }
+    // Group 4: 长音识别方式-逐字歌词光效-仅长音显示光晕-逐字光晕-长音延展-长音判定时长-行间距-远近模糊
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        LyricsStringChoiceSetting(
+            context, "长音识别方式", "lyrics_long_tone_detection", MeloXLyricsGroupingMode.Character.name,
+            MeloXLyricsGroupingMode.entries.map { it.name },
+        ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词识别" else "按字识别" }
+        SettingsToggleRow(context, "逐字歌词光效", "lyrics_glow_enabled", true, grouped = true)
+        SettingsToggleRow(context, "仅长音显示光晕", "lyrics_glow_long_tones_only", true, grouped = true)
+        LyricsFloatChoiceSetting(context, "逐字光晕", "lyrics_glow_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "长音延展", "lyrics_long_tone_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+        LyricsChoiceSetting(context, "长音判定时长", "lyrics_long_tone_threshold_ms", 950, listOf(300, 500, 700, 950, 1_200, 1_500)) { "${it / 1000f} 秒" }
+        LyricsFloatChoiceSetting(context, "行间距", "lyrics_spacing_scale", 1f, listOf(.8f, 1f, 1.2f, 1.4f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .5f, .8f, 1f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+    }
+
+    // Group 5: 当前行放大-未播放文字亮度-控制栏自动隐藏-滚动隐藏UI阈值
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        LyricsFloatChoiceSetting(context, "当前行放大", "lyrics_focus_scale", 1.02f, listOf(1f, 1.02f, 1.04f, 1.08f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .42f, listOf(.3f, .42f, .5f, .6f)) { "${(it * 100).toInt()}%" }
+        LyricsChoiceSetting(context, "控制栏自动隐藏", "lyrics_interface_auto_hide_ms", 5_000, (3..15).map { it * 1_000 }) { "${it / 1_000} 秒" }
+        LyricsChoiceSetting(context, "滚动隐藏 UI 阈值", "lyrics_scroll_hide_threshold_dp", 200, listOf(40, 80, 120, 160, 200, 240)) { "$it dp" }
+    }
+
+    // Group 6: 启用位移回弹-启用升格回弹-升格回弹时长-焦点回弹时长
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        SettingsToggleRow(context, "启用位移回弹", "lyrics_cascade_bounce_enabled", true, grouped = true)
+        SettingsToggleRow(context, "启用升格回弹", "lyrics_scale_bounce_enabled", true, grouped = true)
+        LyricsChoiceSetting(context, "升格回弹时长", "lyrics_scale_bounce_duration_ms", 580, listOf(150, 250, 350, 450, 580, 700, 800)) { "${it}ms" }
+        LyricsChoiceSetting(context, "焦点回弹时长", "lyrics_focus_color_lead_ms", 0, listOf(-300, -200, -100, -50, 0, 50, 100, 200, 300)) { if (it == 0) "同步" else "${it}ms" }
+    }
+
+    // Group 7: 最大回弹弹性-回弹强度梯度-升格回弹弹性
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        PreferenceFloatSlider(context, "最大回弹弹性", "lyrics_cascade_bounce", .26f, 0f..8f / 10f, 79) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "回弹强度梯度", "lyrics_cascade_bounce_gradient", .85f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "升格回弹弹性", "lyrics_scale_bounce", .32f, 0f..5f / 10f, 49) { "${(it * 100).toInt()}%" }
+    }
+
+    // Group 8: 高光渐变宽度-渐变削减程度
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        PreferenceFloatSlider(context, "高光渐变宽度", "lyrics_highlight_gradient_width", .7f, .4f..3f, 25) { "%.1f 字宽".format(it) }
+        PreferenceFloatSlider(context, "渐变削减程度", "lyrics_highlight_gradient_reduction", .65f, 0f..1f, 19) { "${(it * 100).toInt()}%" }
+    }
+
+    // Group 9: 焦点垂直位置-默认逐句模糊加强-隐藏UI逐句模糊加强-非焦点歌词变暗
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        PreferenceFloatSlider(context, "焦点垂直位置", "lyrics_focus_position", .25f, .05f..8f / 10f, 74) { "距顶部 ${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "默认逐句模糊加强", "lyrics_distance_blur_scale", 1.05f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "隐藏 UI 逐句模糊加强", "lyrics_hidden_blur_scale", .85f, 0f..1.5f, 29) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "非焦点歌词变暗", "lyrics_dim_amount", 1f, 0f..1f, 49) { "${(it * 100).toInt()}%" }
+    }
+
+    // Group 10: 基础拖尾延迟-逐句拖尾增量-后续歌词启动延迟-拖尾追赶节奏-追赶速度梯度-位移收束时长
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        PreferenceFloatSlider(context, "基础拖尾延迟", "lyrics_cascade_delay_ms", 21f, 0f..100f, 99) { "${it.toInt()} ms" }
+        PreferenceFloatSlider(context, "逐句拖尾增量", "lyrics_cascade_delay_increase_ms", 5f, 0f..100f, 99) { "${it.toInt()} ms/句" }
+        PreferenceFloatSlider(context, "后续歌词启动延迟", "lyrics_cascade_following_delay_ms", 30f, 0f..200f, 199) { "${it.toInt()} ms" }
+        PreferenceFloatSlider(context, "拖尾追赶节奏", "lyrics_cascade_catch_up_ratio", .97f, .5f..1f, 49) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "追赶速度梯度", "lyrics_cascade_chase_gradient", .70f, 0f..1f, 99) { "${(it * 100).toInt()}%" }
+        PreferenceFloatSlider(context, "位移收束时长", "lyrics_cascade_duration_ms", 740f, 200f..1_200f, 99) { "%.2f 秒".format(it / 1_000f) }
+    }
+
+    // Group 11: 瞬移阈值
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        PreferenceFloatSlider(context, "瞬移阈值", "lyrics_snap_threshold_ms", 260f, 50f..500f, 89) { "${it.toInt()} ms" }
+    }
 }
 
 @Composable
@@ -1174,7 +1226,7 @@ private fun PreferenceFloatSlider(
 
 @Composable
 private fun ContentFeatureSettings(context: android.content.Context) {
-    SettingsToggleGroup {
+    SettingsGlassGroup {
         SettingsToggleRow(context, "播客", "feature_podcasts", true, grouped = true)
         SettingsToggleRow(context, "最近播放", "feature_history", true, grouped = true)
         SettingsToggleRow(context, "下载", "feature_downloads", true, "控制音乐库下载入口；已下载文件不会被删除。", grouped = true)
@@ -1315,15 +1367,17 @@ private fun MessagesSettings(context: android.content.Context) {
 @Composable
 private fun ContentSettings(context: android.content.Context) {
     var area by remember { mutableStateOf(MeloXSettingsRuntime.musicArea) }
-    MeloXSettingsDropdown(
-        title = "新碟与发现地区",
-        selected = area,
-        items = listOf("全部" to "全部", "华语" to "华语", "欧美" to "欧美", "日本" to "日本", "韩国" to "韩国"),
-        onSelected = { area = it; MeloXSettingsPreferences.setString(context, "music_area", it) },
-    )
-    Spacer(Modifier.height(20.dp))
-    SettingsToggleRow(context, "显示歌单播放量", "content_playlist_play_count", true)
-    SettingsToggleRow(context, "发现页显示精品歌单", "content_high_quality_playlist", true)
+    SettingsGlassGroup {
+        MeloXSettingsDropdown(
+            title = "新碟与发现地区",
+            selected = area,
+            items = listOf("全部" to "全部", "华语" to "华语", "欧美" to "欧美", "日本" to "日本", "韩国" to "韩国"),
+            onSelected = { area = it; MeloXSettingsPreferences.setString(context, "music_area", it) },
+            grouped = true,
+        )
+        SettingsToggleRow(context, "发现页显示精品歌单", "content_high_quality_playlist", true, grouped = true)
+        SettingsToggleRow(context, "显示歌单播放量", "content_playlist_play_count", true, grouped = true)
+    }
 }
 
 @Composable
@@ -1338,13 +1392,14 @@ private fun StorageSettings(context: android.content.Context) {
     }
     LaunchedEffect(Unit) { refresh() }
 
-    Spacer(Modifier.height(10.dp))
-    Spacer(Modifier.height(14.dp))
-
     var autoCache by remember { mutableStateOf(MeloXSettingsPreferences.boolean(context, "downloads_auto_cache", false)) }
-    SettingsExternalToggleRow("按播放次数自动缓存", autoCache, "歌曲实际开始播放达到阈值后自动下载；不会重复下载。") {
-        autoCache = it
-        MeloXSettingsPreferences.setBoolean(context, "downloads_auto_cache", it)
+
+    SettingsGlassGroup {
+        SettingsToggleRow(context, "下载歌词", "download_lyrics", true, "下载歌曲时同时保存歌词；默认开启，可在此关闭。封面始终随歌曲保存。", grouped = true)
+        SettingsExternalToggleRow("按播放次数自动缓存", autoCache, "歌曲实际开始播放达到阈值后自动下载；不会重复下载。", grouped = true) {
+            autoCache = it
+            MeloXSettingsPreferences.setBoolean(context, "downloads_auto_cache", it)
+        }
     }
     if (autoCache) {
         LyricsChoiceSetting(context, "触发次数", "downloads_auto_cache_threshold", 3, listOf(2, 3, 5, 8, 10)) { "$it 次" }
@@ -1363,7 +1418,6 @@ private fun StorageSettings(context: android.content.Context) {
         SettingsActionButton("重置自动缓存播放统计") { downloads.resetAutomaticCacheHistory() }
     }
     Spacer(Modifier.height(10.dp))
-    SettingsToggleRow(context, "下载歌词", "download_lyrics", true, "下载歌曲时同时保存歌词；默认开启，可在此关闭。封面始终随歌曲保存。")
 
     if (downloads.activeDownloads.isNotEmpty()) {
         Text("正在下载", modifier = Modifier.padding(top=10.dp,bottom=8.dp), fontWeight=FontWeight.SemiBold)
@@ -1417,28 +1471,28 @@ private fun formatBytes(bytes: Long): String = when {
 
 @Composable
 private fun TabLayoutSettings(context: android.content.Context) {
-    SettingsToggleRow(context, "首页", "tab_home", true)
-    SettingsToggleRow(context, "发现", "tab_explore", true)
-    SettingsToggleRow(context, "音乐库", "tab_library", true)
-    Spacer(Modifier.height(18.dp))
-    Text("页面放置", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Text("播客、下载和云盘可同时出现在多个位置。", modifier = Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .46f))
-    Spacer(Modifier.height(8.dp))
+    SettingsGlassGroup {
+        SettingsToggleRow(context, "首页", "tab_home", true, grouped = true)
+        SettingsToggleRow(context, "发现", "tab_explore", true, grouped = true)
+        SettingsToggleRow(context, "音乐库", "tab_library", true, grouped = true)
+    }
     listOf(
         Triple("播客", "podcasts", MeloXSettingsRuntime.podcastsEnabled),
         Triple("下载", "downloads", MeloXSettingsRuntime.downloadsEnabled),
         Triple("云盘", "cloud", MeloXSettingsRuntime.cloudMusicEnabled),
     ).forEach { (title, key, enabled) ->
-        Text(title, modifier = Modifier.padding(top = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        SettingsToggleRow(context, "首页快捷入口", "placement_${key}_home", key == "podcasts", if (enabled) null else "请先在内容功能中启用$title。")
-        SettingsToggleRow(context, "独立标签页", "placement_${key}_tab", false)
-        SettingsToggleRow(context, "音乐库子页", "placement_${key}_library", true)
+        Spacer(Modifier.height(10.dp))
+        SettingsGlassGroup {
+            Text(title, modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
+            SettingsToggleRow(context, "首页快捷入口", "placement_${key}_home", key == "podcasts", if (enabled) null else "请先在内容功能中启用$title。", grouped = true)
+            SettingsToggleRow(context, "音乐库子页", "placement_${key}_library", true, grouped = true)
+            SettingsToggleRow(context, "独立标签页", "placement_${key}_tab", false, grouped = true)
+        }
     }
-    Spacer(Modifier.height(14.dp))
+    Spacer(Modifier.height(10.dp))
     var order by remember { mutableStateOf(MeloXSettingsRuntime.tabOrder) }
-    Text("标签栏顺序", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
     SettingsGlassGroup {
+        Text("标签栏顺序", modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
         order.forEachIndexed { index, page ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(when (page) { "Home" -> "首页"; "Explore" -> "发现"; "Library" -> "音乐库"; "Podcasts" -> "播客"; "Downloads" -> "下载"; "Cloud" -> "云盘"; else -> "设置" }, Modifier.weight(1f))
@@ -1453,15 +1507,14 @@ private fun TabLayoutSettings(context: android.content.Context) {
             }
         }
     }
-    Spacer(Modifier.height(12.dp))
-    Spacer(Modifier.height(18.dp))
-    Text("首页区块", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsToggleRow(context, "快捷入口", "home_quick_actions", true)
-    SettingsToggleRow(context, "推荐歌单", "home_playlists", true)
-    SettingsToggleRow(context, "推荐新歌", "home_new_songs", true)
+    Spacer(Modifier.height(10.dp))
     var homeOrder by remember { mutableStateOf(MeloXSettingsRuntime.homeSectionOrder) }
     SettingsGlassGroup {
+        Text("首页区块", modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
+        SettingsToggleRow(context, "快捷入口", "home_quick_actions", true, grouped = true)
+        SettingsToggleRow(context, "推荐歌单", "home_playlists", true, grouped = true)
+        SettingsToggleRow(context, "推荐新歌", "home_new_songs", true, grouped = true)
+        SettingsToggleRow(context, "记住音乐库子页面", "library_remember_page", true, grouped = true)
         homeOrder.forEachIndexed { index, section ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(when (section) { "QuickActions" -> "快捷入口"; "Playlists" -> "推荐歌单"; else -> "推荐新歌" }, Modifier.weight(1f))
@@ -1476,59 +1529,60 @@ private fun TabLayoutSettings(context: android.content.Context) {
             }
         }
     }
-    Spacer(Modifier.height(16.dp))
-    SettingsToggleRow(context, "记住音乐库子页面", "library_remember_page", true)
+    Spacer(Modifier.height(10.dp))
     var libraryPage by remember { mutableStateOf(MeloXSettingsRuntime.defaultLibraryPage) }
-    Text("音乐库默认页", modifier = Modifier.padding(top = 12.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
     SettingsGlassGroup {
-        listOf("Songs" to "歌曲", "Playlists" to "歌单", "Podcasts" to "播客", "Cloud" to "云盘", "History" to "最近播放", "Downloads" to "下载")
-            .filter { (value, _) ->
-                (value != "Podcasts" || MeloXSettingsRuntime.podcastsEnabled) &&
-                    (value != "Podcasts" || MeloXSettingsRuntime.podcastsLibraryPlacement) &&
-                    (value != "Cloud" || MeloXSettingsRuntime.cloudMusicEnabled) &&
-                    (value != "Cloud" || MeloXSettingsRuntime.cloudLibraryPlacement) &&
-                    (value != "History" || MeloXSettingsRuntime.listeningHistoryEnabled) &&
-                    (value != "Downloads" || MeloXSettingsRuntime.downloadsEnabled) &&
-                    (value != "Downloads" || MeloXSettingsRuntime.downloadsLibraryPlacement)
-            }.forEach { (value, title) ->
-            SettingsChoiceRow(title, libraryPage == value) {
-                libraryPage = value
-                MeloXSettingsPreferences.setString(context, "library_default_page", value)
-            }
-        }
+        MeloXSettingsDropdown(
+            title = "音乐库默认页",
+            selected = libraryPage,
+            items = listOf("Songs" to "歌曲", "Playlists" to "歌单", "Podcasts" to "播客", "Cloud" to "云盘", "History" to "最近播放", "Downloads" to "下载")
+                .filter { (value, _) ->
+                    (value != "Podcasts" || MeloXSettingsRuntime.podcastsEnabled) &&
+                        (value != "Podcasts" || MeloXSettingsRuntime.podcastsLibraryPlacement) &&
+                        (value != "Cloud" || MeloXSettingsRuntime.cloudMusicEnabled) &&
+                        (value != "Cloud" || MeloXSettingsRuntime.cloudLibraryPlacement) &&
+                        (value != "History" || MeloXSettingsRuntime.listeningHistoryEnabled) &&
+                        (value != "Downloads" || MeloXSettingsRuntime.downloadsEnabled) &&
+                        (value != "Downloads" || MeloXSettingsRuntime.downloadsLibraryPlacement)
+                },
+            onSelected = { libraryPage = it; MeloXSettingsPreferences.setString(context, "library_default_page", it) },
+            grouped = true,
+        )
+        Text("搜索保持为独立的右侧 Liquid Glass 按钮。", modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .46f))
     }
-    Text("搜索保持为独立的右侧 Liquid Glass 按钮。", modifier = Modifier.padding(top = 12.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .46f))
 }
 
 @Composable
 private fun GeneralSettings(context: android.content.Context) {
     var theme by remember { mutableStateOf(MeloXSettingsRuntime.themeMode) }
-    MeloXSettingsDropdown(
-        title = "主题",
-        selected = theme,
-        items = listOf(
-            MeloXThemeMode.System to "跟随系统",
-            MeloXThemeMode.Light to "浅色",
-            MeloXThemeMode.Dark to "深色",
-        ),
-        onSelected = { theme = it; MeloXSettingsPreferences.setString(context, "theme_mode", it.name) },
-    )
-    Spacer(Modifier.height(20.dp))
-    SettingsToggleRow(context, "记住上次标签页", "general_remember_tab", true)
-    var defaultTab by remember { mutableStateOf(MeloXSettingsRuntime.defaultTab) }
-    MeloXSettingsDropdown(
-        title = "默认启动页",
-        selected = defaultTab,
-        items = listOf(
-            "Home" to "首页",
-            "Explore" to "发现",
-            "Library" to "音乐库",
-            "Settings" to "设置",
-        ),
-        onSelected = { defaultTab = it; MeloXSettingsPreferences.setString(context, "general_default_tab", it) },
-    )
-    SettingsToggleRow(context, "识别剪贴板中的网易云链接", "general_clipboard_links", true, "每次回到前台只读取一次；识别歌曲或歌单后会先询问是否打开。")
+    SettingsGlassGroup {
+        MeloXSettingsDropdown(
+            title = "主题",
+            selected = theme,
+            items = listOf(
+                MeloXThemeMode.System to "跟随系统",
+                MeloXThemeMode.Light to "浅色",
+                MeloXThemeMode.Dark to "深色",
+            ),
+            onSelected = { theme = it; MeloXSettingsPreferences.setString(context, "theme_mode", it.name) },
+            grouped = true,
+        )
+        var defaultTab by remember { mutableStateOf(MeloXSettingsRuntime.defaultTab) }
+        MeloXSettingsDropdown(
+            title = "默认启动页",
+            selected = defaultTab,
+            items = listOf(
+                "Home" to "首页",
+                "Explore" to "发现",
+                "Library" to "音乐库",
+                "Settings" to "设置",
+            ),
+            onSelected = { defaultTab = it; MeloXSettingsPreferences.setString(context, "general_default_tab", it) },
+            grouped = true,
+        )
+        SettingsToggleRow(context, "记住上次标签页", "general_remember_tab", true, grouped = true)
+        SettingsToggleRow(context, "识别剪贴板中的网易云链接", "general_clipboard_links", true, "每次回到前台只读取一次；识别歌曲或歌单后会先询问是否打开。", grouped = true)
+    }
 }
 
 @Composable
@@ -1589,10 +1643,8 @@ private fun RecognitionSettings(context: android.content.Context) {
     }
 
     Spacer(Modifier.height(14.dp))
-    Text("识别时长", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
     SettingsGlassGroup {
-        listOf(3 to "3 秒 · 更快", 6 to "6 秒 · 推荐", 9 to "9 秒 · 嘈杂环境", 0 to "持续识别").forEach { (value, title) ->
+        listOf(3 to "3 秒 · 更快", 6 to "6 秒 · 推荐", 9 to "9 秒 · 嘈杂环境").forEach { (value, title) ->
             SettingsChoiceRow(title, duration == value) {
                 if (!working) {
                     duration = value
@@ -1805,21 +1857,14 @@ private fun SettingsToggleRow(
 }
 
 @Composable
-private fun SettingsToggleGroup(content: @Composable ColumnScope.() -> Unit) {
-    SettingsGlassGroup {
-        CompositionLocalProvider(LocalSettingsGroupedRows provides true) { content() }
-    }
-    Spacer(Modifier.height(10.dp))
-}
-
-@Composable
 private fun SettingsExternalToggleRow(
     title: String,
     value: Boolean,
     note: String? = null,
+    grouped: Boolean = false,
     onValueChange: (Boolean) -> Unit,
 ) {
-    SettingsGlassGroup {
+    val row = @Composable {
         MeloXIosListRow(
             title = title,
             subtitle = note,
@@ -1827,7 +1872,12 @@ private fun SettingsExternalToggleRow(
             showTopSeparator = false,
         )
     }
-    Spacer(Modifier.height(10.dp))
+    if (grouped) {
+        row()
+    } else {
+        SettingsGlassGroup { row() }
+        Spacer(Modifier.height(10.dp))
+    }
 }
 
 @Composable

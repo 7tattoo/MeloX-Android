@@ -102,9 +102,10 @@ fun <T> MeloXSettingsDropdown(
     onSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    grouped: Boolean = false,
 ) {
     val selectedLabel = items.firstOrNull { it.first == selected }?.second.orEmpty()
-    MeloXIosGroupedList(modifier = modifier, surfaceColor = MaterialTheme.colorScheme.surface) {
+    val row = @Composable {
         MeloXIosListRow(
             title = title,
             trailing = {
@@ -118,6 +119,11 @@ fun <T> MeloXSettingsDropdown(
             },
             showTopSeparator = false,
         )
+    }
+    if (grouped) {
+        row()
+    } else {
+        MeloXIosGroupedList(modifier = modifier, surfaceColor = MaterialTheme.colorScheme.surface) { row() }
     }
 }
 
@@ -325,7 +331,8 @@ fun MeloXSettingsDropdown(
     prefKey: String,
     default: String,
     items: List<Pair<String, String>>,
+    grouped: Boolean = false,
 ) {
     var selected by remember { mutableStateOf(MeloXSettingsPreferences.string(context, prefKey, default)) }
-    MeloXSettingsDropdown(title, selected, items, { selected = it; MeloXSettingsPreferences.setString(context, prefKey, it) })
+    MeloXSettingsDropdown(title, selected, items, { selected = it; MeloXSettingsPreferences.setString(context, prefKey, it) }, grouped = grouped)
 }
