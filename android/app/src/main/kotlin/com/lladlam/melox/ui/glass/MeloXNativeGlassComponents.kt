@@ -33,20 +33,27 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp as colorLerp
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
@@ -64,6 +71,10 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import com.kyant.shapes.Capsule
+import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.ui.draw.drawBehind
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 
 @Composable
@@ -170,97 +181,116 @@ fun MeloXGlassToggle(
     modifier: Modifier = Modifier,
 ) {
     val dark = isMeloXDarkTheme()
-    val trackBackdrop = rememberLayerBackdrop()
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val pressProgress by animateFloatAsState(
-        targetValue = if (pressed && enabled) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
-        label = "melox-glass-toggle-press",
-    )
-    val fraction by animateFloatAsState(
-        targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = 520f),
-        label = "melox-glass-toggle-value",
-    )
-    val trackColor = when {
-        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = if (dark) 0.18f else 0.16f)
-        checked -> Color(0xFF34C759)
-        else -> Color(0xFF787878).copy(alpha = if (dark) 0.36f else 0.20f)
-    }
-    val pageBackdrop = LocalMeloXBackdrop.current
+    val accent = if (dark) Color(0xFF30D158) else Color(0xFF34C759)
+    val trackOff = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.20f)
+    val density = androidx.compose.ui.platform.LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val travelPx = with(density) { 20.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    var didDrag by remember { mutableStateOf(false) }
+    var fraction by remember { mutableFloatStateOf(if (checked) 1f else 0f) }
+    val animation = remember(scope, enabled) {
+        PublicDampedDragAnimation(
+            animationScope = scope,
+            initialValue = fraction,
+            valueRange = 0f..1f,
+            visibilityThreshold = 0.001f,
+            initialScale = 1f,
+            pressedScale = 1.5f,
+            onDragStarted = {},
+            onDragStopped = {
+                if (!enabled) return@PublicDampedDragAnimation
+                fraction = if (didDrag) {
+                    if (targetValue >= 0.5f) 1f else 0f
+                } else if (checked) 0f else 1f
+                didDrag = false
+                onCheckedChange(fraction == 1f)
+            },
+            onDrag = { _, dragAmount ->
+                if (!enabled) return@PublicDampedDragAnimation
+                didDrag = didDrag || dragAmount.x != 0f
+                val delta = dragAmount.x / travelPx
+                fraction = if (isLtr) (fraction + delta).coerceIn(0f, 1f)
+                else (fraction - delta).coerceIn(0f, 1f)
+            },
+        )
+    }
+    LaunchedEffect(animation) {
+        snapshotFlow { fraction }.collectLatest(animation::updateValue)
+    }
+    LaunchedEffect(checked) {
+        val target = if (checked) 1f else 0f
+        if (target != fraction) {
+            fraction = target
+            animation.animateToValue(target)
+        }
+    }
+
+    val trackBackdrop = rememberLayerBackdrop()
+    val pageBackdrop = LocalMeloXBackdrop.current
     Box(
         modifier = modifier
             .width(64.dp)
             .height(28.dp)
-            .clip(MeloXShapes.capsule)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interactionSource,
-                indication = null,
-                role = Role.Switch,
-                onClick = { onCheckedChange(!checked) },
-            )
-            .padding(0.dp),
+            .semantics { role = Role.Switch }
+            .then(animation.modifier),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             Modifier
-                .fillMaxSize()
                 .layerBackdrop(trackBackdrop)
-                .background(trackColor, MeloXShapes.capsule),
+                .clip(Capsule())
+                .drawBehind { drawRect(colorLerp(trackOff, accent, animation.value)) }
+                .size(width = 64.dp, height = 28.dp),
         )
         Box(
             Modifier
-                .offset {
-                    IntOffset(
-                        x = if (isLtr) {
-                            (2.dp.toPx() + 20.dp.toPx() * fraction).roundToInt()
-                        } else {
-                            (22.dp.toPx() - 20.dp.toPx() * fraction).roundToInt()
-                        },
-                        y = 2.dp.roundToPx(),
-                    )
+                .graphicsLayer {
+                    val padding = 2.dp.toPx()
+                    translationX = if (isLtr) lerp(padding, padding + travelPx, animation.value)
+                    else lerp(-padding, -(padding + travelPx), animation.value)
                 }
-                .size(width = 40.dp, height = 24.dp)
                 .then(
                     if (pageBackdrop != null) {
                         Modifier.drawBackdrop(
                             backdrop = rememberCombinedBackdrop(pageBackdrop, trackBackdrop),
-                            shape = { MeloXShapes.capsule },
+                            shape = { Capsule() },
                             effects = {
-                                blur(8.dp.toPx() * (1f - pressProgress))
-                                lens(
-                                    5.dp.toPx() * pressProgress,
-                                    10.dp.toPx() * pressProgress,
-                                    chromaticAberration = true,
-                                )
+                                val p = animation.pressProgress
+                                blur(8.dp.toPx() * (1f - p))
+                                lens(5.dp.toPx() * p, 10.dp.toPx() * p, chromaticAberration = true)
                             },
                             highlight = {
-                                Highlight.Ambient.copy(alpha = pressProgress)
+                                Highlight.Ambient.copy(
+                                    width = Highlight.Ambient.width / 1.5f,
+                                    blurRadius = Highlight.Ambient.blurRadius / 1.5f,
+                                    alpha = animation.pressProgress,
+                                )
                             },
-                            shadow = {
-                                Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.05f))
-                            },
-                            innerShadow = {
-                                InnerShadow(radius = 4.dp * pressProgress, alpha = pressProgress)
-                            },
+                            shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.05f)) },
+                            innerShadow = { InnerShadow(radius = 4.dp * animation.pressProgress, alpha = animation.pressProgress) },
                             layerBlock = {
-                                val scale = lerp(1f, 1.5f, pressProgress)
-                                scaleX = scale
-                                scaleY = lerp(1f, 0.92f, pressProgress)
+                                scaleX = animation.scaleX
+                                scaleY = animation.scaleY
+                                val velocity = animation.velocity / 50f
+                                scaleX /= 1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f)
+                                scaleY *= 1f - (velocity * 0.25f).coerceIn(-0.2f, 0.2f)
                                 alpha = if (enabled) 1f else 0.45f
                             },
-                            onDrawSurface = {
-                                drawRect(Color.White.copy(alpha = 1f - pressProgress), blendMode = BlendMode.Screen)
-                            },
+                            onDrawSurface = { drawRect(Color.White.copy(alpha = 1f - animation.pressProgress)) },
                         )
                     } else {
                         Modifier
                             .background(Color.White, MeloXShapes.capsule)
-                            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
+                            .graphicsLayer {
+                                val scale = lerp(1f, 1.5f, animation.pressProgress)
+                                scaleX = scale
+                                scaleY = lerp(1f, 0.92f, animation.pressProgress)
+                                alpha = if (enabled) 1f else 0.45f
+                            }
                     },
-                ),
+                )
+                .size(width = 40.dp, height = 24.dp),
         )
     }
 }
