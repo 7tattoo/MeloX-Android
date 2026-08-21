@@ -72,8 +72,8 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.Capsule
-import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import kotlinx.coroutines.flow.collectLatest
+import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import androidx.compose.ui.draw.drawBehind
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
 
@@ -182,7 +182,7 @@ fun MeloXGlassToggle(
 ) {
     val dark = isMeloXDarkTheme()
     val accent = if (dark) Color(0xFF30D158) else Color(0xFF34C759)
-    val trackOff = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.20f)
+    val track = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.20f)
     val density = androidx.compose.ui.platform.LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val travelPx = with(density) { 20.dp.toPx() }
@@ -198,19 +198,11 @@ fun MeloXGlassToggle(
             initialScale = 1f,
             pressedScale = 1.5f,
             onDragStarted = {},
-            onTap = {
-                if (!enabled) return@PublicDampedDragAnimation
-                val newChecked = !checked
-                fraction = if (newChecked) 1f else 0f
-                onCheckedChange(newChecked)
-            },
             onDragStopped = {
                 if (!enabled) return@PublicDampedDragAnimation
                 fraction = if (didDrag) {
                     if (targetValue >= 0.5f) 1f else 0f
-                } else {
-                    if (checked) 0f else 1f
-                }
+                } else if (checked) 0f else 1f
                 didDrag = false
                 onCheckedChange(fraction == 1f)
             },
@@ -248,7 +240,7 @@ fun MeloXGlassToggle(
             Modifier
                 .layerBackdrop(trackBackdrop)
                 .clip(Capsule())
-                .drawBehind { drawRect(colorLerp(trackOff, accent, animation.value)) }
+                .drawBehind { drawRect(colorLerp(track, accent, animation.value)) }
                 .size(width = 64.dp, height = 28.dp),
         )
         Box(
@@ -290,12 +282,7 @@ fun MeloXGlassToggle(
                     } else {
                         Modifier
                             .background(Color.White, MeloXShapes.capsule)
-                            .graphicsLayer {
-                                val scale = lerp(1f, 1.5f, animation.pressProgress)
-                                scaleX = scale
-                                scaleY = lerp(1f, 0.92f, animation.pressProgress)
-                                alpha = if (enabled) 1f else 0.45f
-                            }
+                            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
                     },
                 )
                 .size(width = 40.dp, height = 24.dp),
