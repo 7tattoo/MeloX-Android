@@ -54,9 +54,14 @@ import com.kyant.backdrop.shadow.Shadow
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.lladlam.melox.ui.glass.publicdemo.PublicInteractiveHighlight
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sin
+
+private const val PopupOvershootScale = 1.15f
+private val PopupOvershootStart = 64.dp
+private val PopupOvershootVertical = 32.dp
 
 private class MeloXPopupPositionProvider(
     private val targetMenuHeightPx: Int,
@@ -85,7 +90,10 @@ private class MeloXPopupPositionProvider(
     }
 }
 
-/** Exact Mei-style anchored Popup hierarchy for settings choices. */
+/**
+ * Mei IosPopupButton equivalent. The setting row is stable; only its trailing
+ * selected-value capsule is the Popup anchor and morphs into the glass menu.
+ */
 @Composable
 fun <T> MeloXSettingsDropdown(
     title: String,
@@ -95,42 +103,93 @@ fun <T> MeloXSettingsDropdown(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val selectedLabel = items.firstOrNull { it.first == selected }?.second.orEmpty()
+    MeloXIosGroupedList(modifier = modifier, surfaceColor = MaterialTheme.colorScheme.surface) {
+        MeloXIosListRow(
+            title = title,
+            trailing = {
+                MeloXPopupSelector(
+                    value = selectedLabel,
+                    items = items,
+                    selected = selected,
+                    onSelected = onSelected,
+                    enabled = enabled,
+                )
+            },
+            showTopSeparator = false,
+        )
+    }
+}
+
+@Composable
+private fun <T> MeloXPopupSelector(
+    value: String,
+    items: List<Pair<T, String>>,
+    selected: T,
+    onSelected: (T) -> Unit,
+    enabled: Boolean,
+) {
     var expanded by remember { mutableStateOf(false) }
     var popupAlive by remember { mutableStateOf(false) }
-    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
     var opensAbove by remember { mutableStateOf(false) }
+    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
     val progress = remember { Animatable(0f) }
     val backdrop = LocalMeloXBackdrop.current
 
     LaunchedEffect(expanded) {
         if (expanded) {
             popupAlive = true
-            progress.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 260f, visibilityThreshold = 0.001f))
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 260f, visibilityThreshold = 0.001f),
+            )
         } else {
-            progress.animateTo(0f, spring(dampingRatio = 0.74f, stiffness = 280f, visibilityThreshold = 0.001f))
+            progress.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(dampingRatio = 0.74f, stiffness = 280f, visibilityThreshold = 0.001f),
+            )
             popupAlive = false
         }
     }
 
-    Box(modifier.onSizeChanged { anchorSize = it }) {
-        SettingsDropdownAnchor(
-            title = title,
-            value = items.firstOrNull { it.first == selected }?.second.orEmpty(),
-            enabled = enabled,
-            onClick = { expanded = !expanded },
-        )
+    Box(Modifier.onSizeChanged { anchorSize = it }) {
+        Row(
+            Modifier
+                .graphicsLayer { alpha = if (expanded) 0f else 1f }
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = null,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = { expanded = !expanded },
+                )
+                .padding(horizontal = 2.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(value, style = MeloXTypography.body, color = MeloXSystemColors.Red)
+            MeloXSymbolIcon(
+                MeloXSymbol.ChevronUpDown,
+                Modifier.size(15.dp).padding(start = 7.dp),
+                MeloXSystemColors.Red,
+            )
+        }
+
         if (popupAlive && anchorSize != IntSize.Zero) {
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val menuHeightPx = with(density) { (20.dp + 44.dp * items.size).roundToPx() }
-            val positionProvider = remember(anchorSize, menuHeightPx) {
-                MeloXPopupPositionProvider(menuHeightPx) { opensAbove = it }
+            val targetHeight = with(density) { (20.dp + 44.dp * items.size).roundToPx() }
+            val provider = remember(anchorSize, targetHeight) {
+                MeloXPopupPositionProvider(targetHeight) { opensAbove = it }
             }
             Popup(
-                popupPositionProvider = positionProvider,
+                popupPositionProvider = provider,
                 onDismissRequest = { expanded = false },
-                properties = PopupProperties(focusable = expanded, dismissOnBackPress = expanded, dismissOnClickOutside = expanded),
+                properties = PopupProperties(
+                    focusable = expanded,
+                    dismissOnBackPress = expanded,
+                    dismissOnClickOutside = expanded,
+                ),
             ) {
-                MeloXSettingsContextMenu(
+                MeloXPopupGlassMenu(
                     backdrop = backdrop,
                     progress = progress.value,
                     velocity = progress.velocity,
@@ -140,7 +199,7 @@ fun <T> MeloXSettingsDropdown(
                     itemCount = items.size,
                 ) {
                     items.forEach { (item, label) ->
-                        MeloXSettingsMenuItem(
+                        MeloXPopupMenuItem(
                             title = label,
                             checked = item == selected,
                             enabled = expanded,
@@ -153,25 +212,9 @@ fun <T> MeloXSettingsDropdown(
     }
 }
 
+/** Direct port of Mei's stable overshoot shell + inner glass morph. */
 @Composable
-private fun SettingsDropdownAnchor(title: String, value: String, enabled: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .meloXContentSurface(MeloXShapes.largeCard, MaterialTheme.colorScheme.surface)
-            .clickable(enabled = enabled, interactionSource = null, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MeloXTypography.body, modifier = Modifier.weight(1f))
-        Text(value, style = MeloXTypography.body, color = MeloXSystemColors.Red)
-        MeloXSymbolIcon(MeloXSymbol.ChevronUpDown, Modifier.size(16.dp).padding(start = 7.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = .4f))
-    }
-}
-
-@Composable
-private fun MeloXSettingsContextMenu(
+private fun MeloXPopupGlassMenu(
     backdrop: Backdrop?,
     progress: Float,
     velocity: Float,
@@ -185,71 +228,76 @@ private fun MeloXSettingsContextMenu(
     val highlight = remember(scope) { PublicInteractiveHighlight(scope) }
     val childBackdrop = rememberLayerBackdrop()
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val fraction = progress.coerceIn(0f, 1f)
-    val pulse = max(sin(Math.PI.toFloat() * fraction), abs(velocity / 18f).coerceIn(0f, 1f) * .65f)
+    val geometryProgress = progress.coerceIn(-.04f, 1.06f)
+    val visualProgress = progress.coerceIn(0f, 1f)
+    val normalizedVelocity = (velocity / 18f).coerceIn(-1f, 1f)
+    val pulse = max(sin(PI.toFloat() * visualProgress), abs(normalizedVelocity) * .65f).coerceIn(0f, 1f)
     val collapsedWidth = with(density) { collapsedSize.width.toDp() }
     val collapsedHeight = with(density) { collapsedSize.height.toDp() }
     val menuWidth = 238.dp
     val menuHeight = 20.dp + 44.dp * itemCount
-    val width = lerpDp(collapsedWidth, menuWidth, progress.coerceIn(-.04f, 1.06f))
-    val height = lerpDp(collapsedHeight, menuHeight, progress.coerceIn(-.04f, 1.06f))
+    val width = lerpDp(collapsedWidth, menuWidth, geometryProgress)
+    val height = lerpDp(collapsedHeight, menuHeight, geometryProgress)
     val shape = ContinuousRoundedRectangle(34.dp)
-    val menuSurface = MaterialTheme.colorScheme.surface
-    val fallbackSurface = MaterialTheme.colorScheme.surface
+    val surface = MaterialTheme.colorScheme.surface
 
-    Column(
+    Box(
         Modifier
-            .width(menuWidth * 1.15f)
-            .height(menuHeight * 1.15f)
-            .padding(top = if (opensAbove) 32.dp else 0.dp, bottom = if (opensAbove) 0.dp else 32.dp, start = 64.dp)
-            .then(if (interactive) highlight.modifier else Modifier)
-            .then(if (interactive) highlight.gestureModifier else Modifier)
-            .clip(shape)
-            .padding(10.dp)
-            .width(width)
-            .height(height)
-            .blur(10.dp * (1f - fraction), BlurredEdgeTreatment.Unbounded)
-            .graphicsLayer {
-                alpha = 1f
-                transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
-            }
-            .then(
-                if (backdrop != null) Modifier.drawBackdrop(
-                    backdrop = backdrop,
-                    exportedBackdrop = childBackdrop,
-                    shape = { shape },
-                    effects = {
-                        vibrancy()
-                        blur(androidx.compose.ui.util.lerp(3.dp.toPx(), 16.dp.toPx(), fraction))
-                        lens(
-                            refractionHeight = androidx.compose.ui.util.lerp(10.dp.toPx(), 18.dp.toPx(), fraction) + 2.dp.toPx() * pulse,
-                            refractionAmount = androidx.compose.ui.util.lerp(16.dp.toPx(), 26.dp.toPx(), fraction) + 4.dp.toPx() * pulse,
-                            depthEffect = pulse > .01f,
-                            chromaticAberration = true,
-                        )
-                    },
-                    highlight = { Highlight.Default.copy(alpha = fraction * (.46f + .18f * pulse)) },
-                    shadow = { Shadow(radius = 15.dp, alpha = .10f) },
-                    innerShadow = { InnerShadow(radius = 8.dp, alpha = .10f * fraction) },
-                    onDrawSurface = { drawRect(menuSurface) },
-                ) else Modifier.meloXContentSurface(shape, fallbackSurface)
+            .padding(
+                start = PopupOvershootStart,
+                top = if (opensAbove) PopupOvershootVertical else 0.dp,
+                bottom = if (opensAbove) 0.dp else PopupOvershootVertical,
             )
-            .then(if (interactive) highlight.modifier else Modifier)
-            .then(if (interactive) highlight.gestureModifier else Modifier)
-            .clip(shape)
-            .padding(10.dp)
-            .graphicsLayer {
-                val contentScale = .92f + .08f * fraction
-                scaleX = contentScale
-                scaleY = contentScale
-                transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
-            },
-        content = content,
-    )
+            .size(width = menuWidth * PopupOvershootScale, height = menuHeight * PopupOvershootScale),
+    ) {
+        Column(
+            Modifier
+                .align(if (opensAbove) Alignment.BottomEnd else Alignment.TopEnd)
+                .blur(10.dp * (1f - visualProgress), BlurredEdgeTreatment.Unbounded)
+                .graphicsLayer {
+                    alpha = visualProgress
+                    transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
+                }
+                .width(width)
+                .height(height)
+                .then(
+                    if (backdrop != null) Modifier.drawBackdrop(
+                        backdrop = backdrop,
+                        exportedBackdrop = childBackdrop,
+                        shape = { shape },
+                        effects = {
+                            vibrancy()
+                            blur(androidx.compose.ui.util.lerp(3.dp.toPx(), 16.dp.toPx(), visualProgress))
+                            lens(
+                                refractionHeight = androidx.compose.ui.util.lerp(10.dp.toPx(), 18.dp.toPx(), visualProgress) + 2.dp.toPx() * pulse,
+                                refractionAmount = androidx.compose.ui.util.lerp(16.dp.toPx(), 26.dp.toPx(), visualProgress) + 4.dp.toPx() * pulse,
+                                depthEffect = pulse > .01f,
+                                chromaticAberration = true,
+                            )
+                        },
+                        highlight = { Highlight.Default.copy(alpha = visualProgress * (.46f + .18f * pulse)) },
+                        shadow = { Shadow(radius = 15.dp, alpha = .10f) },
+                        innerShadow = { InnerShadow(radius = 8.dp, alpha = .10f * visualProgress) },
+                        onDrawSurface = { drawRect(surface) },
+                    ) else Modifier.meloXContentSurface(shape, surface)
+                )
+                .then(if (interactive) highlight.modifier else Modifier)
+                .then(if (interactive) highlight.gestureModifier else Modifier)
+                .clip(shape)
+                .padding(10.dp)
+                .graphicsLayer {
+                    val contentScale = .92f + .08f * visualProgress
+                    scaleX = contentScale
+                    scaleY = contentScale
+                    transformOrigin = TransformOrigin(1f, if (opensAbove) 1f else 0f)
+                },
+            content = content,
+        )
+    }
 }
 
 @Composable
-private fun MeloXSettingsMenuItem(title: String, checked: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun MeloXPopupMenuItem(title: String, checked: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val scope = rememberCoroutineScope()
     val highlight = remember(scope) { PublicInteractiveHighlight(scope) }
     Row(
