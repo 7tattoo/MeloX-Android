@@ -156,7 +156,7 @@ fun MeloXSymbolIcon(
     // glyph at a slightly smaller em size leaves a real optical inset inside
     // callers' 18/20/24dp icon boxes, instead of clipping the gear and arrows
     // at their ascender/descender edges.
-    val glyphSize = iconSize * 0.817f
+    val glyphSize = iconSize * 0.7598f
     val sfCodePoint = MeloXSfSymbolCodePoints[symbol.sfSymbolName]
     Text(
         text = sfCodePoint?.let { String(Character.toChars(it)) } ?: symbol.materialLigature,

@@ -5,17 +5,13 @@ package com.lladlam.melox.ui.glass.publicdemo
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MutatorMutex
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.time.Clock
 
 class PublicDampedDragAnimation(
@@ -83,13 +79,6 @@ class PublicDampedDragAnimation(
 
     fun release() {
         animationScope.launch {
-            androidx.compose.runtime.withFrameNanos { }
-            if (valueAnimation.value != valueAnimation.targetValue) {
-                val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
-                snapshotFlow { valueAnimation.value }
-                    .filter { abs(it - valueAnimation.targetValue) < threshold }
-                    .first()
-            }
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(1f, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(1f, scaleYAnimationSpec) }

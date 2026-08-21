@@ -198,11 +198,19 @@ fun MeloXGlassToggle(
             initialScale = 1f,
             pressedScale = 1.5f,
             onDragStarted = {},
+            onTap = {
+                if (!enabled) return@PublicDampedDragAnimation
+                val newChecked = !checked
+                fraction = if (newChecked) 1f else 0f
+                onCheckedChange(newChecked)
+            },
             onDragStopped = {
                 if (!enabled) return@PublicDampedDragAnimation
                 fraction = if (didDrag) {
                     if (targetValue >= 0.5f) 1f else 0f
-                } else if (checked) 0f else 1f
+                } else {
+                    if (checked) 0f else 1f
+                }
                 didDrag = false
                 onCheckedChange(fraction == 1f)
             },
