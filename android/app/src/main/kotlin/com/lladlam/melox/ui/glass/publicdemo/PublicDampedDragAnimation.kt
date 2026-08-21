@@ -58,7 +58,7 @@ class PublicDampedDragAnimation(
 
     private val velocityTracker = VelocityTracker()
     private var downPosition = Offset.Zero
-    private var movedDuringGesture = false
+    internal var movedDuringGesture = false
 
     val value: Float get() = valueAnimation.value
     val progress: Float get() = (value - valueRange.start) / (valueRange.endInclusive - valueRange.start)
@@ -78,7 +78,6 @@ class PublicDampedDragAnimation(
             },
             onDragEnd = {
                 onDragStopped()
-                if (!movedDuringGesture) onTap(downPosition)
                 release()
             },
             onDragCancel = { onDragStopped(); release() },

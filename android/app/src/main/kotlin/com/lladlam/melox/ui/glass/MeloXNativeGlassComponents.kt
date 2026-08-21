@@ -187,7 +187,6 @@ fun MeloXGlassToggle(
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val travelPx = with(density) { 20.dp.toPx() }
     val scope = rememberCoroutineScope()
-    var didDrag by remember { mutableStateOf(false) }
     var fraction by remember { mutableFloatStateOf(if (checked) 1f else 0f) }
     val animation = remember(scope, enabled) {
         PublicDampedDragAnimation(
@@ -200,15 +199,17 @@ fun MeloXGlassToggle(
             onDragStarted = {},
             onDragStopped = {
                 if (!enabled) return@PublicDampedDragAnimation
-                fraction = if (didDrag) {
-                    if (targetValue >= 0.5f) 1f else 0f
-                } else if (checked) 0f else 1f
-                didDrag = false
-                onCheckedChange(fraction == 1f)
+                if (!movedDuringGesture) {
+                    val newChecked = !checked
+                    fraction = if (newChecked) 1f else 0f
+                    onCheckedChange(newChecked)
+                } else {
+                    fraction = if (targetValue >= 0.5f) 1f else 0f
+                    onCheckedChange(fraction == 1f)
+                }
             },
             onDrag = { _, dragAmount ->
                 if (!enabled) return@PublicDampedDragAnimation
-                didDrag = didDrag || dragAmount.x != 0f
                 val delta = dragAmount.x / travelPx
                 fraction = if (isLtr) (fraction + delta).coerceIn(0f, 1f)
                 else (fraction - delta).coerceIn(0f, 1f)
