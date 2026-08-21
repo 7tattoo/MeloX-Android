@@ -501,12 +501,13 @@ private fun SkylineLyricsSettings(context: android.content.Context) {
             "lyrics_skyline_ambient_lines",
             2,
             listOf(0, 1, 2, 3, 4),
+            grouped = true,
         ) { if (it == 0) "关闭" else "$it 行" }
     }
     Spacer(Modifier.height(10.dp))
     SettingsGlassGroup {
-        LyricsChoiceSetting(context, "单组最大字数", "lyrics_skyline_ambient_max_characters", 4, listOf(1, 2, 3, 4)) { "$it 个字" }
-        LyricsChoiceSetting(context, "同屏文字上限", "lyrics_skyline_ambient_max_visible", 16, listOf(4, 8, 12, 16, 20, 24)) { "$it 组" }
+        LyricsChoiceSetting(context, "单组最大字数", "lyrics_skyline_ambient_max_characters", 4, listOf(1, 2, 3, 4), grouped = true) { "$it 个字" }
+        LyricsChoiceSetting(context, "同屏文字上限", "lyrics_skyline_ambient_max_visible", 16, listOf(4, 8, 12, 16, 20, 24), grouped = true) { "$it 组" }
     }
     Spacer(Modifier.height(10.dp))
     var currentFontSize by remember { mutableStateOf(MeloXSettingsRuntime.skylineCurrentFontSize) }
@@ -630,6 +631,7 @@ private fun FloatingLyricsSettings(context: android.content.Context) {
             "floating_lyrics_font_size",
             18,
             listOf(14, 16, 18, 20, 24, 28),
+            grouped = true,
         ) { "$it sp" }
         SettingsToggleRow(context, "高对比背景", "floating_lyrics_high_contrast", true, "重新开启悬浮歌词后生效。", grouped = true)
     }
@@ -666,6 +668,7 @@ private fun PlaybackSettings(context: android.content.Context) {
             "player_transition_duration_ms",
             575,
             listOf(300, 400, 575, 700, 900),
+            grouped = true,
         ) { "${it}ms" }
     }
     Spacer(Modifier.height(10.dp))
@@ -877,7 +880,7 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
         )
         SettingsToggleRow(context, "流动光影背景", "player_flowing_backdrop", true, "关闭后使用模糊封面背景。", grouped = true)
         SettingsToggleRow(context, "播放器背景隔离", "player_background_isolation", true, "开启后播放器独立覆盖首页；关闭后恢复原始透明背景，可能透出下层页面。", grouped = true)
-        LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
+        LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60), grouped = true) { value ->
             when (value) {
                 15 -> "15 FPS · 省电"
                 24 -> "24 FPS · 推荐"
@@ -937,7 +940,7 @@ private fun LyricsSettings(context: android.content.Context) {
         SettingsToggleRow(context, "长按歌词分享", "lyrics_long_press_share", true, grouped = true)
         SettingsToggleRow(context, "间奏倒计时", "lyrics_interlude_countdown", true, "歌词间隔至少 4 秒时显示三点倒计时。", grouped = true)
         SettingsToggleRow(context, "自动跟随当前歌词", "lyrics_auto_follow", true, grouped = true)
-        LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000)) { "${it / 1_000f} 秒" }
+        LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000), grouped = true) { "${it / 1_000f} 秒" }
         SettingsToggleRow(context, "减弱歌词动画", "lyrics_reduce_motion", false, "保留逐字高亮，关闭弹性、抬升与光晕。", grouped = true)
     }
     if (lyricsStyle == MeloXLyricsStyle.TextPV) {
@@ -996,33 +999,33 @@ private fun LyricsSettings(context: android.content.Context) {
     Spacer(Modifier.height(10.dp))
     SettingsGlassGroup {
         SettingsToggleRow(context, "显示翻译", "lyrics_translation", true, grouped = true)
-        LyricsFloatChoiceSetting(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
-        LyricsFloatChoiceSetting(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f), grouped = true) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f), grouped = true) { "${(it * 100).toInt()}%" }
         LyricsStringChoiceSetting(
             context, "翻译显示范围", "lyrics_translation_display_mode",
-            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name },
+            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name }, grouped = true,
         ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
         SettingsToggleRow(context, "显示罗马音", "lyrics_romanization", true, grouped = true)
         LyricsStringChoiceSetting(
             context, "罗马音显示范围", "lyrics_romanization_display_mode",
-            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name },
+            MeloXLyricAnnotationDisplayMode.FocusedLine.name, MeloXLyricAnnotationDisplayMode.entries.map { it.name }, grouped = true,
         ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
-        LyricsFloatChoiceSetting(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
-        LyricsFloatChoiceSetting(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f), grouped = true) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f), grouped = true) { "${(it * 100).toInt()}%" }
     }
 
     // Group 3: 歌词提前量-提前量同时应用于逐字高亮-歌词刷新率-歌词字号-歌词字重-抬升方式
     Spacer(Modifier.height(10.dp))
     SettingsGlassGroup {
-        LyricsChoiceSetting(context, "歌词提前量", "lyrics_advance_ms", 0, listOf(-1_000, -500, -200, 0, 200, 500, 1_000, 2_000, 5_000)) { value ->
+        LyricsChoiceSetting(context, "歌词提前量", "lyrics_advance_ms", 0, listOf(-1_000, -500, -200, 0, 200, 500, 1_000, 2_000, 5_000), grouped = true) { value ->
             if (value == 0) "同步" else if (value > 0) "提前 ${value}ms" else "延后 ${-value}ms"
         }
         SettingsToggleRow(context, "提前量同时应用于逐字高亮", "lyrics_advance_word_by_word", false, grouped = true)
-        LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120)) { "$it FPS" }
-        LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f)) { "${(it * 100).toInt()}%" }
+        LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120), grouped = true) { "$it FPS" }
+        LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f), grouped = true) { "${(it * 100).toInt()}%" }
         LyricsStringChoiceSetting(
             context, "歌词字重", "lyrics_font_weight", MeloXLyricsFontWeight.Heavy.name,
-            MeloXLyricsFontWeight.entries.map { it.name },
+            MeloXLyricsFontWeight.entries.map { it.name }, grouped = true,
         ) { value ->
             when (MeloXLyricsFontWeight.valueOf(value)) {
                 MeloXLyricsFontWeight.Light -> "细体"
@@ -1035,7 +1038,7 @@ private fun LyricsSettings(context: android.content.Context) {
         }
         LyricsStringChoiceSetting(
             context, "抬升方式", "lyrics_lift_mode", MeloXLyricsGroupingMode.Character.name,
-            MeloXLyricsGroupingMode.entries.map { it.name },
+            MeloXLyricsGroupingMode.entries.map { it.name }, grouped = true,
         ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词抬升" else "按字抬升" }
     }
 
@@ -1044,24 +1047,24 @@ private fun LyricsSettings(context: android.content.Context) {
     SettingsGlassGroup {
         LyricsStringChoiceSetting(
             context, "长音识别方式", "lyrics_long_tone_detection", MeloXLyricsGroupingMode.Character.name,
-            MeloXLyricsGroupingMode.entries.map { it.name },
+            MeloXLyricsGroupingMode.entries.map { it.name }, grouped = true,
         ) { if (it == MeloXLyricsGroupingMode.Word.name) "按词识别" else "按字识别" }
         SettingsToggleRow(context, "逐字歌词光效", "lyrics_glow_enabled", true, grouped = true)
         SettingsToggleRow(context, "仅长音显示光晕", "lyrics_glow_long_tones_only", true, grouped = true)
-        LyricsFloatChoiceSetting(context, "逐字光晕", "lyrics_glow_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
-        LyricsFloatChoiceSetting(context, "长音延展", "lyrics_long_tone_strength", 1f, listOf(0f, .6f, 1f, 1.4f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
-        LyricsChoiceSetting(context, "长音判定时长", "lyrics_long_tone_threshold_ms", 950, listOf(300, 500, 700, 950, 1_200, 1_500)) { "${it / 1000f} 秒" }
-        LyricsFloatChoiceSetting(context, "行间距", "lyrics_spacing_scale", 1f, listOf(.8f, 1f, 1.2f, 1.4f)) { "${(it * 100).toInt()}%" }
-        LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .5f, .8f, 1f)) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "逐字光晕", "lyrics_glow_strength", 1f, listOf(0f, .6f, 1f, 1.4f), grouped = true) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "长音延展", "lyrics_long_tone_strength", 1f, listOf(0f, .6f, 1f, 1.4f), grouped = true) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
+        LyricsChoiceSetting(context, "长音判定时长", "lyrics_long_tone_threshold_ms", 950, listOf(300, 500, 700, 950, 1_200, 1_500), grouped = true) { "${it / 1000f} 秒" }
+        LyricsFloatChoiceSetting(context, "行间距", "lyrics_spacing_scale", 1f, listOf(.8f, 1f, 1.2f, 1.4f), grouped = true) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "远近模糊", "lyrics_blur_strength", 1f, listOf(0f, .5f, .8f, 1f), grouped = true) { if (it == 0f) "关闭" else "${(it * 100).toInt()}%" }
     }
 
     // Group 5: 当前行放大-未播放文字亮度-控制栏自动隐藏-滚动隐藏UI阈值
     Spacer(Modifier.height(10.dp))
     SettingsGlassGroup {
-        LyricsFloatChoiceSetting(context, "当前行放大", "lyrics_focus_scale", 1.02f, listOf(1f, 1.02f, 1.04f, 1.08f)) { "${(it * 100).toInt()}%" }
-        LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .42f, listOf(.3f, .42f, .5f, .6f)) { "${(it * 100).toInt()}%" }
-        LyricsChoiceSetting(context, "控制栏自动隐藏", "lyrics_interface_auto_hide_ms", 5_000, (3..15).map { it * 1_000 }) { "${it / 1_000} 秒" }
-        LyricsChoiceSetting(context, "滚动隐藏 UI 阈值", "lyrics_scroll_hide_threshold_dp", 200, listOf(40, 80, 120, 160, 200, 240)) { "$it dp" }
+        LyricsFloatChoiceSetting(context, "当前行放大", "lyrics_focus_scale", 1.02f, listOf(1f, 1.02f, 1.04f, 1.08f), grouped = true) { "${(it * 100).toInt()}%" }
+        LyricsFloatChoiceSetting(context, "未播放文字亮度", "lyrics_inactive_opacity", .42f, listOf(.3f, .42f, .5f, .6f), grouped = true) { "${(it * 100).toInt()}%" }
+        LyricsChoiceSetting(context, "控制栏自动隐藏", "lyrics_interface_auto_hide_ms", 5_000, (3..15).map { it * 1_000 }, grouped = true) { "${it / 1_000} 秒" }
+        LyricsChoiceSetting(context, "滚动隐藏 UI 阈值", "lyrics_scroll_hide_threshold_dp", 200, listOf(40, 80, 120, 160, 200, 240), grouped = true) { "$it dp" }
     }
 
     // Group 6: 启用位移回弹-启用升格回弹-升格回弹时长-焦点回弹时长
@@ -1069,8 +1072,8 @@ private fun LyricsSettings(context: android.content.Context) {
     SettingsGlassGroup {
         SettingsToggleRow(context, "启用位移回弹", "lyrics_cascade_bounce_enabled", true, grouped = true)
         SettingsToggleRow(context, "启用升格回弹", "lyrics_scale_bounce_enabled", true, grouped = true)
-        LyricsChoiceSetting(context, "升格回弹时长", "lyrics_scale_bounce_duration_ms", 580, listOf(150, 250, 350, 450, 580, 700, 800)) { "${it}ms" }
-        LyricsChoiceSetting(context, "焦点回弹时长", "lyrics_focus_color_lead_ms", 0, listOf(-300, -200, -100, -50, 0, 50, 100, 200, 300)) { if (it == 0) "同步" else "${it}ms" }
+        LyricsChoiceSetting(context, "升格回弹时长", "lyrics_scale_bounce_duration_ms", 580, listOf(150, 250, 350, 450, 580, 700, 800), grouped = true) { "${it}ms" }
+        LyricsChoiceSetting(context, "焦点回弹时长", "lyrics_focus_color_lead_ms", 0, listOf(-300, -200, -100, -50, 0, 50, 100, 200, 300), grouped = true) { if (it == 0) "同步" else "${it}ms" }
     }
 
     // Group 7: 最大回弹弹性-回弹强度梯度-升格回弹弹性
@@ -1123,6 +1126,7 @@ private fun LyricsStringChoiceSetting(
     default: String,
     values: List<String>,
     label: (String) -> String,
+    grouped: Boolean = false,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.string(context, key, default)) }
     MeloXSettingsDropdown(
@@ -1133,8 +1137,9 @@ private fun LyricsStringChoiceSetting(
             selected = it
             MeloXSettingsPreferences.setString(context, key, it)
         },
+        grouped = grouped,
     )
-    Spacer(Modifier.height(10.dp))
+    if (!grouped) Spacer(Modifier.height(10.dp))
 }
 
 @Composable
@@ -1145,6 +1150,7 @@ private fun LyricsChoiceSetting(
     default: Int,
     values: List<Int>,
     label: (Int) -> String,
+    grouped: Boolean = false,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.int(context, key, default)) }
     MeloXSettingsDropdown(
@@ -1155,8 +1161,9 @@ private fun LyricsChoiceSetting(
             selected = it
             MeloXSettingsPreferences.setInt(context, key, it)
         },
+        grouped = grouped,
     )
-    Spacer(Modifier.height(10.dp))
+    if (!grouped) Spacer(Modifier.height(10.dp))
 }
 
 @Composable
@@ -1167,6 +1174,7 @@ private fun LyricsFloatChoiceSetting(
     default: Float,
     values: List<Float>,
     label: (Float) -> String,
+    grouped: Boolean = false,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.float(context, key, default)) }
     val selectedValue = values.minByOrNull { kotlin.math.abs(selected - it) } ?: default
@@ -1178,8 +1186,9 @@ private fun LyricsFloatChoiceSetting(
             selected = it
             MeloXSettingsPreferences.setFloat(context, key, it)
         },
+        grouped = grouped,
     )
-    Spacer(Modifier.height(10.dp))
+    if (!grouped) Spacer(Modifier.height(10.dp))
 }
 
 @Composable
