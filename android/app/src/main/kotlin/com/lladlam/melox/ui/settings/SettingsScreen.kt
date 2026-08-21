@@ -733,39 +733,27 @@ private fun AutoMixSettings(context: android.content.Context) {
     var settings by remember { mutableStateOf(MeloXAutoMixSettings.read(context)) }
     fun refresh() { settings = MeloXAutoMixSettings.read(context) }
 
-    Text("混音模式", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(MeloXAutoMixMode.Smart to "智能", MeloXAutoMixMode.Fixed to "固定时长").forEach { (mode, title) ->
-            SettingsChoiceRow(title, settings.mode == mode) {
-                MeloXPlaybackModePreferences.setAutoMixString(context, "automix_mode", mode.name)
-                refresh()
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = "混音模式",
+        selected = settings.mode,
+        items = listOf(MeloXAutoMixMode.Smart to "智能", MeloXAutoMixMode.Fixed to "固定时长"),
+        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_mode", it.name); refresh() },
+    )
     Spacer(Modifier.height(14.dp))
     if (settings.mode == MeloXAutoMixMode.Smart) {
-        Text("智能过渡长度", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-        Spacer(Modifier.height(8.dp))
-        SettingsGlassGroup {
-            listOf(4, 8, 16).forEach { bars ->
-                SettingsChoiceRow("$bars 小节", settings.transitionBars == bars) {
-                    MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_transition_bars", bars)
-                    refresh()
-                }
-            }
-        }
+        MeloXSettingsDropdown(
+            title = "智能过渡长度",
+            selected = settings.transitionBars,
+            items = listOf(4, 8, 16).map { it to "$it 小节" },
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_transition_bars", it); refresh() },
+        )
         Spacer(Modifier.height(14.dp))
-        Text("上一首结束位置", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-        Spacer(Modifier.height(8.dp))
-        SettingsGlassGroup {
-            listOf(0 to "保留至结尾", 2 to "提前 2 小节", 4 to "提前 4 小节", 8 to "提前 8 小节").forEach { (bars, title) ->
-                SettingsChoiceRow(title, settings.tailCutBars == bars) {
-                    MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_tail_cut_bars", bars)
-                    refresh()
-                }
-            }
-        }
+        MeloXSettingsDropdown(
+            title = "上一首结束位置",
+            selected = settings.tailCutBars,
+            items = listOf(0 to "保留至结尾", 2 to "提前 2 小节", 4 to "提前 4 小节", 8 to "提前 8 小节"),
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixInt(context, "automix_tail_cut_bars", it); refresh() },
+        )
         Spacer(Modifier.height(14.dp))
         SettingsExternalToggleRow("跳过安静开头", settings.skipQuietOpening, "从下一首的首个可听乐句开始交接。") {
             MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_skip_quiet_opening", it)
@@ -775,85 +763,65 @@ private fun AutoMixSettings(context: android.content.Context) {
             MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_analyze_streaming", it)
             refresh()
         }
-        Text("最低分析置信度", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-        Spacer(Modifier.height(8.dp))
-        SettingsGlassGroup {
-            listOf(.30f, .42f, .55f, .70f).forEach { confidence ->
-                SettingsChoiceRow("${(confidence * 100).toInt()}%", kotlin.math.abs(settings.minimumConfidence - confidence) < .001) {
-                    MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_minimum_confidence", confidence)
-                    refresh()
-                }
-            }
-        }
+        val confidenceOptions = listOf(.30f, .42f, .55f, .70f)
+        MeloXSettingsDropdown(
+            title = "最低分析置信度",
+            selected = confidenceOptions.minByOrNull { kotlin.math.abs(settings.minimumConfidence - it) } ?: .42f,
+            items = confidenceOptions.map { it to "${(it * 100).toInt()}%" },
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_minimum_confidence", it); refresh() },
+        )
         Spacer(Modifier.height(14.dp))
     }
-    Text("交叉淡化时长", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(3_000L, 6_000L, 8_000L, 12_000L, 16_000L, 20_000L).forEach { duration ->
-            SettingsChoiceRow("${duration / 1_000} 秒", settings.fixedDurationMs == duration) {
-                MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_fixed_duration_ms", duration)
-                refresh()
-            }
-        }
-    }
+    val durationOptions = listOf(3_000L, 6_000L, 8_000L, 12_000L, 16_000L, 20_000L)
+    MeloXSettingsDropdown(
+        title = "交叉淡化时长",
+        selected = durationOptions.minByOrNull { kotlin.math.abs(settings.fixedDurationMs - it) } ?: 6_000L,
+        items = durationOptions.map { it to "${it / 1_000} 秒" },
+        onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_fixed_duration_ms", it); refresh() },
+    )
     Spacer(Modifier.height(14.dp))
-    Text("预加载提前量", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(30_000L, 60_000L, 90_000L, 120_000L, 180_000L).forEach { lead ->
-            SettingsChoiceRow("${lead / 1_000} 秒", settings.preloadLeadMs == lead) {
-                MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_preload_lead_ms", lead)
-                refresh()
-            }
-        }
-    }
+    val preloadOptions = listOf(30_000L, 60_000L, 90_000L, 120_000L, 180_000L)
+    MeloXSettingsDropdown(
+        title = "预加载提前量",
+        selected = preloadOptions.minByOrNull { kotlin.math.abs(settings.preloadLeadMs - it) } ?: 60_000L,
+        items = preloadOptions.map { it to "${it / 1_000} 秒" },
+        onSelected = { MeloXPlaybackModePreferences.setAutoMixLong(context, "automix_preload_lead_ms", it); refresh() },
+    )
     Spacer(Modifier.height(14.dp))
-    Text("淡化曲线", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(
+    MeloXSettingsDropdown(
+        title = "淡化曲线",
+        selected = settings.fadeCurve,
+        items = listOf(
             MeloXAutoMixFadeCurve.EqualPower to "等功率",
             MeloXAutoMixFadeCurve.Smooth to "平滑",
             MeloXAutoMixFadeCurve.Linear to "线性",
-        ).forEach { (curve, title) ->
-            SettingsChoiceRow(title, settings.fadeCurve == curve) {
-                MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fade_curve", curve.name)
-                refresh()
-            }
-        }
-    }
+        ),
+        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fade_curve", it.name); refresh() },
+    )
     Spacer(Modifier.height(14.dp))
-    Text("分析失败时", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        listOf(
+    MeloXSettingsDropdown(
+        title = "分析失败时",
+        selected = settings.fallback,
+        items = listOf(
             MeloXAutoMixFallback.Crossfade to "使用所选时长",
             MeloXAutoMixFallback.ShortCrossfade to "短淡化（3 秒）",
             MeloXAutoMixFallback.Normal to "正常切歌",
-        ).forEach { (fallback, title) ->
-            SettingsChoiceRow(title, settings.fallback == fallback) {
-                MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fallback", fallback.name)
-                refresh()
-            }
-        }
-    }
+        ),
+        onSelected = { MeloXPlaybackModePreferences.setAutoMixString(context, "automix_fallback", it.name); refresh() },
+    )
     Spacer(Modifier.height(14.dp))
     SettingsExternalToggleRow("速度匹配", settings.tempoMatching, "有可靠 BPM 分析时平滑调整两台播放器速度。") {
         MeloXPlaybackModePreferences.setAutoMixBoolean(context, "automix_tempo_matching", it)
         refresh()
     }
     if (settings.tempoMatching) {
-        Text("最大速度调整", modifier = Modifier.padding(top = 10.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-        Spacer(Modifier.height(8.dp))
-        SettingsGlassGroup {
-            listOf(.02f, .05f, .08f).forEach { adjustment ->
-                SettingsChoiceRow("${(adjustment * 100).toInt()}%", kotlin.math.abs(settings.maxTempoAdjustment - adjustment) < .001) {
-                    MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_max_tempo_adjustment", adjustment)
-                    refresh()
-                }
-            }
-        }
+        val adjustmentOptions = listOf(.02f, .05f, .08f)
+        MeloXSettingsDropdown(
+            title = "最大速度调整",
+            selected = adjustmentOptions.minByOrNull { kotlin.math.abs(settings.maxTempoAdjustment - it) } ?: .05f,
+            items = adjustmentOptions.map { it to "${(it * 100).toInt()}%" },
+            onSelected = { MeloXPlaybackModePreferences.setAutoMixFloat(context, "automix_max_tempo_adjustment", it); refresh() },
+        )
     }
 }
 
@@ -905,6 +873,14 @@ private fun PlayerAppearanceSettings(context: android.content.Context) {
         ),
         onSelected = { MeloXSettingsPreferences.setString(context, "player_screen_awake_mode", it.name) },
     )
+    LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
+        when (value) {
+            15 -> "15 FPS · 省电"
+            24 -> "24 FPS · 推荐"
+            30 -> "30 FPS · 均衡"
+            else -> "$value FPS · 流畅"
+        }
+    }
 }
 
 @Composable
@@ -1003,10 +979,10 @@ private fun LyricsSettings(context: android.content.Context) {
         MeloXLyricAnnotationDisplayMode.FocusedLine.name,
         MeloXLyricAnnotationDisplayMode.entries.map { it.name },
     ) { if (it == MeloXLyricAnnotationDisplayMode.FocusedLine.name) "仅当前播放行" else "全部歌词行" }
-    PreferenceFloatSlider(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, .5f..8f / 10f, 5) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, .4f..9f / 10f, 9) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, .5f..8f / 10f, 5) { "${(it * 100).toInt()}%" }
-    PreferenceFloatSlider(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, .4f..9f / 10f, 9) { "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "罗马音大小", "lyrics_romanization_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "罗马音亮度", "lyrics_romanization_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "翻译歌词大小", "lyrics_translation_font_scale", .65f, listOf(.5f, .55f, .6f, .65f, .7f, .75f, .8f)) { "${(it * 100).toInt()}%" }
+    LyricsFloatChoiceSetting(context, "翻译歌词亮度", "lyrics_translation_opacity", .9f, listOf(.4f, .5f, .6f, .7f, .8f, .9f)) { "${(it * 100).toInt()}%" }
     LyricsStringChoiceSetting(
         context,
         "翻译显示范围",
@@ -1029,14 +1005,6 @@ private fun LyricsSettings(context: android.content.Context) {
     }
     SettingsToggleRow(context, "提前量同时应用于逐字高亮", "lyrics_advance_word_by_word", false)
     LyricsChoiceSetting(context, "歌词刷新率", "lyrics_refresh_rate", 60, listOf(30, 60, 90, 120)) { "$it FPS" }
-    LyricsChoiceSetting(context, "动态背景帧率", "lyrics_background_frame_rate", 24, listOf(15, 24, 30, 45, 60)) { value ->
-        when (value) {
-            15 -> "15 FPS · 省电"
-            24 -> "24 FPS · 推荐"
-            30 -> "30 FPS · 均衡"
-            else -> "$value FPS · 流畅"
-        }
-    }
     LyricsChoiceSetting(context, "手动滚动后恢复跟随", "lyrics_follow_delay_ms", 3_000, listOf(1_500, 3_000, 5_000, 8_000)) { "${it / 1_000f} 秒" }
     LyricsFloatChoiceSetting(context, "歌词字号", "lyrics_font_scale", 1f, listOf(.85f, 1f, 1.12f, 1.25f)) { "${(it * 100).toInt()}%" }
     LyricsStringChoiceSetting(
@@ -1105,16 +1073,15 @@ private fun LyricsStringChoiceSetting(
     label: (String) -> String,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.string(context, key, default)) }
-    Text(title, modifier = Modifier.padding(top = 8.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        values.forEach { value ->
-            SettingsChoiceRow(label(value), selected == value) {
-                selected = value
-                MeloXSettingsPreferences.setString(context, key, value)
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = title,
+        selected = selected,
+        items = values.map { it to label(it) },
+        onSelected = {
+            selected = it
+            MeloXSettingsPreferences.setString(context, key, it)
+        },
+    )
     Spacer(Modifier.height(10.dp))
 }
 
@@ -1128,16 +1095,15 @@ private fun LyricsChoiceSetting(
     label: (Int) -> String,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.int(context, key, default)) }
-    Text(title, modifier = Modifier.padding(top = 8.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        values.forEach { value ->
-            SettingsChoiceRow(label(value), selected == value) {
-                selected = value
-                MeloXSettingsPreferences.setInt(context, key, value)
-            }
-        }
-    }
+    MeloXSettingsDropdown(
+        title = title,
+        selected = selected,
+        items = values.map { it to label(it) },
+        onSelected = {
+            selected = it
+            MeloXSettingsPreferences.setInt(context, key, it)
+        },
+    )
     Spacer(Modifier.height(10.dp))
 }
 
@@ -1151,16 +1117,16 @@ private fun LyricsFloatChoiceSetting(
     label: (Float) -> String,
 ) {
     var selected by remember(key) { mutableStateOf(MeloXSettingsPreferences.float(context, key, default)) }
-    Text(title, modifier = Modifier.padding(top = 8.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f))
-    Spacer(Modifier.height(8.dp))
-    SettingsGlassGroup {
-        values.forEach { value ->
-            SettingsChoiceRow(label(value), kotlin.math.abs(selected - value) < .001f) {
-                selected = value
-                MeloXSettingsPreferences.setFloat(context, key, value)
-            }
-        }
-    }
+    val selectedValue = values.minByOrNull { kotlin.math.abs(selected - it) } ?: default
+    MeloXSettingsDropdown(
+        title = title,
+        selected = selectedValue,
+        items = values.map { it to label(it) },
+        onSelected = {
+            selected = it
+            MeloXSettingsPreferences.setFloat(context, key, it)
+        },
+    )
     Spacer(Modifier.height(10.dp))
 }
 
