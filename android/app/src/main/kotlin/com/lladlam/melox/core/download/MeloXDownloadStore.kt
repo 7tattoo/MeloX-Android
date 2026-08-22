@@ -395,8 +395,13 @@ class MeloXDownloadStore private constructor(private val context: Context) {
             val resolvedSource = withContext(Dispatchers.IO) {
                 qualityClient.downloadSourceBlocking(song.id, quality)
             }
+            val downloadUrl = resolvedSource.url.takeIf { value ->
+                value.isNotBlank() &&
+                    !value.equals("null", ignoreCase = true) &&
+                    (value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true))
+            } ?: throw IOException("《${song.name}》没有返回可用的 HTTP 下载地址")
             val request = Request.Builder()
-                .url(resolvedSource.url)
+                .url(downloadUrl)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36")
                 .header("Referer", "https://music.163.com/")
                 .build()

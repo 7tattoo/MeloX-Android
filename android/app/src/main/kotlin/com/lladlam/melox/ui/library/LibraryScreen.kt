@@ -1588,12 +1588,6 @@ private fun MeloXPlaylistDetailScreen(
                         },
                         isSaved = isSaved == true,
                         showSaveAction = !isProviderPlaylist,
-                        showDownloadAction = !isProviderPlaylist,
-                        onDownloadAll = {
-                            if (!isProviderPlaylist) {
-                                showBatchDownload = true
-                            }
-                        },
                         onToggleSaved = {
                             if (!isProviderPlaylist && !savingPlaylist) {
                                 val desired = isSaved != true
@@ -1701,6 +1695,7 @@ private fun MeloXPlaylistDetailScreen(
                 visible = showPlaylistActions,
                 onDismiss = { showPlaylistActions = false },
                 onRefresh = { scope.launch { refreshPlaylist() } },
+                onBatchDownload = { showBatchDownload = true },
             )
             MeloXBatchDownloadSheet(
                 songs = songs,
@@ -1851,8 +1846,6 @@ private fun MeloXStandardPlaylistHero(
     onShuffle: () -> Unit,
     isSaved: Boolean,
     showSaveAction: Boolean,
-    showDownloadAction: Boolean,
-    onDownloadAll: () -> Unit,
     onToggleSaved: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
@@ -1993,33 +1986,6 @@ private fun MeloXStandardPlaylistHero(
                             fontWeight = if (isSaved) FontWeight.SemiBold else FontWeight.Light,
                         )
                     }
-                }
-            }
-
-            if (showDownloadAction) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = 14.dp)
-                        .width(148.dp)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(21.dp))
-                        .meloXLiquidButton(
-                            shape = RoundedCornerShape(21.dp),
-                            enabled = tracks.isNotEmpty(),
-                            tint = glassColor(foreground).copy(alpha = .10f),
-                            surfaceColor = glassColor(foreground).copy(alpha = .46f),
-                            lensRadius = 10.dp,
-                            refractionHeight = 16.dp,
-                        )
-                        .clickable(enabled = tracks.isNotEmpty(), onClick = onDownloadAll),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "↓ 一键下载",
-                        color = foreground,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
                 }
             }
 

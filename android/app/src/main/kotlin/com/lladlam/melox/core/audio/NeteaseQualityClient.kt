@@ -83,7 +83,7 @@ class NeteaseQualityClient(
                     .mapNotNull(sources::optJSONObject)
                     .firstOrNull { it.optLong("id", -1L) == songId }
                     ?: throw IOException("no source for ${candidate.apiLevel}")
-                val rawUrl = source.optString("url").takeIf(String::isNotBlank)
+                val rawUrl = source.optString("url").takeIf(::isUsableHttpUrl)
                     ?: throw IOException("no URL for ${candidate.apiLevel}")
 
                 val actual = MusicQuality.fromApiLevel(
@@ -140,7 +140,7 @@ class NeteaseQualityClient(
                 val data = response.optJSONObject("data")
                     ?: response.optJSONArray("data")?.optJSONObject(0)
                     ?: throw IOException("download route returned no source")
-                val rawUrl = data.optString("url").takeIf(String::isNotBlank)
+                val rawUrl = data.optString("url").takeIf(::isUsableHttpUrl)
                     ?: throw IOException("download route returned no URL")
                 val actual = MusicQuality.fromApiLevel(data.optString("level").takeIf(String::isNotBlank)) ?: candidate
                 return NeteasePlaybackSource(
@@ -294,6 +294,11 @@ class NeteaseQualityClient(
         } else {
             url
         }
+
+    private fun isUsableHttpUrl(value: String): Boolean =
+        value.isNotBlank() &&
+            !value.equals("null", ignoreCase = true) &&
+            (value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true))
 
     private fun encodeURIComponent(value: String): String =
         URLEncoder.encode(value, Charsets.UTF_8.name())

@@ -1,6 +1,7 @@
 package com.lladlam.melox.ui.library
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadPlaylistRef
@@ -35,7 +39,10 @@ import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.ui.glass.MeloXGlassButton
 import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.MeloXGlassSheet
-import com.lladlam.melox.ui.glass.meloXContentSurface
+import com.lladlam.melox.ui.glass.MeloXIosGroupedList
+import com.lladlam.melox.ui.glass.MeloXIosListRow
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 
 /** Multi-selection and explicit quality gate shared by playlists, albums and rankings. */
 @Composable
@@ -52,9 +59,24 @@ fun MeloXBatchDownloadSheet(
     var quality by remember { mutableStateOf(MusicQualityPreferences.read(context)) }
     val selectedSongs = remember(songs, selectedIds) { songs.filter { it.id in selectedIds } }
 
-    MeloXGlassSheet(visible = true, onDismiss = onDismiss, modifier = Modifier.fillMaxHeight(.88f)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Text("批量下载", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
+        dragHandle = {
+            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(width = 58.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .24f), RoundedCornerShape(99.dp)),
+                )
+            }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text("下载选项", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 13.sp)
+            Text("批量下载", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
             Text(
                 "先选择音质，再选择要下载的歌曲。",
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f),
@@ -62,14 +84,16 @@ fun MeloXBatchDownloadSheet(
             )
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 item {
-                    Text("音质", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 4.dp))
-                    MusicQuality.entries.forEach { option ->
-                        Row(
-                            Modifier.fillMaxWidth().height(42.dp).clickable { quality = option },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(option.title, Modifier.weight(1f))
-                            Text(if (quality == option) "✓" else "○", color = MaterialTheme.colorScheme.primary)
+                    Text("音质", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+                    MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        MusicQuality.entries.forEachIndexed { index, option ->
+                            MeloXIosListRow(
+                                title = option.title,
+                                leading = { MeloXSymbolIcon(MeloXSymbol.MusicNote, Modifier.size(21.dp), MaterialTheme.colorScheme.onSurface, iconSize = 20.sp) },
+                                trailing = { if (quality == option) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) },
+                                showTopSeparator = index > 0,
+                                onClick = { quality = option },
+                            )
                         }
                     }
                     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -85,26 +109,13 @@ fun MeloXBatchDownloadSheet(
                 }
                 items(songs, key = SearchSong::id) { song ->
                     val selected = song.id in selectedIds
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .meloXContentSurface(
-                                shape = RoundedCornerShape(14.dp),
-                                surfaceColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) .08f else .03f),
-                            )
-                            .clickable {
-                                selectedIds = if (selected) selectedIds - song.id else selectedIds + song.id
-                            }
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(song.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(song.artists, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .48f), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Text(if (selected) "✓" else "○", color = MaterialTheme.colorScheme.primary)
-                    }
+                    MeloXIosListRow(
+                        title = song.name,
+                        subtitle = song.artists,
+                        leading = { MeloXSymbolIcon(MeloXSymbol.Download, Modifier.size(21.dp), MaterialTheme.colorScheme.onSurface, iconSize = 20.sp) },
+                        trailing = { Text(if (selected) "✓" else "○", color = MaterialTheme.colorScheme.primary) },
+                        onClick = { selectedIds = if (selected) selectedIds - song.id else selectedIds + song.id },
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))
