@@ -25,6 +25,7 @@ class UnifiedMusicService(
     data class SearchResult(
         val tracks: List<MusicTrack>,
         val failures: List<SearchFailure> = emptyList(),
+        val aggregated: List<AggregatedTrack> = emptyList(),
     )
 
     suspend fun searchSongs(
@@ -73,10 +74,54 @@ class UnifiedMusicService(
 
         // Keep provider results distinct. Same-title tracks are not silently
         // merged here because their rights/quality/account availability differ.
+        val tracks = requests.flatMap(ProviderResult::tracks)
         SearchResult(
-            tracks = requests.flatMap(ProviderResult::tracks),
+            tracks = tracks,
             failures = requests.mapNotNull(ProviderResult::failure),
+            aggregated = TrackAggregation.aggregate(tracks),
         )
+    }
+
+    data class AggregationResult(
+        val tracks: List<MusicTrack>,
+        val failures: List<SearchFailure> = emptyList(),
+    )
+
+    suspend fun collectAggregationTracks(
+        sources: Set<MusicSource>,
+        pageSizePerProvider: Int = 100,
+    ): AggregationResult = coroutineScope {
+        val results = MusicSource.entries.filter(sources::contains).map { source ->
+            async {
+                val capability = registry[source] as? LocalAggregationCapability
+                if (capability == null) {
+                    ProviderResult(source, emptyList(), null)
+                } else {
+                    runCatching { capability.aggregationTracks(page = 1, pageSize = pageSizePerProvider.coerceIn(1, 200)).items }
+                        .fold({ ProviderResult(source, it, null) }, { ProviderResult(source, emptyList(), SearchFailure(source, it.message ?: "${source.displayName} 聚合数据读取失败")) })
+                }
+            }
+        }.awaitAll()
+        AggregationResult(results.flatMap(ProviderResult::tracks), results.mapNotNull(ProviderResult::failure))
+    }
+
+    suspend fun collectRecommendationCandidates(
+        sources: Set<MusicSource>,
+        limitPerProvider: Int = 30,
+    ): List<MusicTrack> = coroutineScope {
+        MusicSource.entries.filter(sources::contains).map { source ->
+            async {
+                val feed = registry[source] as? HomeFeedCapability ?: return@async emptyList()
+                runCatching {
+                    val home = feed.homeFeed(
+                        playlistLimit = 6,
+                        newSongLimit = limitPerProvider.coerceIn(1, 50),
+                        rankingLimit = 4,
+                    )
+                    home.newSongs + home.rankings.flatMap { it.previewTracks }
+                }.getOrDefault(emptyList())
+            }
+        }.awaitAll().flatten().distinctBy { "${it.id.source.storageValue}:${it.id.value}" }
     }
 
     private data class ProviderResult(

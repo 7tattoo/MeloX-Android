@@ -2,6 +2,8 @@ package com.lladlam.melox.core.provider.netease
 
 import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.NeteaseQualityClient
+import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.AudioQualityTier
 import com.lladlam.melox.core.music.model.MusicAlbumRef
@@ -13,6 +15,7 @@ import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
 import com.lladlam.melox.core.music.model.ProviderTrackMetadata
 import com.lladlam.melox.core.music.provider.LyricsCapability
+import com.lladlam.melox.core.music.provider.LocalAggregationCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
 import com.lladlam.melox.core.music.provider.MusicProvider
 import com.lladlam.melox.core.music.provider.PlaybackCapability
@@ -28,9 +31,9 @@ import okhttp3.OkHttpClient
  * MeloX iOS migrations can keep their current one-to-one structure.
  */
 class NeteaseProvider(
-    cookieProvider: () -> String = { "" },
-    httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
-) : MusicProvider, SearchCapability, LyricsCapability, PlaybackCapability {
+    private val cookieProvider: () -> String = { "" },
+    private val httpClient: OkHttpClient = com.lladlam.melox.core.network.MeloXHttpClient.shared,
+) : MusicProvider, SearchCapability, LyricsCapability, PlaybackCapability, LocalAggregationCapability {
     override val source: MusicSource = MusicSource.Netease
     override val displayName: String = source.displayName
     override val capabilities: Set<MusicCapability> = setOf(
@@ -105,6 +108,34 @@ class NeteaseProvider(
 
     override suspend fun lyrics(track: MusicTrack): LyricsDocument =
         searchClient.lyrics(track.requireNeteaseId())
+
+    override suspend fun aggregationTracks(page: Int, pageSize: Int): MusicPage<MusicTrack> =
+        withContext(Dispatchers.IO) {
+            if (page > 1) return@withContext MusicPage(emptyList(), page, pageSize, 0L, false)
+            val cookie = cookieProvider()
+            val userId = cookie
+                .takeIf { NeteaseSessionStore.containsMusicU(it) }
+                ?.let { runCatching { searchClient.accountProfile(it).userId }.getOrNull() }
+                ?: return@withContext MusicPage(emptyList(), page, pageSize, 0L, false)
+            val snapshot = NeteaseLibraryClient(cookieProvider, httpClient).snapshot(userId)
+            val songs = (snapshot.likedSongs + snapshot.recentSongs).distinctBy { it.id }
+            MusicPage(
+                items = songs.map { song ->
+                    MusicTrack(
+                        id = MusicResourceId(MusicSource.Netease, song.id.toString()),
+                        title = song.name,
+                        artists = song.artists.split(" / ").map(String::trim).filter(String::isNotBlank).map { MusicArtistRef(name = it) },
+                        album = song.album.takeIf(String::isNotBlank)?.let { MusicAlbumRef(name = it, artworkUrl = song.artworkUrl) },
+                        artworkUrl = song.artworkUrl,
+                        durationMs = song.durationMs.takeIf { it > 0L },
+                        providerMetadata = ProviderTrackMetadata.Netease(song.id),
+                    )
+                },
+                page = page,
+                pageSize = pageSize,
+                total = songs.size.toLong(),
+            )
+        }
 
     override suspend fun resolvePlayback(
         track: MusicTrack,

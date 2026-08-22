@@ -100,6 +100,7 @@ import com.lladlam.melox.core.lyrics.LyricRomanizationAligner
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.lyrics.withPseudoTiming
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.MeloXAppVisibility
 import com.lladlam.melox.ui.settings.MeloXLyricsStyle
 import com.lladlam.melox.ui.settings.MeloXLyricsRenderingQuality
 import com.lladlam.melox.ui.settings.MeloXLyricAnnotationDisplayMode
@@ -299,11 +300,11 @@ private fun MeloXAppleMusicLyricsPanel(
     val interludes = remember(lines) { sourceLyricInterludes(lines) }
     val interludeByLyricIndex = remember(interludes) { interludes.associateBy { it.followingLyricIndex } }
     var activeInterludeIndex by remember(document) { mutableIntStateOf(-1) }
-    LaunchedEffect(state.isPlaying, mediaId, document, hasSyllableSync, lineAdvanceMs, refreshRate) {
+    LaunchedEffect(state.isPlaying, mediaId, document, hasSyllableSync, lineAdvanceMs, refreshRate, MeloXAppVisibility.isForeground) {
         var lastFrameNanos = 0L
         val minimumFrameNanos = 1_000_000_000L / refreshRate.coerceIn(30, 120)
         while (true) {
-            if (!activeState.value) {
+            if (!activeState.value || !MeloXAppVisibility.isForeground) {
                 delay(200L)
                 continue
             }

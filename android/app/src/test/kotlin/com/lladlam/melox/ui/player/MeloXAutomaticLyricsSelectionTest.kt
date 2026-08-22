@@ -51,6 +51,29 @@ class MeloXAutomaticLyricsSelectionTest {
     }
 
     @Test
+    fun nonWordSyncedAmlLFallsBackToWordSyncedQq() {
+        val selected = selectAutomaticLyrics(
+            listOf(
+                AutoLyricCandidate(0, document("AMLL 行级", wordSynced = false, translation = "translation")),
+                AutoLyricCandidate(1, document("QQ 逐字", wordSynced = true)),
+                AutoLyricCandidate(2, document("网易 逐字", wordSynced = true)),
+            ),
+        )
+        assertEquals(document("QQ 逐字", wordSynced = true), selected)
+    }
+
+    @Test
+    fun whenNoSourceHasWordTimingPriorityStillChoosesNonEmptyAmlL() {
+        val selected = selectAutomaticLyrics(
+            listOf(
+                AutoLyricCandidate(0, document("AMLL 行级", wordSynced = false)),
+                AutoLyricCandidate(1, document("QQ 行级", wordSynced = false)),
+            ),
+        )
+        assertEquals(document("AMLL 行级", wordSynced = false), selected)
+    }
+
+    @Test
     fun originalDoesNotMatchDjLiveRemixOrInstrumental() {
         listOf(
             "提瓦特民谣 DJ版",

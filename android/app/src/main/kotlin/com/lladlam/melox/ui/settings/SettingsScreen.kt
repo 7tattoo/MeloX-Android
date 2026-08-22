@@ -91,6 +91,9 @@ import com.lladlam.melox.core.network.MeloXMessageContact
 import com.lladlam.melox.core.network.MeloXPrivateMessage
 import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
+import com.lladlam.melox.core.recommendation.LocalAnalysisStage
+import com.lladlam.melox.core.recommendation.LocalRecommendationEngine
+import com.lladlam.melox.core.recommendation.LocalRecommendationStore
 import com.lladlam.melox.core.recognition.SongRecognitionClient
 import com.lladlam.melox.core.recognition.SongRecognitionResult
 import com.lladlam.melox.core.update.MeloXRelease
@@ -142,6 +145,7 @@ private enum class SettingsRoute(val title: String) {
     TabLayout("页面与标签栏"),
     General("通用"),
     About("关于 MeloX"),
+    Privacy("隐私与本地算法"),
     Developer("开发者选项"),
     Experimental("测试功能尝鲜"),
 }
@@ -175,6 +179,7 @@ private val SettingsSections = listOf(
     )),
     SettingsSection("关于", listOf(
         SettingsItem(SettingsRoute.About, "版本、项目主页与开源信息", "ⓘ", "GitHub 更新 开源 许可"),
+        SettingsItem(SettingsRoute.Privacy, "本地数据、个性化推荐与算法进度", "◎", "隐私 算法 推荐 本地 数据 同意"),
         SettingsItem(SettingsRoute.Developer, "播放器诊断与迁移状态", "⌘", "BeatNet 节拍 调试 日志"),
         SettingsItem(SettingsRoute.Experimental, "预览尚未稳定的新功能", "✦", "实验 测试 歌词 强绑定"),
     )),
@@ -196,6 +201,11 @@ fun SettingsScreen(
     val rootScrollState = rememberScrollState()
 
     LaunchedEffect(Unit) { MeloXSettingsPreferences.initialize(context) }
+    LaunchedEffect(Unit) {
+        if (LocalRecommendationStore.isAlgorithmEnabled(context) && LocalRecommendationStore.hasPersonalizationConsent(context)) {
+            LocalRecommendationEngine.start(context)
+        }
+    }
     LaunchedEffect(initialRouteRequest) {
         initialRouteRequest?.let { requested ->
             route = SettingsRoute.entries.firstOrNull { it.name == requested }
@@ -405,8 +415,101 @@ private fun SettingsDetailScreen(route: SettingsRoute, onBack: () -> Unit) {
             SettingsRoute.TabLayout -> TabLayoutSettings(context)
             SettingsRoute.General -> GeneralSettings(context)
             SettingsRoute.About -> AboutSettings(context)
+            SettingsRoute.Privacy -> PrivacySettings(context)
             SettingsRoute.Developer -> DeveloperSettings()
             SettingsRoute.Experimental -> ExperimentalSettings(context)
+        }
+    }
+}
+
+@Composable
+private fun PrivacySettings(context: android.content.Context) {
+    var algorithmEnabled by remember { mutableStateOf(LocalRecommendationStore.isAlgorithmEnabled(context)) }
+    var consent by remember { mutableStateOf(LocalRecommendationStore.hasPersonalizationConsent(context)) }
+    var showPolicy by remember { mutableStateOf(false) }
+    var showClearPersonalization by remember { mutableStateOf(false) }
+    var secondsLeft by remember { mutableIntStateOf(10) }
+    val progress by LocalRecommendationStore.progress
+
+    LaunchedEffect(showPolicy) {
+        if (!showPolicy) return@LaunchedEffect
+        secondsLeft = 10
+        while (secondsLeft > 0) { kotlinx.coroutines.delay(1_000L); secondsLeft-- }
+    }
+
+    SettingsGlassGroup {
+        Column(Modifier.padding(16.dp)) {
+            Text("本地数据与算法", fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+            Text("MeloX 不上传播放记录、收藏、推荐模型或账号凭据。规则推荐无需个性化同意；轻量模型只在你明确同意后读取本地行为数据。", modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f), fontSize = 13.sp, lineHeight = 19.sp)
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        SettingsExternalToggleRow("本地算法模式", algorithmEnabled, "开启后在后台并行运行规则推荐与本地轻量模型。") {
+            algorithmEnabled = it
+            LocalRecommendationStore.setAlgorithmEnabled(context, it)
+            if (it && consent) LocalRecommendationEngine.start(context) else if (!it) LocalRecommendationEngine.stop()
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        Text("本地个性化推荐", modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(if (consent) "已同意，本地轻量模型可以读取本地播放行为。" else "未同意。请阅读隐私协议后开启。", modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
+        SettingsActionButton(if (consent) "撤回同意并删除本地模型" else "阅读隐私协议并开启") {
+            if (consent) {
+                consent = false
+                LocalRecommendationStore.clearPersonalization(context)
+                LocalRecommendationEngine.stop()
+            } else showPolicy = true
+        }
+        SettingsActionButton("清空全部个性化推荐数据") { showClearPersonalization = true }
+    }
+    Spacer(Modifier.height(10.dp))
+    SettingsGlassGroup {
+        Column(Modifier.padding(16.dp)) {
+            Text("算法状态", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (progress.isFullAnalysis) "后台全量分析：${progress.stage} · ${progress.processed}/${progress.total}"
+                else "快速更新：${progress.stage}",
+                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
+            )
+            Text("模型后端：${progress.modelBackend}", modifier = Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f))
+            progress.message?.let { Text(it, modifier = Modifier.padding(top = 5.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f)) }
+        }
+    }
+    SettingsActionButton("立即开始后台全量分析") {
+        if (algorithmEnabled && consent) LocalRecommendationEngine.startFullAnalysis(context)
+    }
+    if (showPolicy) {
+        MeloXGlassDialog(visible = true, onDismiss = { if (secondsLeft == 0) showPolicy = false }) {
+            Text("本地个性化推荐隐私协议", style = MaterialTheme.typography.titleMedium)
+            Text("开启后，MeloX 将在本机读取播放次数、完成度、跳过记录、喜欢状态和来源偏好，用于训练与运行轻量推荐模型。数据不上传服务器，不读取密码、Cookie、私信或麦克风原始音频。你可以随时撤回同意并删除模型数据。", modifier = Modifier.padding(top = 10.dp), fontSize = 13.sp, lineHeight = 19.sp)
+            Spacer(Modifier.height(16.dp))
+            SettingsActionButton(if (secondsLeft > 0) "请阅读后等待 ${secondsLeft} 秒" else "同意并开启") {
+                if (secondsLeft == 0) {
+                    consent = true; showPolicy = false
+                    LocalRecommendationStore.setPersonalizationConsent(context, true)
+                    LocalRecommendationStore.setConsentAt(context, System.currentTimeMillis())
+                    if (algorithmEnabled) LocalRecommendationEngine.start(context)
+                }
+            }
+        }
+    }
+    if (showClearPersonalization) {
+        MeloXGlassDialog(visible = true, onDismiss = { showClearPersonalization = false }) {
+            Text("清空个性化推荐数据？", style = MaterialTheme.typography.titleMedium)
+            Text("将销毁本地模型、歌曲特征、推荐索引、分析进度和隐私同意状态。平台登录、原始播放历史和收藏不会被删除。", modifier = Modifier.padding(top = 10.dp), fontSize = 13.sp, lineHeight = 19.sp)
+            Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SettingsActionButton("取消", Modifier.weight(1f)) { showClearPersonalization = false }
+                SettingsDangerButton("清空", Modifier.weight(1f)) {
+                    LocalRecommendationEngine.stop()
+                    LocalRecommendationStore.clearPersonalization(context)
+                    consent = false
+                    showClearPersonalization = false
+                }
+            }
         }
     }
 }
@@ -499,6 +602,7 @@ private fun ExperimentalSettings(context: android.content.Context) {
     var showQQLogin by remember { mutableStateOf(false) }
     var showKugouLogin by remember { mutableStateOf(false) }
     var showClearPlaybackConfirmation by remember { mutableStateOf(false) }
+    var showClearLyricBindingsConfirmation by remember { mutableStateOf(false) }
     var refreshRevision by remember { mutableIntStateOf(0) }
 
     if (showNeteaseLogin) {
@@ -632,6 +736,35 @@ private fun ExperimentalSettings(context: android.content.Context) {
             enabled = value
             MeloXSettingsPreferences.setBoolean(context, "experimental_lyric_strong_binding", value)
             if (!value) com.lladlam.melox.core.lyrics.LyricBindingStore.clear(context)
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    SettingsDangerButton("清除强绑定配置") {
+        showClearLyricBindingsConfirmation = true
+    }
+    MeloXGlassDialog(
+        visible = showClearLyricBindingsConfirmation,
+        onDismiss = { showClearLyricBindingsConfirmation = false },
+    ) {
+        Text("清除所有歌词强绑定？", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "此操作会删除歌曲与歌词来源之间保存的全部绑定。强绑定开关保持不变，之后播放歌曲时会重新自动选择并建立绑定。",
+            modifier = Modifier.padding(top = 8.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
+            fontSize = 13.sp,
+            lineHeight = 19.sp,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SettingsActionButton("取消", Modifier.weight(1f)) {
+                showClearLyricBindingsConfirmation = false
+            }
+            SettingsDangerButton("清除", Modifier.weight(1f)) {
+                com.lladlam.melox.core.lyrics.LyricBindingStore.clear(context)
+                showClearLyricBindingsConfirmation = false
+            }
         }
     }
 }
@@ -2132,9 +2265,9 @@ private fun SettingsResetCard() {
 }
 
 @Composable
-private fun SettingsDangerButton(title: String, onClick: () -> Unit) {
+private fun SettingsDangerButton(title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().height(54.dp).meloXLiquidButton(
+        modifier.fillMaxWidth().height(54.dp).meloXLiquidButton(
             shape = RoundedCornerShape(27.dp),
             tint = MaterialTheme.colorScheme.error.copy(alpha = .25f),
             surfaceColor = MaterialTheme.colorScheme.error.copy(alpha = .20f),

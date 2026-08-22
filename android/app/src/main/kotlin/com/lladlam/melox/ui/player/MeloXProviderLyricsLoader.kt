@@ -1,6 +1,8 @@
 package com.lladlam.melox.ui.player
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.lyrics.LyricsDocument
@@ -41,7 +43,7 @@ import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
  */
 internal object MeloXProviderLyricsLoader {
     private const val MaxCachedDocuments = 24
-    private const val AutomaticSelectionCacheVersion = 2
+    private const val AutomaticSelectionCacheVersion = 3
     private val workerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
     private val inFlight = mutableMapOf<String, Deferred<LyricsDocument>>()
@@ -155,7 +157,13 @@ internal object MeloXProviderLyricsLoader {
         snapshot: LyricTrackSnapshot,
     ): LyricsDocument {
         if (snapshot.automaticSelection) {
-            snapshot.binding?.let { return loadBinding(appContext, it) }
+            snapshot.binding?.let { binding ->
+                val bound = loadBinding(appContext, binding)
+                // Bindings created by the former source-first algorithm may
+                // point at line-timed NetEase lyrics. Do not let such a stale
+                // binding suppress a newly available QRC/YRC word timeline.
+                if (hasWordTiming(bound)) return bound
+            }
             return loadAutomatic(appContext, snapshot)
         }
         return loadCurrentProvider(appContext, snapshot)
@@ -173,13 +181,32 @@ internal object MeloXProviderLyricsLoader {
         )
         val candidates = orderedSources.mapIndexed { priority, source ->
             async {
-                val resolved = withTimeoutOrNull(10_000L) {
+                val startedAt = SystemClock.elapsedRealtime()
+                val timeoutMs = when (source) {
+                    LyricAutoSource.QQMusic -> 30_000L
+                    LyricAutoSource.AmlL -> 12_000L
+                    LyricAutoSource.Netease,
+                    LyricAutoSource.Current -> 15_000L
+                }
+                val resolved = withTimeoutOrNull(timeoutMs) {
                     loadMatchedSource(appContext, snapshot, source)
                 } ?: ResolvedLyrics(LyricsDocument(emptyList()), null)
+                Log.d(
+                    "MeloXLyricsAuto",
+                    "source=$source elapsed=${SystemClock.elapsedRealtime() - startedAt}ms " +
+                        "lines=${resolved.document.lines.size} " +
+                        "wordLines=${resolved.document.lines.count { it.syllables.isNotEmpty() }} " +
+                        "timeout=${resolved.document.lines.isEmpty() && SystemClock.elapsedRealtime() - startedAt >= timeoutMs}",
+                )
                 AutoLyricCandidate(priority, resolved.document, resolved.binding)
             }
         }.awaitAll()
         val selected = selectAutomaticLyricCandidate(candidates)
+        Log.d(
+            "MeloXLyricsAuto",
+            "selectedPriority=${selected?.priority} lines=${selected?.document?.lines?.size ?: 0} " +
+                "wordLines=${selected?.document?.lines?.count { it.syllables.isNotEmpty() } ?: 0}",
+        )
         if (selected != null) {
             if (MeloXSettingsRuntime.lyricStrongBindingEnabled) {
                 selected.binding?.let { LyricBindingStore.write(appContext, snapshot.resourceId, it) }
@@ -367,11 +394,14 @@ internal fun selectAutomaticLyrics(candidates: List<AutoLyricCandidate>): Lyrics
 
 internal fun selectAutomaticLyricCandidate(candidates: List<AutoLyricCandidate>): AutoLyricCandidate? =
     candidates
-        .filter { it.document.lines.isNotEmpty() }
-        .minWithOrNull(
-            compareBy<AutoLyricCandidate> { it.priority }
-                .thenByDescending { lyricQualityScore(it.document) },
-        )
+        .filter { it.document.lines.isNotEmpty() && hasWordTiming(it.document) }
+        .minByOrNull(AutoLyricCandidate::priority)
+        ?: candidates
+            .filter { it.document.lines.isNotEmpty() }
+            .minByOrNull(AutoLyricCandidate::priority)
+
+private fun hasWordTiming(document: LyricsDocument): Boolean =
+    document.lines.any { line -> line.syllables.isNotEmpty() }
 
 private fun lyricQualityScore(document: LyricsDocument): Int =
     document.lines.count { it.syllables.isNotEmpty() } * 100 +

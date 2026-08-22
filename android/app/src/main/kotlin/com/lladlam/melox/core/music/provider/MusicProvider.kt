@@ -139,6 +139,11 @@ interface UserLibraryCapability {
     ): MusicPage<MusicPlaylistSummary>
 }
 
+/** Optional read-only data surface used by local aggregation analysis. */
+interface LocalAggregationCapability {
+    suspend fun aggregationTracks(page: Int = 1, pageSize: Int = 100): MusicPage<MusicTrack>
+}
+
 /** Read-only playlist surface shared by provider-specific Experience UIs. */
 interface PlaylistCapability {
     suspend fun playlistDetail(

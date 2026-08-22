@@ -98,6 +98,8 @@ import com.lladlam.melox.core.library.NeteaseLibraryCache
 import com.lladlam.melox.core.library.NeteaseLibrarySnapshot
 import com.lladlam.melox.core.library.NeteasePlaylistDetail
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
+import com.lladlam.melox.core.recommendation.LocalRecommendationStore
+import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.core.music.model.MusicAccountSummary
 import com.lladlam.melox.core.music.model.MusicSource
@@ -200,6 +202,7 @@ fun LibraryScreen(
     }
     var selectedPage by remember(source, forcedPageName) { mutableStateOf(initialLibraryPage) }
     var selectedPlaylist by remember(source, session.cookie) { mutableStateOf<NeteasePlaylistSummary?>(null) }
+    var showLocalRecommendations by remember(source) { mutableStateOf(false) }
     var snapshot by remember(source, session.cookie) { mutableStateOf<NeteaseLibrarySnapshot?>(null) }
     var providerAccount by remember(source) { mutableStateOf<MusicAccountSummary?>(null) }
     var loading by remember(source, session.cookie) { mutableStateOf(source != MusicSource.Netease) }
@@ -430,6 +433,8 @@ fun LibraryScreen(
 
                             MeloXLibraryPage.Playlists -> MeloXLibraryPlaylistsPage(
                                 playlists = data.playlists,
+                                localRecommendations = LocalRecommendationStore.readRecommendedTracks(context),
+                                onLocalRecommendationsClick = { showLocalRecommendations = true },
                                 onPlaylistClick = { selectedPlaylist = it },
                                 listState = playlistListState,
                                 sharedTransitionScope = sharedScope,
@@ -469,6 +474,11 @@ fun LibraryScreen(
             }
         }
       }
+    }
+    if (showLocalRecommendations) {
+        LocalRecommendationPlaylistScreen(
+            onBack = { showLocalRecommendations = false },
+        )
     }
 }
 
@@ -1183,6 +1193,8 @@ private fun MeloXLibraryTrackRow(
 @Composable
 private fun MeloXLibraryPlaylistsPage(
     playlists: List<NeteasePlaylistSummary>,
+    localRecommendations: List<com.lladlam.melox.core.music.model.MusicTrack> = emptyList(),
+    onLocalRecommendationsClick: () -> Unit = {},
     onPlaylistClick: (NeteasePlaylistSummary) -> Unit,
     listState: LazyListState,
     sharedTransitionScope: SharedTransitionScope,
@@ -1204,6 +1216,23 @@ private fun MeloXLibraryPlaylistsPage(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = MeloXBottomContentClearance),
     ) {
+        if (localRecommendations.isNotEmpty()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(66.dp).clickable(onClick = onLocalRecommendationsClick).padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    AsyncImage(localRecommendations.firstOrNull()?.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)))
+                    Column(Modifier.weight(1f)) {
+                        Text("MeloX 为你推荐", fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("本地算法 · ${localRecommendations.size} 首 · 只读", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .48f))
+                    }
+                    MeloXActionIcon("›", Modifier.size(18.dp), MaterialTheme.colorScheme.onBackground.copy(alpha = .4f))
+                }
+                MeloXInsetDivider(leading = 74.dp)
+            }
+        }
         item {
             Text(
                 text = "歌单",
@@ -1268,6 +1297,43 @@ private fun MeloXLibraryPlaylistsPage(
                 )
             }
             MeloXInsetDivider(leading = 84.dp)
+        }
+    }
+}
+
+@Composable
+private fun LocalRecommendationPlaylistScreen(onBack: () -> Unit) {
+    val context = LocalContext.current.applicationContext
+    val tracks = LocalRecommendationStore.readRecommendedTracks(context)
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+        MeloXPlaylistToolbar(
+            foreground = MaterialTheme.colorScheme.onBackground,
+            onBack = onBack,
+            onShare = {},
+            showMore = false,
+            onMore = {},
+        )
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+            Text("MeloX 为你推荐", fontSize = 25.sp, fontWeight = FontWeight.Bold)
+            Text("本地规则与轻量模型生成 · 只读内部歌单 · ${tracks.size} 首", modifier = Modifier.padding(top = 5.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .54f))
+        }
+        if (tracks.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("暂无达到相似度阈值的推荐歌曲\n请继续播放、收藏或完成歌曲后重新分析", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .55f))
+            }
+            return
+        }
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = MeloXBottomContentClearance)) {
+            itemsIndexed(tracks, key = { _, track -> "local-recommendation-${track.id.source.storageValue}-${track.id.value}" }) { index, track ->
+                Row(Modifier.fillMaxWidth().clickable { ProviderPlaybackCommands.playQueue(context, tracks, track.id) }.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${index + 1}", Modifier.width(38.dp), color = MaterialTheme.colorScheme.onBackground.copy(alpha = .45f), textAlign = TextAlign.Center)
+                    AsyncImage(track.artworkUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(track.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                        Text("${track.artistText} · ${track.id.source.displayName}", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = .5f))
+                    }
+                }
+            }
         }
     }
 }

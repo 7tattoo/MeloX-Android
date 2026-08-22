@@ -66,6 +66,8 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import coil3.compose.AsyncImage
 import com.lladlam.melox.playback.MeloXPlaybackService
+import com.lladlam.melox.core.recommendation.LocalRecommendationEngine
+import com.lladlam.melox.core.recommendation.LocalRecommendationStore
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.playback.MeloXPlaybackModePreferences
 import com.lladlam.melox.playback.MeloXPlaybackModeRuntime
@@ -101,6 +103,8 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
     private val downloadStore = MeloXDownloadStore.get(appContext)
     private val sleepTimerHandler = Handler(Looper.getMainLooper())
     private var pendingMediaClearRunnable: Runnable? = null
+    private var recordedMediaId: String? = null
+    private var recordedCompletion = false
 
     var mediaId by mutableStateOf<String?>(null)
         private set
@@ -203,6 +207,14 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         durationMs = player.duration
             .takeUnless { it == C.TIME_UNSET || it < 0L }
             ?: 0L
+        if (recordedMediaId != item.mediaId) {
+            recordedMediaId = item.mediaId
+            recordedCompletion = false
+            LocalRecommendationStore.recordPlayback(appContext, item.mediaId, title, artist)
+            if (LocalRecommendationStore.isAlgorithmEnabled(appContext) && LocalRecommendationStore.hasPersonalizationConsent(appContext)) {
+                LocalRecommendationEngine.start(appContext)
+            }
+        }
         hasPrevious = player.hasPreviousMediaItem()
         hasNext = player.hasNextMediaItem()
         currentIndex = player.currentMediaItemIndex
@@ -238,6 +250,15 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         durationMs = player.duration
             .takeUnless { it == C.TIME_UNSET || it < 0L }
             ?: 0L
+        if (!recordedCompletion && durationMs > 0L && positionMs >= (durationMs * .85f).toLong()) {
+            recordedCompletion = true
+            mediaId?.let { key ->
+                LocalRecommendationStore.recordPlayback(appContext, key, title, artist, completed = true)
+                if (LocalRecommendationStore.isAlgorithmEnabled(appContext) && LocalRecommendationStore.hasPersonalizationConsent(appContext)) {
+                    LocalRecommendationEngine.start(appContext)
+                }
+            }
+        }
     }
 
     private fun scheduleDeferredMediaClear(player: Player) {
@@ -330,6 +351,9 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
 
     fun next() {
         controller?.let { player ->
+            if (!recordedCompletion && player.currentPosition < 30_000L) {
+                mediaId?.let { LocalRecommendationStore.recordPlayback(appContext, it, title, artist, skipped = true) }
+            }
             PlaybackCommands.prioritizeManualQueue(player)
             player.seekToNextMediaItem()
         }

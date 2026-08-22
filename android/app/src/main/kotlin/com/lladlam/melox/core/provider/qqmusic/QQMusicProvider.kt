@@ -21,6 +21,7 @@ import com.lladlam.melox.core.music.provider.CatalogSearchCapability
 import com.lladlam.melox.core.music.provider.FavoriteCapability
 import com.lladlam.melox.core.music.provider.HomeFeedCapability
 import com.lladlam.melox.core.music.provider.LyricsCapability
+import com.lladlam.melox.core.music.provider.LocalAggregationCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
 import com.lladlam.melox.core.music.provider.MusicProvider
 import com.lladlam.melox.core.music.provider.PlaybackCapability
@@ -44,7 +45,8 @@ class QQMusicProvider(
     PlaylistCapability,
     RankingCapability,
     AlbumCapability,
-    ArtistCapability {
+    ArtistCapability,
+    LocalAggregationCapability {
     override val source: MusicSource = MusicSource.QQMusic
     override val displayName: String = source.displayName
     override val capabilities: Set<MusicCapability> = setOf(
@@ -135,6 +137,15 @@ class QQMusicProvider(
 
     override suspend fun userPlaylists(page: Int, pageSize: Int): MusicPage<MusicPlaylistSummary> =
         api.userPlaylists(page, pageSize)
+
+    override suspend fun aggregationTracks(page: Int, pageSize: Int): MusicPage<MusicTrack> {
+        val playlists = api.userPlaylists(page = 1, pageSize = 20).items
+        val tracks = playlists.flatMap { playlist ->
+            runCatching { this@QQMusicProvider.playlistDetail(playlist, page = 1, pageSize = pageSize).tracks }
+                .getOrDefault(emptyList())
+        }.distinctBy { it.id.value }
+        return MusicPage(tracks, page, pageSize, tracks.size.toLong())
+    }
 
     override suspend fun playlistDetail(
         playlist: MusicPlaylistSummary,

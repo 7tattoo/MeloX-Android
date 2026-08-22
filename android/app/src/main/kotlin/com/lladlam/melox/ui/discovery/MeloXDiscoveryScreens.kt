@@ -76,6 +76,7 @@ import com.lladlam.melox.core.music.provider.MeloXLegacyUiBridge
 import com.lladlam.melox.core.music.provider.PlaylistCapability
 import com.lladlam.melox.core.music.provider.RankingCapability
 import com.lladlam.melox.core.music.provider.UserLibraryCapability
+import com.lladlam.melox.core.recommendation.LocalRecommendationStore
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackCommands
 import com.lladlam.melox.ui.account.MeloXAccountActivity
@@ -207,6 +208,8 @@ private fun NeteaseHomeDataScreen(onOpenTool: (String) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var selectedCollection by remember { mutableStateOf<DiscoveryCollection?>(null) }
     var activeAction by remember { mutableStateOf<String?>(null) }
+    var localRecommendations by remember { mutableStateOf(LocalRecommendationStore.readRecommendations(context)) }
+    var localCandidates by remember { mutableStateOf(LocalRecommendationStore.readCandidateTracks(context)) }
     val homeCacheKey = "${session.cookie.hashCode()}_${MeloXSettingsRuntime.musicArea}_${MeloXSettingsRuntime.podcastsEnabled}"
 
     selectedCollection?.let { collection ->
@@ -236,6 +239,8 @@ private fun NeteaseHomeDataScreen(onOpenTool: (String) -> Unit) {
     }
 
     LaunchedEffect(homeCacheKey) {
+        localRecommendations = LocalRecommendationStore.readRecommendations(context)
+        localCandidates = LocalRecommendationStore.readCandidateTracks(context)
         content = cache.loadHomeContent(homeCacheKey)
         if (session.isLoggedIn) session.refreshProfile()
         if (NeteaseLibraryCache.beginHomeColdStartRefresh(homeCacheKey)) refresh(false)
@@ -243,6 +248,14 @@ private fun NeteaseHomeDataScreen(onOpenTool: (String) -> Unit) {
 
     val blocks = content?.let { value ->
         buildList<HomeBlock> {
+            if (localRecommendations.isNotEmpty()) {
+                val orderedCandidates = localRecommendations.mapNotNull { recommendation ->
+                    localCandidates.firstOrNull { candidate ->
+                        candidate.title == recommendation.title && candidate.artistText == recommendation.artist
+                    }?.let { DiscoveryTrack.Provider(it) }
+                }
+                if (orderedCandidates.isNotEmpty()) add(HomeBlock.Tracks("MeloX 为你推荐", "跨平台本地算法", orderedCandidates))
+            }
             MeloXSettingsRuntime.homeSectionOrder.forEach { section ->
                 when (section) {
                     "QuickActions" -> if (MeloXSettingsRuntime.homeQuickActionsEnabled) add(HomeBlock.QuickActions)
