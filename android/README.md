@@ -2,7 +2,7 @@
 
 这里是 MeloX Android 的原生 Android 工程。
 
-当前开发版本：`0.3.4-Dev`（`versionCode 7`）。
+当前开发版本：`0.4.1-Beta`（`versionCode 9`）。
 
 完整的项目介绍、功能状态、许可证、第三方项目与构建说明请参阅仓库根目录的 [`README.md`](../README.md)。
 

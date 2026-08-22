@@ -2,7 +2,7 @@
 
 [![Android](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml/badge.svg)](https://github.com/lladlam/MeloX-Android/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.0--Beta-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.0-Beta)
+[![Version](https://img.shields.io/badge/version-0.4.1--Beta-ff2d55.svg)](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.1-Beta)
 
 <p align="center">
   <img src="android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png" width="128" alt="MeloX Android icon" />
@@ -17,16 +17,13 @@
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
 
-## 当前版本：0.4.0-Beta
+## 当前版本：0.4.1-Beta
 
-`0.4.0-Beta` 完成一轮以 Mei Android 与 MeloX iOS 为参照的业务、界面和性能收敛：补齐歌单写操作、本地音乐导出与分类、集合批量下载、十段均衡器和通知歌词配置；新增自适应页面、完整高层玻璃组件、Classic 播放器和 18 套独立 TextPV 风格；同时治理后台轮询、歌词逐帧重组、网络/媒体缓存、包体和 Release 优化。
+`0.4.1-Beta` 集中完善高级歌词、独立播放账号和 Android 稳定性：支持 AMLL TTML、QQ Music QRC 与网易云 YRC 的逐字、对唱和伴唱歌词，增加自动歌词选择与强绑定；补充网易云、QQ 音乐和酷狗第二播放账号；修复逐字渲染、登录流程、增量 DEX 启动崩溃，并优化 SF Symbols、MiniPlayer、页面过渡与操作弹层。
 
-- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.0-Beta)
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.1-Beta)
 - 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
-- 审计证据与逐项修复状态：[0.4.0-Beta 审计与修复计划](docs/0.4.0-beta-audit-and-remediation.md)
-
-
-> Android 迁移说明：收藏歌曲会按 100 首一批完整读取（不再截断）；播放开始与听歌时长会回传网易云；首页会消费网易云 `/homepage/block/page` 推荐块并在缺块时回退；用户主页/用户搜索、专辑收藏、歌手专辑、评论分页、歌曲/歌单/专辑站内资源分享与全局一起听邀请均已接入。
+- 本次版本说明：[0.4.1-Beta Release Notes](docs/releases/0.4.1-Beta.md)
 
 ## 项目说明
 
@@ -208,7 +205,7 @@ DF:CC:A9:86:5B:87:A4:02:D3:41:98:5A:48:EB:13:2B:D8:67:9D:FA:6D:9D:50:2F:36:5D:D1
 可使用 Android SDK Build Tools 验证：
 
 ```bash
-apksigner verify --verbose --print-certs MeloX-Android-0.4.0-Beta.apk
+apksigner verify --verbose --print-certs MeloX-Android-0.4.1-Beta.apk
 ```
 
 ## 项目结构
