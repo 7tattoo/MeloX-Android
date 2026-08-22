@@ -21,9 +21,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,9 +48,10 @@ import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.library.NeteasePlaylistSummary
 import com.lladlam.melox.core.network.NeteaseMusicOperationsClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
-import com.lladlam.melox.ui.glass.meloXLiquidButton
-import com.lladlam.melox.ui.glass.MeloXGlassSheet
-import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXIosGroupedList
+import com.lladlam.melox.ui.glass.MeloXIosListRow
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,18 +72,56 @@ internal fun MeloXPlaylistActionsOverlay(
     var message by remember(playlist.id,visible){mutableStateOf<String?>(null)}
     LaunchedEffect(visible,playlist.id){if(!visible)return@LaunchedEffect;runCatching{val p=account.accountProfile();withContext(Dispatchers.IO){client.userPlaylistsBlocking(p.userId)}.any{it.id==playlist.id}}.onSuccess{subscribed=it}}
     BackHandler(enabled=visible,onBack=onDismiss)
-    MeloXGlassSheet(visible = visible, onDismiss = onDismiss) {
-            Column(Modifier.fillMaxWidth().padding(horizontal=18.dp, vertical=18.dp)){
-                Text("歌单操作",color=Color.White.copy(alpha=.58f),fontSize=13.sp);Text(playlist.name,color=Color.White,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=3.dp,bottom=10.dp))
-                message?.let{Text(it,color=Color(0xFFFF8A90),fontSize=12.sp)}
-                PAction("分享歌单","↗"){sharePlaylist(context,playlist);onDismiss()}
-                PAction(if(subscribed==true)"取消收藏歌单" else "收藏歌单",if(subscribed==true)"✓" else "+"){
-                    if(busy)return@PAction;val desired=subscribed!=true;busy=true;scope.launch{runCatching{ops.setPlaylistSubscribed(playlist.id,desired)}.onSuccess{subscribed=desired}.onFailure{message=it.message};busy=false}
-                }
-                PAction("刷新","↻"){onRefresh();onDismiss()}
-                if(busy)Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(18.dp),color=Color.White,strokeWidth=2.dp);Spacer(Modifier.size(10.dp));Text("正在处理",color=Color.White.copy(alpha=.6f))}
+    if (visible) ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
+        dragHandle = {
+            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(width = 58.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .24f), RoundedCornerShape(99.dp)),
+                )
             }
+        },
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 18.dp),
+        ) {
+            Text("歌单操作", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 13.sp)
+            Text(playlist.name, color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp, bottom = 10.dp))
+            message?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp)) }
+            MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                PlaylistActionRow("分享歌单", MeloXSymbol.Share, false) { sharePlaylist(context, playlist); onDismiss() }
+                PlaylistActionRow(if (subscribed == true) "取消收藏歌单" else "收藏歌单", if (subscribed == true) MeloXSymbol.Check else MeloXSymbol.Plus, true) {
+                    if (busy) return@PlaylistActionRow
+                    val desired = subscribed != true
+                    busy = true
+                    scope.launch {
+                        runCatching { ops.setPlaylistSubscribed(playlist.id, desired) }
+                            .onSuccess { subscribed = desired }
+                            .onFailure { message = it.message }
+                        busy = false
+                    }
+                }
+                PlaylistActionRow("刷新", MeloXSymbol.Refresh, true) { onRefresh(); onDismiss() }
+            }
+            if (busy) Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                Spacer(Modifier.size(10.dp))
+                Text("正在处理", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+            }
+        }
     }
 }
-@Composable private fun PAction(title:String,symbol:String,onClick:()->Unit){Row(Modifier.fillMaxWidth().height(48.dp).clickable(onClick=onClick).padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){Box(Modifier.size(28.dp),contentAlignment=Alignment.Center){MeloXActionIcon(token=symbol,modifier=Modifier.size(20.dp),color=Color.White.copy(alpha=.86f))};Text(title,color=Color.White,fontSize=16.sp,fontWeight=FontWeight.Medium)}}
+@Composable private fun PlaylistActionRow(title: String, symbol: MeloXSymbol, separator: Boolean, onClick: () -> Unit) {
+    MeloXIosListRow(
+        title = title,
+        leading = { MeloXSymbolIcon(symbol, Modifier.size(22.dp), MaterialTheme.colorScheme.onSurface, iconSize = 21.sp) },
+        showTopSeparator = separator,
+        onClick = onClick,
+    )
+}
 private fun sharePlaylist(context:Context,p:NeteasePlaylistSummary){runCatching{context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,"${p.name}\nhttps://music.163.com/playlist?id=${p.id}"),"分享歌单").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))}}

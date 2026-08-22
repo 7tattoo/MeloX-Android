@@ -17,6 +17,9 @@ import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricSyllable
+import com.lladlam.melox.core.lyrics.LyricAccompaniment
+import com.lladlam.melox.core.lyrics.LyricAgent
+import com.lladlam.melox.core.lyrics.LyricAgentAlignment
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.model.SearchSong
 import com.lladlam.melox.core.network.NeteaseSearchClient
@@ -570,6 +573,9 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                         .put("text", line.text)
                         .put("translation", line.translation ?: "")
                         .put("romanization", line.romanization ?: "")
+                        .put("agentId", line.agent?.id ?: "")
+                        .put("agentName", line.agent?.name ?: "")
+                        .put("agentAlignment", line.agent?.alignment?.name ?: "")
                         .put(
                             "syllables",
                             JSONArray().apply {
@@ -592,6 +598,27 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                                             .put("text", syllable.text)
                                             .put("startTimeMs", syllable.startTimeMs)
                                             .put("endTimeMs", syllable.endTimeMs),
+                                    )
+                                }
+                            },
+                        )
+                        .put(
+                            "accompaniment",
+                            JSONArray().apply {
+                                line.accompaniment.forEach { vocal ->
+                                    put(
+                                        JSONObject()
+                                            .put("timeMs", vocal.timeMs)
+                                            .put("durationMs", vocal.durationMs ?: JSONObject.NULL)
+                                            .put("text", vocal.text)
+                                            .put("agentId", vocal.agent?.id ?: "")
+                                            .put("agentName", vocal.agent?.name ?: "")
+                                            .put("agentAlignment", vocal.agent?.alignment?.name ?: "")
+                                            .put("syllables", JSONArray().apply {
+                                                vocal.syllables.forEach { syllable ->
+                                                    put(JSONObject().put("text", syllable.text).put("startTimeMs", syllable.startTimeMs).put("endTimeMs", syllable.endTimeMs))
+                                                }
+                                            }),
                                     )
                                 }
                             },
@@ -632,6 +659,27 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                         )
                     }
                 }
+                fun decodeAgent(objectValue: JSONObject): LyricAgent? {
+                    val id = objectValue.optString("agentId")
+                    if (id.isBlank()) return null
+                    val alignment = runCatching { LyricAgentAlignment.valueOf(objectValue.optString("agentAlignment")) }
+                        .getOrDefault(LyricAgentAlignment.Normal)
+                    return LyricAgent(id, objectValue.optString("agentName").ifBlank { id }, alignment)
+                }
+                val accompanimentArray = line.optJSONArray("accompaniment") ?: JSONArray()
+                val accompaniment = buildList {
+                    for (a in 0 until accompanimentArray.length()) {
+                        val vocal = accompanimentArray.optJSONObject(a) ?: continue
+                        val vocalSyllablesArray = vocal.optJSONArray("syllables") ?: JSONArray()
+                        val vocalSyllables = buildList {
+                            for (s in 0 until vocalSyllablesArray.length()) {
+                                val item = vocalSyllablesArray.optJSONObject(s) ?: continue
+                                add(LyricSyllable(item.optString("text"), item.optLong("startTimeMs"), item.optLong("endTimeMs")))
+                            }
+                        }
+                        add(LyricAccompaniment(vocal.optLong("timeMs"), vocal.optLong("durationMs", -1L).takeIf { it >= 0L }, vocal.optString("text"), vocalSyllables, agent = decodeAgent(vocal)))
+                    }
+                }
                 add(
                     LyricLine(
                         timeMs = line.optLong("timeMs"),
@@ -641,6 +689,8 @@ class MeloXDownloadStore private constructor(private val context: Context) {
                         translation = line.optString("translation").takeIf(String::isNotBlank),
                         romanization = line.optString("romanization").takeIf(String::isNotBlank),
                         romanizationSyllables = romanizationSyllables,
+                        agent = decodeAgent(line),
+                        accompaniment = accompaniment,
                     ),
                 )
             }

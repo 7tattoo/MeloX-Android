@@ -331,7 +331,7 @@ internal fun MeloXIOSNowPlayingScene(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .clickable(enabled = !artworkVisible, onClick = onShowActions),
+                    .clickable(onClick = onShowActions),
                     contentAlignment = Alignment.Center,
                 ) {
                     MeloXSymbolIcon(

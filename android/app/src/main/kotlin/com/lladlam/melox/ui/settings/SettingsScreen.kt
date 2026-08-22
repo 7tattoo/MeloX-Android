@@ -34,7 +34,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Slider
@@ -66,6 +75,15 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.R
 import com.lladlam.melox.BuildConfig
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.music.provider.PlaybackAccountSlot
+import com.lladlam.melox.core.music.provider.PlaybackAccountStore
+import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.provider.kugou.KugouSessionStore
+import com.lladlam.melox.ui.account.QQMusicLoginScreen
+import com.lladlam.melox.ui.account.KugouLoginScreen
+import com.lladlam.melox.ui.account.NeteaseLoginScreen
+import com.lladlam.melox.playback.ProviderPlaybackQualityRuntime
 import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
@@ -90,6 +108,7 @@ import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXGlassTextField
+import com.lladlam.melox.ui.glass.MeloXGlassDialog
 import com.lladlam.melox.ui.glass.MeloXGlassToggle
 import com.lladlam.melox.ui.glass.MeloXSettingsDropdown
 import com.lladlam.melox.ui.glass.MeloXShapes
@@ -124,6 +143,7 @@ private enum class SettingsRoute(val title: String) {
     General("通用"),
     About("关于 MeloX"),
     Developer("开发者选项"),
+    Experimental("测试功能尝鲜"),
 }
 
 private data class SettingsItem(
@@ -156,6 +176,7 @@ private val SettingsSections = listOf(
     SettingsSection("关于", listOf(
         SettingsItem(SettingsRoute.About, "版本、项目主页与开源信息", "ⓘ", "GitHub 更新 开源 许可"),
         SettingsItem(SettingsRoute.Developer, "播放器诊断与迁移状态", "⌘", "BeatNet 节拍 调试 日志"),
+        SettingsItem(SettingsRoute.Experimental, "预览尚未稳定的新功能", "✦", "实验 测试 歌词 强绑定"),
     )),
 )
 
@@ -187,11 +208,20 @@ fun SettingsScreen(
 
     BackHandler(enabled = route != null) { route = null }
 
-    if (route != null) {
-        SettingsDetailScreen(route = route!!, onBack = { route = null })
-        return
+    AnimatedVisibility(
+        visible = route != null,
+        enter = slideInHorizontally(tween(300)) { it } + fadeIn(tween(220)),
+        exit = slideOutHorizontally(tween(260)) { it / 4 } + fadeOut(tween(180)),
+    ) {
+        route?.let { selectedRoute ->
+            SettingsDetailScreen(route = selectedRoute, onBack = { route = null })
+        }
     }
-
+    AnimatedVisibility(
+        visible = route == null,
+        enter = slideInHorizontally(tween(300)) { -it / 4 } + fadeIn(tween(220)),
+        exit = slideOutHorizontally(tween(260)) { -it / 4 } + fadeOut(tween(180)),
+    ) {
     val normalized = search.trim().lowercase()
     val visibleSections = SettingsSections.mapNotNull { section ->
         val filtered = section.items.filter { item ->
@@ -254,6 +284,7 @@ fun SettingsScreen(
                 SettingsDangerButton("退出登录") { session.clear() }
             }
         }
+    }
     }
 }
 
@@ -375,6 +406,7 @@ private fun SettingsDetailScreen(route: SettingsRoute, onBack: () -> Unit) {
             SettingsRoute.General -> GeneralSettings(context)
             SettingsRoute.About -> AboutSettings(context)
             SettingsRoute.Developer -> DeveloperSettings()
+            SettingsRoute.Experimental -> ExperimentalSettings(context)
         }
     }
 }
@@ -457,6 +489,150 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
                 .setSilent(true)
                 .build(),
         )
+    }
+}
+
+@Composable
+private fun ExperimentalSettings(context: android.content.Context) {
+    var playbackEnabled by remember { mutableStateOf(PlaybackAccountStore.isEnabled(context)) }
+    var showNeteaseLogin by remember { mutableStateOf(false) }
+    var showQQLogin by remember { mutableStateOf(false) }
+    var showKugouLogin by remember { mutableStateOf(false) }
+    var showClearPlaybackConfirmation by remember { mutableStateOf(false) }
+    var refreshRevision by remember { mutableIntStateOf(0) }
+
+    if (showNeteaseLogin) {
+        val session = remember { NeteaseSessionStore(context) }
+        Dialog(
+            onDismissRequest = { showNeteaseLogin = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            NeteaseLoginScreen(
+                session = session,
+                onDismiss = { showNeteaseLogin = false },
+                onLoggedIn = { showNeteaseLogin = false; refreshRevision++ },
+                targetSlot = PlaybackAccountSlot.Playback,
+            )
+        }
+    }
+    if (showQQLogin) {
+        Dialog(
+            onDismissRequest = { showQQLogin = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            QQMusicLoginScreen(
+                onDismiss = { showQQLogin = false },
+                onLoggedIn = { showQQLogin = false; refreshRevision++ },
+                targetSlot = PlaybackAccountSlot.Playback,
+            )
+        }
+    }
+    if (showKugouLogin) {
+        Dialog(
+            onDismissRequest = { showKugouLogin = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            KugouLoginScreen(
+                onDismiss = { showKugouLogin = false },
+                onLoggedIn = { showKugouLogin = false; refreshRevision++ },
+                targetSlot = PlaybackAccountSlot.Playback,
+            )
+        }
+    }
+
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "使用第二者账号获取音频",
+            value = playbackEnabled,
+            grouped = true,
+        ) { enabled ->
+            playbackEnabled = enabled
+            PlaybackAccountStore.setEnabled(context, enabled)
+            if (!enabled) ProviderPlaybackQualityRuntime.clear()
+        }
+    }
+    if (playbackEnabled) {
+        Spacer(Modifier.height(10.dp))
+        SettingsGlassGroup {
+            SettingsInfoCard("以下账号仅用于播放音频 URL 和可用音质探测，不影响搜索、歌词、收藏、资料库、歌单、社交或下载。")
+        }
+        Spacer(Modifier.height(10.dp))
+
+        val neteaseCookie = remember(refreshRevision) { NeteaseSessionStore.readPlaybackCookie(context) }
+        val qqLoggedIn = remember(refreshRevision) { QQMusicSessionStore.read(context, playback = true).isLoggedIn }
+        val kugouLoggedIn = remember(refreshRevision) { KugouSessionStore.read(context, playback = true).isLoggedIn }
+
+        SettingsGlassGroup {
+            MeloXIosListRow(
+                title = "网易云音乐",
+                subtitle = if (NeteaseSessionStore.containsMusicU(neteaseCookie)) "已登录" else "未登录",
+                leading = { MeloXSymbolIcon(MeloXSymbol.MusicNote, Modifier.size(24.dp), MaterialTheme.colorScheme.primary) },
+                onClick = { showNeteaseLogin = true },
+                showTopSeparator = false,
+            )
+            MeloXIosListRow(
+                title = "QQ音乐",
+                subtitle = if (qqLoggedIn) "已登录" else "未登录",
+                leading = { MeloXSymbolIcon(MeloXSymbol.MusicNote, Modifier.size(24.dp), MaterialTheme.colorScheme.primary) },
+                onClick = { showQQLogin = true },
+            )
+            MeloXIosListRow(
+                title = "酷狗音乐",
+                subtitle = if (kugouLoggedIn) "已登录" else "未登录",
+                leading = { MeloXSymbolIcon(MeloXSymbol.MusicNote, Modifier.size(24.dp), MaterialTheme.colorScheme.primary) },
+                onClick = { showKugouLogin = true },
+            )
+            MeloXIosListRow(
+                title = "Apple Music",
+                subtitle = "当前版本暂不支持第二账号；全曲播放由 Apple 官方 DRM 管理",
+                leading = { MeloXSymbolIcon(MeloXSymbol.MusicNote, Modifier.size(24.dp), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)) },
+                onClick = null,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        SettingsDangerButton("清除所有第二者账号") { showClearPlaybackConfirmation = true }
+        MeloXGlassDialog(
+            visible = showClearPlaybackConfirmation,
+            onDismiss = { showClearPlaybackConfirmation = false },
+        ) {
+            Text("是否清除所有第二者账号？", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "此操作只清除用于获取音频的第二账号，不影响主账号登录状态。",
+                modifier = Modifier.padding(top = 8.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SettingsActionButton("取消", Modifier.weight(1f)) { showClearPlaybackConfirmation = false }
+                SettingsActionButton("清除", Modifier.weight(1f)) {
+                    PlaybackAccountStore.clear(context)
+                    ProviderPlaybackQualityRuntime.clear()
+                    refreshRevision++
+                    showClearPlaybackConfirmation = false
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    if (!MeloXSettingsRuntime.automaticLyricSelectionEnabled) {
+        SettingsInfoCard("请先开启自动选择最合适的歌词")
+        return
+    }
+    var enabled by remember {
+        mutableStateOf(MeloXSettingsPreferences.boolean(context, "experimental_lyric_strong_binding", false))
+    }
+    SettingsGlassGroup {
+        SettingsExternalToggleRow(
+            title = "歌曲与自动选择的歌词强绑定",
+            value = enabled,
+            grouped = true,
+        ) { value ->
+            enabled = value
+            MeloXSettingsPreferences.setBoolean(context, "experimental_lyric_strong_binding", value)
+            if (!value) com.lladlam.melox.core.lyrics.LyricBindingStore.clear(context)
+        }
     }
 }
 
@@ -929,12 +1105,13 @@ private fun LyricsSettings(context: android.content.Context) {
             selected = MeloXSettingsRuntime.lyricRenderingQuality,
             items = listOf(
                 MeloXLyricsRenderingQuality.Low to "低 · 更省电",
-                MeloXLyricsRenderingQuality.Balanced to "均衡 · 推荐",
-                MeloXLyricsRenderingQuality.High to "高 · 完整 iOS 效果",
+                MeloXLyricsRenderingQuality.Balanced to "均衡",
+                MeloXLyricsRenderingQuality.High to "高 · 推荐 / 完整 iOS 效果",
             ),
             onSelected = { MeloXSettingsPreferences.setString(context, "lyrics_rendering_quality", it.name) },
             grouped = true,
         )
+        SettingsToggleRow(context, "自动选择最合适的歌词", "lyrics_auto_select", true, grouped = true)
         SettingsToggleRow(context, "逐字歌词（YRC）", "lyrics_word_by_word", true, grouped = true)
         SettingsToggleRow(context, "普通 LRC 生成逐字时间", "lyrics_pseudo_timing", true, "按 Unicode 字素分配行时长，不覆盖真实 YRC。", grouped = true)
         SettingsToggleRow(context, "点击歌词跳转进度", "lyrics_tap_seek", true, grouped = true)
@@ -1854,7 +2031,6 @@ private fun SettingsToggleRow(
     @Composable fun row() {
         MeloXIosListRow(
             title = title,
-            subtitle = note,
             trailing = {
                 MeloXGlassToggle(checked = value, onCheckedChange = {
                     value = it
@@ -1883,7 +2059,6 @@ private fun SettingsExternalToggleRow(
     val row = @Composable {
         MeloXIosListRow(
             title = title,
-            subtitle = note,
             trailing = { MeloXGlassToggle(checked = value, onCheckedChange = onValueChange) },
             showTopSeparator = effectiveShowTopSeparator,
         )
@@ -1917,19 +2092,20 @@ private fun SettingsGlassGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SettingsInfoCard(title: String, value: String) {
+private fun SettingsInfoCard(value: String) {
     SettingsGlassGroup {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-            Text(value, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f))
-        }
+        Text(
+            value,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .52f),
+        )
     }
 }
 
 @Composable
-private fun SettingsActionButton(title: String, onClick: () -> Unit) {
+private fun SettingsActionButton(title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().height(50.dp).meloXLiquidButton(
+        modifier.fillMaxWidth().height(50.dp).meloXLiquidButton(
             shape = RoundedCornerShape(25.dp),
             surfaceColor = MaterialTheme.colorScheme.onBackground.copy(alpha = .06f),
         ).clickable(onClick = onClick),

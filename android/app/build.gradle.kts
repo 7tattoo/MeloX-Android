@@ -12,8 +12,8 @@ android {
         applicationId = "com.lladlam.melox.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.4.0-Beta"
+        versionCode = 9
+        versionName = "0.4.1-Beta"
     }
 
     // Release credentials are supplied from the command line or CI secrets;
@@ -57,6 +57,10 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 }
 
@@ -118,6 +122,7 @@ dependencies {
     compileOnly(project(":hidden-api"))
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")

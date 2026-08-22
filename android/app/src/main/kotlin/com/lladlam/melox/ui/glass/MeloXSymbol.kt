@@ -1,33 +1,27 @@
 package com.lladlam.melox.ui.glass
 
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.lladlam.melox.R
 
 /**
- * Semantic icon inventory aligned with SF Symbols names. The personal-use
- * distribution bundles the matching glyph font in res/font/sf_pro.ttf; any
- * unknown symbol falls back to Material Symbols rather than rendering a blank.
+ * Semantic icon inventory aligned with SF Symbols names. The bundled SF font is
+ * the only icon font used by this component; unresolved symbols fail fast.
  */
 enum class MeloXSymbol(
     val sfSymbolName: String,
@@ -36,7 +30,7 @@ enum class MeloXSymbol(
     Home("house", "home"),
     Explore("safari", "explore"),
     Library("music.note.list", "library_music"),
-    Settings("gearshape", "settings"),
+    Settings("gear", "settings"),
     Person("person.crop.circle", "account_circle"),
     Search("magnifyingglass", "search"),
     ChevronLeft("chevron.left", "chevron_left"),
@@ -46,16 +40,16 @@ enum class MeloXSymbol(
     Ellipsis("ellipsis", "more_horiz"),
     Clock("clock", "schedule"),
     Plus("plus", "add"),
-    Download("arrow.down.to.line", "download"),
+    Download("arrow.down.circle", "download"),
     Share("square.and.arrow.up", "ios_share"),
-    Mail("envelope", "mail"),
+    Mail("paperplane", "mail"),
     Message("message", "chat_bubble"),
     Info("info.circle", "info"),
     Heart("heart", "favorite"),
     List("list.bullet", "format_list_bulleted"),
     Check("checkmark", "check"),
-    ArrowUp("arrow.up", "arrow_upward"),
-    ArrowDown("arrow.down", "arrow_downward"),
+    ArrowUp("arrow.up.circle.fill", "arrow_upward"),
+    ArrowDown("arrow.down.circle", "arrow_downward"),
     Refresh("arrow.clockwise", "refresh"),
     MusicNote("music.note", "music_note"),
     Calendar("calendar", "calendar_month"),
@@ -63,11 +57,11 @@ enum class MeloXSymbol(
     RadioWaves("dot.radiowaves.left.and.right", "graphic_eq"),
     Walk("figure.walk.motion", "directions_walk"),
     Sparkles("sparkles", "auto_awesome"),
-    Quote("quote.opening", "format_quote"),
-    Devices("rectangle.on.rectangle", "devices"),
+    Quote("quote.bubble", "format_quote"),
+    Devices("display", "devices"),
     Landscape("rectangle.landscape.rotate", "screen_rotation"),
-    PictureInPicture("rectangle.on.rectangle", "picture_in_picture"),
-    Apps("square.grid.2x2", "apps"),
+    PictureInPicture("pip", "picture_in_picture"),
+    Apps("circle.grid.2x2.fill", "apps"),
     Microphone("mic", "mic"),
     Storage("internaldrive", "storage"),
     Bug("ladybug", "bug_report"),
@@ -77,7 +71,17 @@ enum class MeloXSymbol(
     Next("forward.fill", "skip_next"),
     Shuffle("shuffle", "shuffle"),
     Repeat("repeat", "repeat"),
-    Volume("speaker.wave.2", "volume_up"),
+    RepeatOne("repeat.1", "repeat_one"),
+    Infinity("infinity", "all_inclusive"),
+    Lyrics("quote.bubble", "lyrics"),
+    AutoMix("waveform", "graphic_eq"),
+    AddToPlaylist("text.badge.plus", "playlist_add"),
+    Trash("trash", "delete"),
+    Moon("moon", "bedtime"),
+    Switch("switch.2", "swap_horiz"),
+    Book("book.pages", "menu_book"),
+    Comment("bubble.left", "chat_bubble"),
+    Volume("speaker.wave.2.fill", "volume_up"),
     Queue("text.line.first.and.arrowtriangle.forward", "queue_music"),
     MoreVertical("ellipsis", "more_vert"),
     Circle("circle", "radio_button_unchecked"),
@@ -90,23 +94,11 @@ enum class MeloXSymbolVariant {
     Fill,
 }
 
-private val MeloXSymbolsFont = FontFamily(
-    Font(R.font.material_symbols_rounded, weight = FontWeight.Normal),
-)
-
-private val MeloXSymbolsFilledFont = FontFamily(
-    Font(R.font.material_symbols_rounded_filled, weight = FontWeight.Medium),
-)
-
-private val MeloXSfSymbolsFont = FontFamily(
-    Font(R.font.sf_pro, weight = FontWeight.Normal),
-)
-
 private val MeloXSfSymbolCodePoints = mapOf(
     "house" to 0x10039E,
     "safari" to 0x1003AC,
     "music.note.list" to 0x10046C,
-    "gearshape" to 0x1008CB,
+    "gear" to 0x10035F,
     "person.crop.circle" to 0x10026D,
     "magnifyingglass" to 0x1002AB,
     "chevron.left" to 0x100189,
@@ -122,6 +114,9 @@ private val MeloXSfSymbolCodePoints = mapOf(
     "heart" to 0x1002B4,
     "list.bullet" to 0x1002F2,
     "checkmark" to 0x100185,
+    "arrow.down.circle" to 0x100078,
+    "paperplane" to 0x10021F,
+    "arrow.up.circle.fill" to 0x100077,
     "arrow.clockwise" to 0x100148,
     "music.note" to 0x10046A,
     "calendar" to 0x100249,
@@ -129,7 +124,10 @@ private val MeloXSfSymbolCodePoints = mapOf(
     "dot.radiowaves.left.and.right" to 0x100319,
     "figure.walk.motion" to 0x101411,
     "sparkles" to 0x1001BF,
-    "rectangle.on.rectangle" to 0x10089A,
+    "quote.bubble" to 0x10032E,
+    "display" to 0x1008B9,
+    "pip" to 0x100833,
+    "circle.grid.2x2.fill" to 0x1007BF,
     "rectangle.landscape.rotate" to 0x101EEF,
     "mic" to 0x1002B0,
     "internaldrive" to 0x10097E,
@@ -140,6 +138,18 @@ private val MeloXSfSymbolCodePoints = mapOf(
     "forward.fill" to 0x10028C,
     "shuffle" to 0x10029D,
     "repeat" to 0x10029E,
+    "repeat.1" to 0x10029F,
+    "infinity" to 0x100BE0,
+    "waveform" to 0x10066B,
+    "text.badge.plus" to 0x1002F8,
+    "trash" to 0x100211,
+    "moon" to 0x1001B9,
+    "switch.2" to 0x10070A,
+    "book.pages" to 0x10173E,
+    "bubble.left" to 0x10032A,
+    "speaker.wave.2.fill" to 0x1002A7,
+    "text.line.first.and.arrowtriangle.forward" to 0x10163F,
+    "questionmark.circle" to 0x10005C,
     "checkmark.circle.fill" to 0x100063,
 )
 
@@ -156,29 +166,16 @@ fun MeloXSymbolIcon(
     // glyph at a slightly smaller em size leaves a real optical inset inside
     // callers' 18/20/24dp icon boxes, instead of clipping the gear and arrows
     // at their ascender/descender edges.
-    val glyphSize = iconSize * 0.7598f
-    val sfCodePoint = MeloXSfSymbolCodePoints[symbol.sfSymbolName]
-    Text(
-        text = sfCodePoint?.let { String(Character.toChars(it)) } ?: symbol.materialLigature,
-        modifier = if (contentDescription == null) modifier else modifier.semantics {
-            this.contentDescription = contentDescription
-        },
+    val codePoint = requireNotNull(MeloXSfSymbolCodePoints[symbol.sfSymbolName]) {
+        "Missing SF Symbol mapping: ${symbol.sfSymbolName}"
+    }
+    SfGlyphIcon(
+        codePoint = codePoint,
+        modifier = modifier,
         color = color,
-        fontFamily = if (sfCodePoint != null) {
-            MeloXSfSymbolsFont
-        } else if (variant == MeloXSymbolVariant.Fill) {
-            MeloXSymbolsFilledFont
-        } else {
-            MeloXSymbolsFont
-        },
-        fontWeight = if (variant == MeloXSymbolVariant.Fill) FontWeight.Medium else FontWeight.Normal,
-        fontSize = glyphSize,
-        lineHeight = iconSize,
-        style = TextStyle(
-            platformStyle = PlatformTextStyle(includeFontPadding = false),
-        ),
-        textAlign = TextAlign.Center,
-        maxLines = 1,
+        iconSize = iconSize,
+        contentDescription = contentDescription,
+        weight = if (variant == MeloXSymbolVariant.Fill) FontWeight.Medium else FontWeight.Normal,
     )
 }
 
@@ -193,39 +190,55 @@ fun MeloXSearchBackMorphIcon(
     color: Color,
     contentDescription: String? = null,
 ) {
-    val progress by animateFloatAsState(
-        targetValue = if (focused) 1f else 0f,
-        animationSpec = tween(300, easing = LinearOutSlowInEasing),
-        label = "search-back-morph",
-    )
-    Canvas(if (contentDescription == null) modifier else modifier.semantics { this.contentDescription = contentDescription }) {
-        val strokeWidth = size.minDimension * 0.095f
-        val magnifierAlpha = (1f - progress).coerceIn(0f, 1f)
-        val arrowAlpha = progress.coerceIn(0f, 1f)
-        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        if (magnifierAlpha > 0f) {
-            drawCircle(
-                color = color.copy(alpha = color.alpha * magnifierAlpha),
-                radius = size.minDimension * 0.22f,
-                center = androidx.compose.ui.geometry.Offset(
-                    size.width * 0.40f,
-                    size.height * 0.40f,
-                ),
-                style = stroke,
-            )
-            drawLine(
-                color = color.copy(alpha = color.alpha * magnifierAlpha),
-                start = androidx.compose.ui.geometry.Offset(size.width * 0.56f, size.height * 0.56f),
-                end = androidx.compose.ui.geometry.Offset(size.width * 0.80f, size.height * 0.80f),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round,
-            )
-        }
-        if (arrowAlpha > 0f) {
-            val arrowColor = color.copy(alpha = color.alpha * arrowAlpha)
-            drawLine(arrowColor, Offset(size.width * 0.78f, size.height * 0.50f), Offset(size.width * 0.22f, size.height * 0.50f), strokeWidth, StrokeCap.Round)
-            drawLine(arrowColor, Offset(size.width * 0.22f, size.height * 0.50f), Offset(size.width * 0.46f, size.height * 0.27f), strokeWidth, StrokeCap.Round)
-            drawLine(arrowColor, Offset(size.width * 0.22f, size.height * 0.50f), Offset(size.width * 0.46f, size.height * 0.73f), strokeWidth, StrokeCap.Round)
+    AnimatedContent(
+        targetState = focused,
+        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+        modifier = modifier,
+        label = "search-back-sf-transition",
+    ) { isFocused ->
+        MeloXSymbolIcon(
+            symbol = if (isFocused) MeloXSymbol.ChevronLeft else MeloXSymbol.Search,
+            modifier = Modifier,
+            color = color,
+            iconSize = 24.sp,
+            contentDescription = contentDescription,
+        )
+    }
+}
+
+@Composable
+private fun SfGlyphIcon(
+    codePoint: Int,
+    modifier: Modifier,
+    color: Color,
+    iconSize: TextUnit,
+    contentDescription: String?,
+    weight: FontWeight,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val typeface = androidx.compose.runtime.remember(context, weight) {
+        val font = androidx.core.content.res.ResourcesCompat.getFont(context, R.font.sf_pro_subset)
+            ?: error("SF Symbols font could not be loaded")
+        android.graphics.Typeface.create(font, weight.weight)
+    }
+    androidx.compose.foundation.Canvas(
+        modifier = modifier,
+    ) {
+        drawIntoCanvas { canvas ->
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.SUBPIXEL_TEXT_FLAG).apply {
+                this.color = color.toArgb()
+                this.typeface = typeface
+                textSize = with(density) { iconSize.toPx() }
+                textAlign = android.graphics.Paint.Align.LEFT
+                fontFeatureSettings = "'ss16' 1"
+            }
+            val glyph = String(Character.toChars(codePoint))
+            val bounds = android.graphics.Rect()
+            paint.getTextBounds(glyph, 0, glyph.length, bounds)
+            val x = size.width / 2f - (bounds.left + bounds.right) / 2f
+            val baseline = size.height / 2f - (bounds.top + bounds.bottom) / 2f
+            canvas.nativeCanvas.drawText(glyph, x, baseline, paint)
         }
     }
 }

@@ -28,6 +28,22 @@ object MeloXMusicProviders {
         }
     }
 
+    /** Registry reserved for URL resolution and quality probing. */
+    fun createPlayback(
+        context: Context,
+        httpClient: OkHttpClient = MeloXHttpClient.shared,
+    ): MusicProviderRegistry {
+        val appContext = context.applicationContext
+        return MusicProviderRegistry(
+            listOf(
+                NeteaseProvider({ PlaybackAccountStore.neteaseCookie(appContext) }, httpClient),
+                QQMusicProvider({ PlaybackAccountStore.qqSession(appContext) }, httpClient),
+                KugouProvider({ PlaybackAccountStore.kugouSession(appContext) }, httpClient),
+                AppleMusicApiClient({ AppleMusicSessionStore.read(appContext) }, httpClient),
+            ),
+        )
+    }
+
     private fun buildRegistry(context: Context, httpClient: OkHttpClient): MusicProviderRegistry =
         MusicProviderRegistry(
             listOf(

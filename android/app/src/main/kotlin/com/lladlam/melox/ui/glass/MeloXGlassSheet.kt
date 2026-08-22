@@ -129,12 +129,9 @@ fun MeloXGlassDialog(
         dark -> Color.Black
         else -> Color.White
     }
-    val dialogSurface = when {
-        hasBackdrop && dark -> Color.Black.copy(alpha = 0.12f)
-        hasBackdrop -> Color.White.copy(alpha = 0.20f)
-        dark -> Color.Black
-        else -> Color.White
-    }
+    // Confirmation/prompt content must remain fully opaque. Only the empty
+    // area around the dialog uses a translucent modal scrim.
+    val dialogSurface = if (dark) Color.Black else Color.White
     if (visible) {
         Dialog(
             onDismissRequest = onDismiss,

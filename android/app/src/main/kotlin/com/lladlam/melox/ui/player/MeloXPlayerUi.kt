@@ -74,6 +74,7 @@ import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXVolumeControlMode
 import com.lladlam.melox.ui.glass.MeloXSymbol
 import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSymbolVariant
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -317,10 +318,30 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         }
     }
 
+    fun previousFromMiniPlayer() {
+        controller?.let { player ->
+            if (player.mediaItemCount > 1 && player.currentMediaItemIndex <= 0) {
+                playQueueIndex(player.mediaItemCount - 1)
+            } else {
+                previous()
+            }
+        }
+    }
+
     fun next() {
         controller?.let { player ->
             PlaybackCommands.prioritizeManualQueue(player)
             player.seekToNextMediaItem()
+        }
+    }
+
+    fun nextFromMiniPlayer() {
+        controller?.let { player ->
+            if (player.mediaItemCount > 1 && player.currentMediaItemIndex >= player.mediaItemCount - 1) {
+                playQueueIndex(0)
+            } else {
+                next()
+            }
         }
     }
 
@@ -800,20 +821,17 @@ private fun MeloXTransportControls(state: MeloXPlaybackUiState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MeloXTransportButton(
-            label = "◀◀",
-            fontSize = 30.sp,
+            symbol = MeloXSymbol.Previous,
             enabled = state.hasPrevious || state.repeatMode == Player.REPEAT_MODE_ALL,
             onClick = state::previous,
         )
         MeloXTransportButton(
-            label = if (state.isPlaying) "Ⅱ" else "▶",
-            fontSize = if (state.isPlaying) 44.sp else 40.sp,
+            symbol = if (state.isPlaying) MeloXSymbol.Pause else MeloXSymbol.Play,
             enabled = true,
             onClick = state::togglePlayPause,
         )
         MeloXTransportButton(
-            label = "▶▶",
-            fontSize = 30.sp,
+            symbol = MeloXSymbol.Next,
             enabled = state.hasNext || state.repeatMode == Player.REPEAT_MODE_ALL,
             onClick = state::next,
         )
@@ -822,8 +840,7 @@ private fun MeloXTransportControls(state: MeloXPlaybackUiState) {
 
 @Composable
 private fun MeloXTransportButton(
-    label: String,
-    fontSize: androidx.compose.ui.unit.TextUnit,
+    symbol: MeloXSymbol,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
@@ -834,11 +851,12 @@ private fun MeloXTransportButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
+        MeloXSymbolIcon(
+            symbol = symbol,
+            modifier = Modifier.size(42.dp),
             color = Color.White.copy(alpha = if (enabled) 1f else 0.28f),
-            fontSize = fontSize,
-            fontWeight = FontWeight.Medium,
+            variant = if (symbol == MeloXSymbol.Play || symbol == MeloXSymbol.Pause) MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
+            iconSize = if (symbol == MeloXSymbol.Play || symbol == MeloXSymbol.Pause) 56.sp else 42.sp,
         )
     }
 }
@@ -852,7 +870,7 @@ private fun MeloXVolumeControl(state: MeloXPlaybackUiState) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("🔈", fontSize = 12.sp, color = Color.White.copy(alpha = 0.62f))
+        MeloXSymbolIcon(MeloXSymbol.Volume, Modifier.size(18.dp), Color.White.copy(alpha = 0.62f), iconSize = 16.sp)
         Slider(
             value = state.volume,
             onValueChange = state::changeVolume,
@@ -865,7 +883,7 @@ private fun MeloXVolumeControl(state: MeloXPlaybackUiState) {
                 inactiveTrackColor = Color.White.copy(alpha = 0.20f),
             ),
         )
-        Text("🔊", fontSize = 14.sp, color = Color.White.copy(alpha = 0.62f))
+        MeloXSymbolIcon(MeloXSymbol.Volume, Modifier.size(20.dp), Color.White.copy(alpha = 0.62f), iconSize = 18.sp)
     }
 }
 
@@ -884,13 +902,13 @@ private fun MeloXPageSelector(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MeloXPageButton(
-            label = "词",
+            symbol = MeloXSymbol.Lyrics,
             selected = page == MeloXNowPlayingPage.Lyrics,
             onClick = { onPageSelected(MeloXNowPlayingPage.Lyrics) },
         )
 
         MeloXPageButton(
-            label = "浮",
+            symbol = MeloXSymbol.Landscape,
             selected = false,
             enabled = false,
             onClick = {},
@@ -898,7 +916,7 @@ private fun MeloXPageSelector(
 
         Box {
             MeloXPageButton(
-                label = "≡",
+                symbol = MeloXSymbol.Queue,
                 selected = page == MeloXNowPlayingPage.Queue,
                 onClick = { onPageSelected(MeloXNowPlayingPage.Queue) },
             )
@@ -911,15 +929,15 @@ private fun MeloXPageSelector(
                         .background(Color.White.copy(alpha = 0.82f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = when {
-                            state.shuffleEnabled -> "↝"
-                            state.repeatMode == Player.REPEAT_MODE_ONE -> "1"
-                            else -> "↻"
+                    MeloXSymbolIcon(
+                        symbol = when {
+                            state.shuffleEnabled -> MeloXSymbol.Shuffle
+                            state.repeatMode == Player.REPEAT_MODE_ONE -> MeloXSymbol.Repeat
+                            else -> MeloXSymbol.Repeat
                         },
+                        modifier = Modifier.size(11.dp),
                         color = Color.Black.copy(alpha = 0.74f),
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
+                        iconSize = 10.sp,
                     )
                 }
             }
@@ -929,7 +947,8 @@ private fun MeloXPageSelector(
 
 @Composable
 private fun MeloXPageButton(
-    label: String,
+    label: String? = null,
+    symbol: MeloXSymbol? = null,
     selected: Boolean,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -942,8 +961,19 @@ private fun MeloXPageButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
+        symbol?.let {
+            MeloXSymbolIcon(
+                symbol = it,
+                modifier = Modifier.size(22.dp),
+                color = when {
+                    !enabled -> Color.White.copy(alpha = 0.26f)
+                    selected -> Color.Black.copy(alpha = 0.68f)
+                    else -> Color.White.copy(alpha = 0.72f)
+                },
+                iconSize = 20.sp,
+            )
+        } ?: Text(
+            text = label.orEmpty(),
             color = when {
                 !enabled -> Color.White.copy(alpha = 0.26f)
                 selected -> Color.Black.copy(alpha = 0.68f)

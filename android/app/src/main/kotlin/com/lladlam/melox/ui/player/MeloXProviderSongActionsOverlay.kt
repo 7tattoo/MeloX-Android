@@ -30,6 +30,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,9 +58,9 @@ import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
-import com.lladlam.melox.ui.glass.meloXLiquidButton
-import com.lladlam.melox.ui.glass.MeloXGlassSheet
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXIosGroupedList
+import com.lladlam.melox.ui.glass.MeloXIosListRow
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -118,10 +120,20 @@ internal fun MeloXProviderSongActionsOverlay(
         if (page == ProviderSongActionPage.Main) onDismiss() else page = ProviderSongActionPage.Main
     }
 
-    MeloXGlassSheet(
-        visible = visible,
-        onDismiss = onDismiss,
-        modifier = Modifier.fillMaxHeight(0.78f),
+    if (visible) ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
+        dragHandle = {
+            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(width = 58.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .24f), RoundedCornerShape(99.dp)),
+                )
+            }
+        },
     ) {
         AnimatedContent(
                     targetState = page,
@@ -148,6 +160,7 @@ internal fun MeloXProviderSongActionsOverlay(
                             },
                         )
 
+                        MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
                         when (target) {
                             ProviderSongActionPage.Main -> {
                                 if (favoriteCapability != null) {
@@ -236,7 +249,6 @@ internal fun MeloXProviderSongActionsOverlay(
                                     }
                                 }
 
-                                ProviderActionStatus(actionStatus, actionError)
                             }
 
                             ProviderSongActionPage.Sleep -> {
@@ -283,10 +295,11 @@ internal fun MeloXProviderSongActionsOverlay(
                                         }
                                     }
                                 }
-                                ProviderActionStatus(actionStatus, actionError)
                                 ProviderActionItem("返回", "‹") { page = ProviderSongActionPage.Main }
                             }
                         }
+                        }
+                        ProviderActionStatus(actionStatus, actionError)
         }
     }
 }
@@ -301,7 +314,7 @@ private fun ProviderActionStatus(
     status?.let { message ->
         Text(
             message,
-            color = Color.White.copy(alpha = 0.66f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.66f),
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
         )
@@ -366,30 +379,19 @@ private fun ProviderActionItem(
     onClick: () -> Unit,
 ) {
     val foreground = MaterialTheme.colorScheme.onSurface
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val alpha = if (enabled) 1f else 0.38f
-        MeloXActionIcon(
-            token = symbol,
-            color = foreground.copy(alpha = 0.82f),
-            enabled = enabled,
-            modifier = Modifier.size(22.dp).padding(horizontal = 1.dp),
-        )
-        Text(
-            title,
-            color = foreground.copy(alpha = 0.94f * alpha),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    MeloXIosListRow(
+        title = title,
+        leading = {
+            MeloXActionIcon(
+                token = symbol,
+                color = foreground.copy(alpha = if (enabled) .82f else .31f),
+                enabled = enabled,
+                modifier = Modifier.size(22.dp),
+            )
+        },
+        onClick = if (enabled) onClick else null,
+        showTopSeparator = true,
+    )
 }
 
 private fun shareProviderSong(

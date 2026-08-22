@@ -43,6 +43,7 @@ import com.lladlam.melox.core.provider.kugou.KugouLoginClient
 import com.lladlam.melox.core.provider.kugou.KugouQrLoginSession
 import com.lladlam.melox.core.provider.kugou.KugouQrLoginState
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
+import com.lladlam.melox.core.music.provider.PlaybackAccountSlot
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
 
@@ -50,6 +51,7 @@ import kotlinx.coroutines.delay
 fun KugouLoginScreen(
     onDismiss: () -> Unit,
     onLoggedIn: () -> Unit,
+    targetSlot: PlaybackAccountSlot = PlaybackAccountSlot.Main,
 ) {
     val context = LocalContext.current.applicationContext
     val client = remember {
@@ -92,6 +94,7 @@ fun KugouLoginScreen(
                         userId = state.userId,
                         vipToken = state.vipToken,
                         vipType = state.vipType,
+                        playback = targetSlot == PlaybackAccountSlot.Playback,
                     )
                     stateText = "登录成功"
                     onLoggedIn()

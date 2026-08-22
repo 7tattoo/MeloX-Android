@@ -32,14 +32,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.music.provider.PlaybackAccountSlot
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
-private const val NETEASE_LOGIN_URL = "https://music.163.com/#"
+private const val NETEASE_LOGIN_URL = "https://music.163.com/#/login"
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -47,7 +51,10 @@ fun NeteaseLoginScreen(
     session: NeteaseSessionStore,
     onDismiss: () -> Unit,
     onLoggedIn: () -> Unit,
+    targetSlot: PlaybackAccountSlot = PlaybackAccountSlot.Main,
 ) {
+    val context = LocalContext.current.applicationContext
+    var loginPrepared by remember { mutableStateOf(targetSlot == PlaybackAccountSlot.Main) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var pageLoading by remember { mutableStateOf(true) }
     var verifying by remember { mutableStateOf(false) }
@@ -59,7 +66,20 @@ fun NeteaseLoginScreen(
         if (view?.canGoBack() == true) view.goBack() else onDismiss()
     }
 
-    LaunchedEffect(webView) {
+    LaunchedEffect(targetSlot) {
+        if (targetSlot == PlaybackAccountSlot.Playback) {
+            suspendCancellableCoroutine { continuation ->
+                CookieManager.getInstance().removeAllCookies {
+                    if (continuation.isActive) continuation.resume(Unit)
+                }
+            }
+            CookieManager.getInstance().flush()
+        }
+        loginPrepared = true
+    }
+
+    LaunchedEffect(webView, loginPrepared) {
+        if (webView == null || !loginPrepared) return@LaunchedEffect
         while (true) {
             val candidate = collectNeteaseCookieHeader()
             if (
@@ -71,11 +91,12 @@ fun NeteaseLoginScreen(
                 handledCookie = candidate
                 verifying = true
                 verificationError = null
-                val result = session.acceptAuthenticatedCookie(candidate)
+                val result = session.acceptAuthenticatedCookie(candidate, persist = targetSlot == PlaybackAccountSlot.Main)
                 verifying = false
                 if (result.isSuccess) {
+                    if (targetSlot == PlaybackAccountSlot.Playback) NeteaseSessionStore.writePlaybackCookie(context, candidate)
                     CookieManager.getInstance().flush()
-                    onLoggedIn()
+                    webView?.post(onLoggedIn)
                     return@LaunchedEffect
                 }
                 verificationError = result.exceptionOrNull()?.message
@@ -123,7 +144,7 @@ fun NeteaseLoginScreen(
                 fontSize = 16.sp,
             )
             Text(
-                text = "登录网易云音乐",
+                text = "手机号登录网易云音乐",
                 fontSize = 17.sp,
                 color = MaterialTheme.colorScheme.onBackground,
             )
@@ -140,7 +161,7 @@ fun NeteaseLoginScreen(
         }
 
         Box(modifier = Modifier.weight(1f)) {
-            AndroidView(
+            if (loginPrepared) AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {

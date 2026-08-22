@@ -41,6 +41,7 @@ data class KugouSession(
  */
 object KugouSessionStore {
     private const val PreferencesName = "melox_kugou_session"
+    private const val PlaybackPreferencesName = "melox_kugou_playback_session"
     private const val Token = "token"
     private const val UserId = "userid"
     private const val VipToken = "vip_token"
@@ -52,10 +53,11 @@ object KugouSessionStore {
     private const val Mac = "mac"
     private const val WebGl = "webgl"
 
-    fun read(context: Context): KugouSession {
+    fun read(context: Context, playback: Boolean = false): KugouSession {
         val preferences = context.applicationContext
-            .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
-        val identity = ensureIdentity(context)
+            .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
+        val identity = if (playback) read(context).let { DeviceIdentity(it.guid, it.mid, it.dev, it.mac, it.webGl) }
+        else ensureIdentity(context)
         return KugouSession(
             token = preferences.getString(Token, "").orEmpty(),
             userId = preferences.getLong(UserId, 0L),
@@ -77,9 +79,10 @@ object KugouSessionStore {
         vipToken: String = "",
         vipType: Int = 0,
         dfid: String? = null,
+        playback: Boolean = false,
     ): KugouSession {
         context.applicationContext
-            .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+            .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
             .edit()
             .putString(Token, token)
             .putLong(UserId, userId)
@@ -89,7 +92,7 @@ object KugouSessionStore {
                 dfid?.takeIf(String::isNotBlank)?.let { putString(Dfid, it) }
             }
             .apply()
-        return read(context)
+        return read(context, playback)
     }
 
     fun updateDfid(context: Context, value: String) {
@@ -101,9 +104,9 @@ object KugouSessionStore {
             .apply()
     }
 
-    fun clearLogin(context: Context) {
+    fun clearLogin(context: Context, playback: Boolean = false) {
         context.applicationContext
-            .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+            .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
             .edit()
             .remove(Token)
             .remove(UserId)

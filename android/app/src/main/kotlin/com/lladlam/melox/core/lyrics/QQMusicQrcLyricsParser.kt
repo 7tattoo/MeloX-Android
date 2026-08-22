@@ -21,6 +21,7 @@ object QQMusicQrcLyricsParser {
     private val qrcKey2 = "123ZXC!@".toByteArray(Charsets.US_ASCII)
     private val qrcKey3 = "!@#)(*$%".toByteArray(Charsets.US_ASCII)
     private val lineTiming = Regex("^\\[(\\d+),(\\d+)](.*)$")
+    private val backgroundTiming = Regex("^\\[bg:(\\d+),(\\d+)](.*)$", RegexOption.IGNORE_CASE)
     private val wordTiming = Regex("\\((\\d+),(\\d+)\\)")
     private val lyricContent = Regex("LyricContent=\"(.*?)\"", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
     private const val AnnotationToleranceMs = 1_500L
@@ -34,7 +35,8 @@ object QQMusicQrcLyricsParser {
                 normalized.substring(index * 2, index * 2 + 2).toInt(16).toByte()
             }
         }.getOrElse { return "" }
-        return decodeCompressed(qrcDecrypt(encrypted))
+        return QQMusicMeiQrcDecoder.decodeLyric(normalized)
+            .ifBlank { decodeCompressed(qrcDecrypt(encrypted)) }
             .ifBlank { decodeCompressed(legacyTripleDesDecrypt(encrypted)) }
     }
 
@@ -132,52 +134,70 @@ object QQMusicQrcLyricsParser {
         return decryptHex(normalized)
     }
 
-    private fun parseQrcLines(source: String): List<LyricLine> = buildList {
+    private fun parseQrcLines(source: String): List<LyricLine> {
+        val lines = mutableListOf<LyricLine>()
+        var alignment = LyricAgentAlignment.Normal
         for (raw in source.lineSequence()) {
-            val match = lineTiming.find(raw.trim()) ?: continue
-            val lineStart = match.groupValues[1].toLongOrNull() ?: continue
-            val lineDuration = match.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
-            val content = match.groupValues[3]
-            val timingMatches = wordTiming.findAll(content).toList()
-            if (timingMatches.isEmpty()) {
-                val text = content.trim()
-                if (text.isNotBlank()) add(LyricLine(lineStart, lineDuration, text))
-                continue
-            }
-
-            val syllables = buildList {
-                var textStart = 0
-                for (timing in timingMatches) {
-                    val textEnd = timing.range.first
-                    if (textEnd < textStart) continue
-                    val text = content.substring(textStart, textEnd)
-                    textStart = timing.range.last + 1
-                    if (text.isEmpty()) continue
-                    val rawStart = timing.groupValues[1].toLongOrNull() ?: continue
-                    val duration = timing.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
-                    val start = if (rawStart < lineStart && lineStart > 0L) lineStart + rawStart else rawStart
-                    add(
-                        LyricSyllable(
+            val trimmed = raw.trim()
+            val background = backgroundTiming.find(trimmed)
+            if (background != null) {
+                val start = background.groupValues[1].toLongOrNull() ?: continue
+                val duration = background.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
+                val content = background.groupValues[3]
+                val syllables = parseQrcSyllables(content, start)
+                val text = syllables.joinToString("") { it.text }.ifBlank { content.trim() }
+                if (text.isNotBlank() && lines.isNotEmpty()) {
+                    val parent = lines.last()
+                    lines[lines.lastIndex] = parent.copy(
+                        accompaniment = parent.accompaniment + LyricAccompaniment(
+                            timeMs = start,
+                            durationMs = duration,
                             text = text,
-                            startTimeMs = start,
-                            endTimeMs = start + duration,
+                            syllables = syllables,
+                            agent = parent.agent,
                         ),
                     )
                 }
+                continue
             }
-            val text = syllables.joinToString("") { it.text }.trim()
+            val match = lineTiming.find(trimmed) ?: continue
+            val lineStart = match.groupValues[1].toLongOrNull() ?: continue
+            val lineDuration = match.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
+            val content = match.groupValues[3]
+            val syllables = parseQrcSyllables(content, lineStart)
+            val text = syllables.joinToString("") { it.text }.ifBlank { content.trim() }.trim()
             if (text.isNotBlank()) {
-                add(
+                if (text.startsWith(":") || text.startsWith("：") || text.endsWith(":") || text.endsWith("：")) {
+                    alignment = if (alignment == LyricAgentAlignment.Normal) LyricAgentAlignment.Flipped else LyricAgentAlignment.Normal
+                }
+                lines +=
                     LyricLine(
                         timeMs = lineStart,
                         durationMs = lineDuration,
                         text = text,
                         syllables = syllables,
-                    ),
-                )
+                        agent = LyricAgent("qrc-${alignment.name}", alignment.name, alignment),
+                    )
             }
         }
-    }.sortedBy(LyricLine::timeMs)
+        return lines.sortedBy(LyricLine::timeMs)
+    }
+
+    private fun parseQrcSyllables(content: String, lineStart: Long): List<LyricSyllable> = buildList {
+        val matches = wordTiming.findAll(content).toList()
+        var textStart = 0
+        for (timing in matches) {
+            val textEnd = timing.range.first
+            if (textEnd < textStart) continue
+            val text = content.substring(textStart, textEnd)
+            textStart = timing.range.last + 1
+            if (text.isEmpty()) continue
+            val rawStart = timing.groupValues[1].toLongOrNull() ?: continue
+            val duration = timing.groupValues[2].toLongOrNull()?.coerceAtLeast(1L) ?: continue
+            val start = if (rawStart < lineStart && lineStart > 0L) lineStart + rawStart else rawStart
+            add(LyricSyllable(text, start, start + duration))
+        }
+    }
 
     private fun extractLyricText(source: String): String {
         val value = source.trim().trimEnd('\u0000')

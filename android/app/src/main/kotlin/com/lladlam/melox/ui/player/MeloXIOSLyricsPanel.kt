@@ -10,6 +10,13 @@ import android.os.SystemClock
 import java.text.BreakIterator
 import java.util.Locale
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.RepeatMode
@@ -206,8 +213,8 @@ private fun MeloXAppleMusicLyricsPanel(
     // raster-prepared the next row when its blurred edge first becomes visible.
     val listState = rememberLazyListState(
         cacheWindow = LazyLayoutCacheWindow(
-            ahead = 240.dp,
-            behind = 120.dp,
+            ahead = 600.dp,
+            behind = 240.dp,
         ),
     )
     val density = LocalDensity.current
@@ -317,8 +324,12 @@ private fun MeloXAppleMusicLyricsPanel(
             val activeInterlude = interludes.getOrNull(nextInterlude)
             val nextIndex = if (
                 MeloXSettingsRuntime.lyricInterludeCountdownEnabled &&
-                activeInterlude != null && position < activeInterlude.countdownEndTimeMs
+                activeInterlude != null
             ) {
+                // Keep the upcoming line as the scroll target for the complete
+                // waiting interval. The countdown itself ends 250 ms early, but
+                // returning focus to the previous line during that final gap
+                // causes an up-then-snap-down jump when singing resumes.
                 activeInterlude.followingLyricIndex
             } else {
                 sourceHighlightedIndex(lines, effectivePosition)
@@ -753,7 +764,7 @@ private fun MeloXAppleMusicLyricsPanel(
                 val browsingVisibleItemsByIndex by remember(listState) {
                     derivedStateOf { listState.layoutInfo.visibleItemsInfo.associateBy { it.index } }
                 }
-                val visibleItemsByIndex = if (isBrowsingLyrics) browsingVisibleItemsByIndex else emptyMap()
+                val visibleItemsByIndex = browsingVisibleItemsByIndex
 
                 LazyColumn(
                     state = listState,
@@ -991,12 +1002,17 @@ private fun MeloXUpstreamLyricLine(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val flipped = line.agent?.alignment == com.lladlam.melox.core.lyrics.LyricAgentAlignment.Flipped
+    val lineAlignment = if (flipped) Alignment.End else Alignment.Start
+    val lineTextAlign = if (flipped) TextAlign.End else TextAlign.Start
     val requestedBlur = max(max(distanceBlurDp, focusBlurDp), 0f)
     val effectiveBlur = when (renderingQuality) {
         MeloXLyricsRenderingQuality.Low -> 0f
         MeloXLyricsRenderingQuality.Balanced -> requestedBlur * .55f
         MeloXLyricsRenderingQuality.High -> requestedBlur
     }
+    val accompanimentBefore = line.accompaniment.filter { it.timeMs < line.timeMs }
+    val accompanimentAfter = line.accompaniment.filterNot { it.timeMs < line.timeMs }
 
     Column(
         modifier = Modifier
@@ -1007,7 +1023,7 @@ private fun MeloXUpstreamLyricLine(
                 scaleX = visualScale
                 scaleY = visualScale
                 alpha = rowAlpha
-                transformOrigin = TransformOrigin(0f, 0f)
+                transformOrigin = TransformOrigin(if (flipped) 1f else 0f, 0f)
             }
             .combinedClickable(
                 enabled = tapSeekEnabled || longPressShareEnabled,
@@ -1015,8 +1031,11 @@ private fun MeloXUpstreamLyricLine(
                 onLongClick = { if (longPressShareEnabled) onLongClick() },
             )
             .padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.Start,
+        horizontalAlignment = lineAlignment,
     ) {
+        accompanimentBefore.forEach { vocal ->
+            MeloXTimedAccompaniment(vocal, playbackTimeProvider, fontScale, reduceMotion, focusProgress, renderingQuality, effectiveBlur)
+        }
         if (showRomanization) {
             MeloXRubyLyricText(
                 line = line,
@@ -1027,6 +1046,7 @@ private fun MeloXUpstreamLyricLine(
                 supportsTimedLyrics = supportsTimedLyrics && focusProgress > 0.01f,
                 fontScale = fontScale,
                 renderingQuality = renderingQuality,
+                softBlurDp = effectiveBlur,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
@@ -1046,6 +1066,10 @@ private fun MeloXUpstreamLyricLine(
             )
         }
 
+        accompanimentAfter.forEach { vocal ->
+            MeloXTimedAccompaniment(vocal, playbackTimeProvider, fontScale, reduceMotion, focusProgress, renderingQuality, effectiveBlur)
+        }
+
         val romanSize = max(UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricRomanizationFontScale, 13f)
         if (!showRomanization && reserveRomanization) {
             val romanHeight = with(LocalDensity.current) { (romanSize * 1.2f).sp.toDp() }
@@ -1058,15 +1082,58 @@ private fun MeloXUpstreamLyricLine(
                 text = line.translation.orEmpty(),
                 modifier = Modifier.fillMaxWidth().padding(top = UpstreamLyrics.ANNOTATION_SPACING_DP.dp),
                 color = Color.White.copy(alpha = MeloXSettingsRuntime.lyricTranslationOpacity),
-                textAlign = TextAlign.Start,
+                textAlign = lineTextAlign,
                 fontSize = translationSize.sp,
                 lineHeight = translationSize.sp * 1.2f,
                 fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
+                style = TextStyle(
+                    shadow = if (effectiveBlur > .05f) {
+                        Shadow(
+                            color = Color.White.copy(alpha = .48f),
+                            offset = Offset.Zero,
+                            blurRadius = effectiveBlur,
+                        )
+                    } else null,
+                ),
             )
         } else if (reserveTranslation) {
             val translationHeight = with(LocalDensity.current) { (translationSize * 1.2f).sp.toDp() }
             Spacer(Modifier.height(translationHeight + UpstreamLyrics.ANNOTATION_SPACING_DP.dp))
         }
+    }
+}
+
+@Composable
+private fun MeloXTimedAccompaniment(
+    vocal: com.lladlam.melox.core.lyrics.LyricAccompaniment,
+    playbackTimeProvider: () -> Long,
+    fontScale: Float,
+    reduceMotion: Boolean,
+    focusProgress: Float,
+    renderingQuality: MeloXLyricsRenderingQuality,
+    softBlurDp: Float,
+) {
+    val end = vocal.durationMs?.let { vocal.timeMs + it }
+        ?: vocal.syllables.maxOfOrNull { it.endTimeMs }
+        ?: vocal.timeMs
+    val visible = playbackTimeProvider() in (vocal.timeMs - 600L)..(end + 600L)
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(600)) + slideInVertically(tween(600)) { it / 2 } + expandVertically(tween(600)),
+        exit = fadeOut(tween(600)) + slideOutVertically(tween(600)) { it / 2 } + shrinkVertically(tween(600)),
+    ) {
+        val vocalLine = LyricLine(vocal.timeMs, vocal.durationMs, vocal.text, vocal.syllables, agent = vocal.agent)
+        MeloXGlyphLyricText(
+            line = vocalLine,
+            playbackTimeProvider = playbackTimeProvider,
+            supportsTimedLyrics = vocal.syllables.isNotEmpty(),
+            fontScale = fontScale * .68f,
+            reduceMotion = reduceMotion,
+            timingEffectsStrength = focusProgress,
+            renderingQuality = renderingQuality,
+            softBlurDp = softBlurDp,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).graphicsLayer { alpha = .72f },
+        )
     }
 }
 
@@ -1078,8 +1145,46 @@ private fun MeloXRubyLyricText(
     supportsTimedLyrics: Boolean,
     fontScale: Float,
     renderingQuality: MeloXLyricsRenderingQuality,
+    softBlurDp: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
+    if (MeloXSettingsRuntime.lyricWordByWordEnabled) {
+        Column(modifier = modifier) {
+            MeloXGlyphLyricText(
+                line = line,
+                playbackTimeProvider = playbackTimeProvider,
+                supportsTimedLyrics = supportsTimedLyrics,
+                fontScale = fontScale,
+                reduceMotion = false,
+                timingEffectsStrength = 1f,
+                renderingQuality = renderingQuality,
+                softBlurDp = softBlurDp,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!line.romanization.isNullOrBlank()) {
+                Text(
+                    text = line.romanization.orEmpty(),
+                    color = Color.White.copy(alpha = MeloXSettingsRuntime.lyricRomanizationOpacity),
+                    modifier = Modifier.fillMaxWidth().padding(top = UpstreamLyrics.ANNOTATION_SPACING_DP.dp),
+                    fontSize = max(
+                        UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricRomanizationFontScale,
+                        13f,
+                    ).sp,
+                    lineHeight = (
+                        max(
+                            UpstreamLyrics.FONT_SIZE_SP * fontScale * MeloXSettingsRuntime.lyricRomanizationFontScale,
+                            13f,
+                        ) * 1.2f
+                    ).sp,
+                    fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
+                    textAlign = if (line.agent?.alignment == com.lladlam.melox.core.lyrics.LyricAgentAlignment.Flipped) TextAlign.End else TextAlign.Start,
+                )
+            }
+        }
+        return
+    }
+
+    val flipped = line.agent?.alignment == com.lladlam.melox.core.lyrics.LyricAgentAlignment.Flipped
     val units = remember(line) { LyricRomanizationAligner.units(line) }
     if (units.isEmpty()) {
         MeloXGlyphLyricText(
@@ -1090,6 +1195,7 @@ private fun MeloXRubyLyricText(
             reduceMotion = true,
             timingEffectsStrength = 1f,
             renderingQuality = renderingQuality,
+            softBlurDp = softBlurDp,
             modifier = modifier,
         )
         return
@@ -1099,7 +1205,10 @@ private fun MeloXRubyLyricText(
     val rubySize = max(primarySize * MeloXSettingsRuntime.lyricRomanizationFontScale, 13f)
     FlowRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(
+            2.dp,
+            alignment = if (flipped) Alignment.End else Alignment.Start,
+        ),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         units.forEach { unit ->
@@ -1122,6 +1231,11 @@ private fun MeloXRubyLyricText(
                     lineHeight = (UpstreamLyrics.LINE_HEIGHT_SP * fontScale).sp,
                     fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
                     maxLines = 1,
+                    style = TextStyle(
+                        shadow = if (softBlurDp > .05f) {
+                            Shadow(Color.White.copy(alpha = .48f), Offset.Zero, softBlurDp)
+                        } else null,
+                    ),
                 )
                 if (!unit.romanizationText.isNullOrBlank()) {
                     val originalUnits = unit.originalText.codePointCount(0, unit.originalText.length).coerceAtLeast(1)
@@ -1134,6 +1248,11 @@ private fun MeloXRubyLyricText(
                         lineHeight = (rubySize * 1.2f).sp,
                         fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
                         maxLines = 1,
+                        style = TextStyle(
+                            shadow = if (softBlurDp > .05f) {
+                                Shadow(Color.White.copy(alpha = .42f), Offset.Zero, softBlurDp)
+                            } else null,
+                        ),
                     )
                 }
             }
@@ -1291,6 +1410,7 @@ private fun MeloXGlyphLyricText(
     modifier: Modifier = Modifier,
 ) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val flipped = line.agent?.alignment == com.lladlam.melox.core.lyrics.LyricAgentAlignment.Flipped
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer(cacheSize = 64)
     BoxWithConstraints(modifier = modifier) {
@@ -1300,12 +1420,13 @@ private fun MeloXGlyphLyricText(
             fontSize = (UpstreamLyrics.FONT_SIZE_SP * fontScale).sp,
             lineHeight = (UpstreamLyrics.LINE_HEIGHT_SP * fontScale).sp,
             fontWeight = MeloXSettingsRuntime.lyricFontWeight.composeWeight,
+            textAlign = if (flipped) TextAlign.End else TextAlign.Start,
         )
         val layout = remember(line.text, widthPx, style) {
             textMeasurer.measure(
                 text = AnnotatedString(line.text),
                 style = style,
-                constraints = Constraints(maxWidth = widthPx),
+                constraints = Constraints(minWidth = widthPx, maxWidth = widthPx),
                 softWrap = true,
             )
         }
@@ -1422,7 +1543,9 @@ private fun MeloXGlyphLyricText(
             // line flash before the first syllable started revealing.
             val unplayedAlpha = MeloXSettingsRuntime.lyricInactiveOpacity
 
-            if (renderingQuality != MeloXLyricsRenderingQuality.High || reduceMotion) {
+            if ((renderingQuality != MeloXLyricsRenderingQuality.High || reduceMotion) &&
+                (!MeloXSettingsRuntime.lyricWordByWordEnabled || reduceMotion)
+            ) {
                 // Low/Balanced render the complete shaped row twice and reveal
                 // it with one row mask. This preserves ligatures and reduces a
                 // CJK line from dozens of native drawText/clip calls to two.

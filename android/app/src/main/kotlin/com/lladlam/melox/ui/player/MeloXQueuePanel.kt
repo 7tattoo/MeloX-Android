@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.lladlam.melox.ui.glass.meloXBackdropBlur
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 
 @Composable
 fun MeloXQueuePanel(
@@ -140,10 +142,10 @@ private fun QueueModeControlsSurface(state: MeloXPlaybackUiState, interactive: B
             .padding(8.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            QueueModeButton("↝", state.shuffleEnabled, enabled = interactive, onClick = state::toggleShuffle, modifier = Modifier.weight(1f))
-            QueueModeButton(if (state.repeatMode == Player.REPEAT_MODE_ONE) "↻1" else "↻", state.repeatMode != Player.REPEAT_MODE_OFF, enabled = interactive, onClick = state::cycleRepeatMode, modifier = Modifier.weight(1f))
-            QueueModeButton("∞", state.autoplayEnabled, enabled = interactive, onClick = state::toggleAutoplay, modifier = Modifier.weight(1f))
-            QueueModeButton("◎", state.autoMixEnabled, enabled = interactive, onClick = state::toggleAutoMix, modifier = Modifier.weight(1f))
+            QueueModeButton(MeloXSymbol.Shuffle, state.shuffleEnabled, enabled = interactive, onClick = state::toggleShuffle, modifier = Modifier.weight(1f))
+            QueueModeButton(if (state.repeatMode == Player.REPEAT_MODE_ONE) MeloXSymbol.RepeatOne else MeloXSymbol.Repeat, state.repeatMode != Player.REPEAT_MODE_OFF, enabled = interactive, onClick = state::cycleRepeatMode, modifier = Modifier.weight(1f))
+            QueueModeButton(MeloXSymbol.Infinity, state.autoplayEnabled, enabled = interactive, onClick = state::toggleAutoplay, modifier = Modifier.weight(1f))
+            QueueModeButton(MeloXSymbol.AutoMix, state.autoMixEnabled, enabled = interactive, onClick = state::toggleAutoMix, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -208,14 +210,20 @@ private fun QueueRow(entry: MeloXQueueEntry, state: MeloXPlaybackUiState, intera
             Text(entry.artist, color = Color.White.copy(alpha = .58f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
         if (entry.index > state.currentIndex) {
-            Text("≡", color = Color.White.copy(alpha = .48f), fontSize = 22.sp)
+            MeloXSymbolIcon(
+                symbol = MeloXSymbol.List,
+                modifier = Modifier.size(22.dp),
+                color = Color.White.copy(alpha = .48f),
+                iconSize = 20.sp,
+                contentDescription = "调整播放顺序",
+            )
         }
     }
 }
 
 @Composable
 private fun QueueModeButton(
-    label: String,
+    symbol: MeloXSymbol,
     selected: Boolean,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -229,15 +237,23 @@ private fun QueueModeButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label,
+        MeloXSymbolIcon(
+            symbol = symbol,
+            modifier = Modifier.size(24.dp),
             color = when {
                 !enabled -> Color.White.copy(alpha = .25f)
                 selected -> Color.Black.copy(alpha = .62f)
                 else -> Color.White.copy(alpha = .86f)
             },
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
+            iconSize = 22.sp,
+            contentDescription = when (symbol) {
+                MeloXSymbol.Shuffle -> "随机播放"
+                MeloXSymbol.Repeat -> "列表循环"
+                MeloXSymbol.RepeatOne -> "单曲循环"
+                MeloXSymbol.Infinity -> "无尽播放"
+                MeloXSymbol.AutoMix -> "自动过渡"
+                else -> null
+            },
         )
     }
 }

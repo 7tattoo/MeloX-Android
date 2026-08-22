@@ -92,6 +92,10 @@ object MeloXSettingsRuntime {
         internal set
     var showLyricTranslation by mutableStateOf(true)
         internal set
+    var automaticLyricSelectionEnabled by mutableStateOf(true)
+        internal set
+    var lyricStrongBindingEnabled by mutableStateOf(false)
+        internal set
     var showLyricRomanization by mutableStateOf(true)
         internal set
     var lyricWordByWordEnabled by mutableStateOf(true)
@@ -116,7 +120,7 @@ object MeloXSettingsRuntime {
         internal set
     var lyricBackgroundFrameRate by mutableStateOf(24)
         internal set
-    var lyricRenderingQuality by mutableStateOf(MeloXLyricsRenderingQuality.Balanced)
+    var lyricRenderingQuality by mutableStateOf(MeloXLyricsRenderingQuality.High)
         internal set
     var lyricRomanizationDisplayMode by mutableStateOf(MeloXLyricAnnotationDisplayMode.FocusedLine)
         internal set
@@ -389,6 +393,8 @@ object MeloXSettingsRuntime {
             )
         }.getOrDefault(MeloXScreenAwakeMode.Disabled)
         showLyricTranslation = MeloXSettingsPreferences.boolean(app, "lyrics_translation", true)
+        automaticLyricSelectionEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_auto_select", true)
+        lyricStrongBindingEnabled = MeloXSettingsPreferences.boolean(app, "experimental_lyric_strong_binding", false)
         showLyricRomanization = MeloXSettingsPreferences.boolean(app, "lyrics_romanization", true)
         lyricWordByWordEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_word_by_word", true)
         lyricPseudoTimingEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_pseudo_timing", true)
@@ -408,10 +414,10 @@ object MeloXSettingsRuntime {
                 MeloXSettingsPreferences.string(
                     app,
                     "lyrics_rendering_quality",
-                    MeloXLyricsRenderingQuality.Balanced.name,
+                    MeloXLyricsRenderingQuality.High.name,
                 ),
             )
-        }.getOrDefault(MeloXLyricsRenderingQuality.Balanced)
+        }.getOrDefault(MeloXLyricsRenderingQuality.High)
         lyricRomanizationDisplayMode = annotationMode(app, "lyrics_romanization_display_mode")
         lyricTranslationDisplayMode = annotationMode(app, "lyrics_translation_display_mode")
         lyricFollowDelayMs = MeloXSettingsPreferences.int(app, "lyrics_follow_delay_ms", 3_000).coerceIn(1_000, 8_000)
@@ -589,6 +595,14 @@ object MeloXSettingsPreferences {
 
     fun setBoolean(context: Context, key: String, value: Boolean) {
         prefs(context).edit().putBoolean(key, value).apply()
+        if (key == "lyrics_auto_select" && !value) {
+            prefs(context).edit().putBoolean("experimental_lyric_strong_binding", false).apply()
+            MeloXSettingsRuntime.lyricStrongBindingEnabled = false
+            com.lladlam.melox.core.lyrics.LyricBindingStore.clear(context)
+        }
+        if (key == "experimental_lyric_strong_binding" && !value) {
+            com.lladlam.melox.core.lyrics.LyricBindingStore.clear(context)
+        }
         when (key) {
             "developer_performance_overlay" -> MeloXSettingsRuntime.performanceOverlayEnabled = value
             "feature_podcasts" -> MeloXSettingsRuntime.podcastsEnabled = value
@@ -609,6 +623,8 @@ object MeloXSettingsPreferences {
             "player_background_isolation" -> MeloXSettingsRuntime.playerBackgroundIsolationEnabled = value
             "player_keep_screen_on" -> MeloXSettingsRuntime.keepScreenOn = value
             "lyrics_translation" -> MeloXSettingsRuntime.showLyricTranslation = value
+            "lyrics_auto_select" -> MeloXSettingsRuntime.automaticLyricSelectionEnabled = value
+            "experimental_lyric_strong_binding" -> MeloXSettingsRuntime.lyricStrongBindingEnabled = value
             "lyrics_romanization" -> MeloXSettingsRuntime.showLyricRomanization = value
             "lyrics_word_by_word" -> MeloXSettingsRuntime.lyricWordByWordEnabled = value
             "lyrics_pseudo_timing" -> MeloXSettingsRuntime.lyricPseudoTimingEnabled = value
@@ -744,7 +760,7 @@ object MeloXSettingsPreferences {
             }.getOrDefault(MeloXLyricAnnotationDisplayMode.FocusedLine)
             "lyrics_rendering_quality" -> MeloXSettingsRuntime.lyricRenderingQuality = runCatching {
                 MeloXLyricsRenderingQuality.valueOf(value)
-            }.getOrDefault(MeloXLyricsRenderingQuality.Balanced)
+            }.getOrDefault(MeloXLyricsRenderingQuality.High)
             "lyrics_style" -> MeloXSettingsRuntime.lyricsStyle = runCatching {
                 MeloXLyricsStyle.valueOf(value)
             }.getOrDefault(MeloXLyricsStyle.AppleMusic)

@@ -7,6 +7,7 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,9 +32,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,14 +49,21 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.shapes.Capsule
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
+import com.lladlam.melox.ui.glass.MeloXSymbolVariant
+import com.lladlam.melox.playback.MeloXAudioReactiveRuntime
+import com.lladlam.melox.playback.MeloXAudioReactiveSample
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -64,7 +77,31 @@ fun MeloXIOSMiniPlayer(
 ) {
     if (!state.hasMedia) return
 
-    var accumulatedDrag by remember(state.mediaId) { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val swipeWidth = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    val contentOffset = remember { Animatable(0f) }
+    var accumulatedDrag by remember { mutableFloatStateOf(0f) }
+    var pendingDirection by remember { mutableIntStateOf(0) }
+    var reactiveSample by remember { mutableStateOf(MeloXAudioReactiveSample.Idle) }
+
+    LaunchedEffect(state.mediaId, state.title, state.artworkUrl) {
+        if (pendingDirection != 0 && state.title.isNotBlank() && state.artworkUrl != null) {
+            // Keep the outgoing frame in place until the new media metadata is
+            // available, then reveal the new frame without a second animation.
+            contentOffset.snapTo(0f)
+            pendingDirection = 0
+        } else if (pendingDirection == 0) {
+            contentOffset.snapTo(0f)
+        }
+    }
+
+    LaunchedEffect(state.mediaId, state.isPlaying) {
+        while (true) {
+            reactiveSample = MeloXAudioReactiveRuntime.sample(state.mediaId)
+            kotlinx.coroutines.delay(50L)
+        }
+    }
 
     val expansionProgress = if (animatedVisibilityScope != null) {
         val value by animatedVisibilityScope.transition.animateFloat(
@@ -101,11 +138,27 @@ fun MeloXIOSMiniPlayer(
 
     val compact = compactProgress.coerceIn(0f, 1f)
     val artworkSize = lerpDp(40.dp, 30.dp, compact)
-    val artworkRadius = lerpDp(9.dp, 7.dp, compact)
+    val artworkRadius = 6.dp
     val compactArtistAlpha = 1f - smoothStep(compact, 0.04f, 0.52f)
     val compactNextAlpha = 1f - smoothStep(compact, 0.04f, 0.50f)
-    val controlStageWidth = lerpDp(82.dp, 44.dp, smoothStep(compact, 0.08f, 0.84f))
+    val controlStageWidth = lerpDp(72.dp, 36.dp, smoothStep(compact, 0.08f, 0.84f))
     val artistHeight = lerpDp(15.dp, 0.dp, smoothStep(compact, 0.04f, 0.72f))
+    val dragDirection = when {
+        contentOffset.value < 0f -> -1
+        contentOffset.value > 0f -> 1
+        else -> 0
+    }
+    val adjacentEntry = when (dragDirection) {
+        -1 -> state.queue.getOrNull(
+            if (state.currentIndex + 1 < state.queue.size) state.currentIndex + 1 else 0,
+        )
+        1 -> state.queue.getOrNull(
+            if (state.currentIndex > 0) state.currentIndex - 1 else state.queue.lastIndex,
+        )
+        else -> null
+    }
+    val dragProgress = (kotlin.math.abs(contentOffset.value) / swipeWidth.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    val adjacentAlpha = smoothStep(dragProgress, 0.15f, 0.85f)
 
     // The shared bounds itself is rendered in SharedTransitionScope's overlay.
     // Lift source chrome into the same overlay so it is not abruptly covered by
@@ -143,13 +196,13 @@ fun MeloXIOSMiniPlayer(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .padding(vertical = 3.dp)
             .then(sharedContainerModifier),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(52.dp),
         ) {
             // Keep the glass surface out of the shared-bounds node itself.
             // When a capsule-shaped draw modifier is resized to the full
@@ -174,32 +227,63 @@ fun MeloXIOSMiniPlayer(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
-                .padding(start = 7.dp, end = 7.dp, top = 5.dp, bottom = 5.dp),
+                .height(52.dp)
+                .clip(Capsule())
+                .padding(
+                    horizontal = lerpDp(12.dp, 8.dp, compact),
+                    vertical = lerpDp(6.dp, 3.dp, compact),
+                )
+                ,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .weight(1f)
+                    .fillMaxHeight()
                     .pointerInput(state.mediaId) {
                         detectHorizontalDragGestures(
-                            onDragStart = { accumulatedDrag = 0f },
-                            onHorizontalDrag = { _, dragAmount -> accumulatedDrag += dragAmount },
+                            onDragStart = {
+                                accumulatedDrag = 0f
+                                scope.launch { contentOffset.stop() }
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                accumulatedDrag += dragAmount
+                                scope.launch {
+                                    contentOffset.snapTo((contentOffset.value + dragAmount).coerceIn(-swipeWidth * .86f, swipeWidth * .86f))
+                                }
+                            },
                             onDragEnd = {
-                                when {
-                                    accumulatedDrag <= -48f -> state.next()
-                                    accumulatedDrag >= 48f -> state.previous()
+                                val direction = when {
+                                    accumulatedDrag <= -28f -> -1
+                                    accumulatedDrag >= 28f -> 1
+                                    else -> 0
+                                }
+                                if (direction != 0) {
+                                    scope.launch {
+                                        contentOffset.animateTo(direction * swipeWidth, spring(dampingRatio = .68f, stiffness = 360f))
+                                        pendingDirection = direction
+                                        if (direction < 0) state.nextFromMiniPlayer() else state.previousFromMiniPlayer()
+                                    }
+                                } else {
+                                    scope.launch { contentOffset.animateTo(0f, spring(dampingRatio = .72f, stiffness = 430f)) }
                                 }
                                 accumulatedDrag = 0f
                             },
-                            onDragCancel = { accumulatedDrag = 0f },
+                            onDragCancel = {
+                                accumulatedDrag = 0f
+                                scope.launch { contentOffset.animateTo(0f, spring(dampingRatio = .72f, stiffness = 430f)) }
+                            },
                         )
                     }
-                    .clickable(onClick = onExpand),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .clickable(interactionSource = null, indication = null, onClick = onExpand),
             ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().graphicsLayer { translationX = contentOffset.value },
+                    verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(lerpDp(10.dp, 8.dp, compact)),
+                ) {
                 // The artwork stays in the shared container. Applying a second
                 // sharedElement here gives it a separate timeline from the
                 // container and makes the cover visibly detach during expansion.
@@ -243,21 +327,41 @@ fun MeloXIOSMiniPlayer(
                         )
                     }
                 }
+                }
+                adjacentEntry?.let { entry ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = adjacentAlpha
+                                translationX = contentOffset.value - dragDirection * swipeWidth
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(lerpDp(10.dp, 8.dp, compact)),
+                    ) {
+                        Artwork(entry.artworkUrl, Modifier.size(artworkSize).clip(RoundedCornerShape(artworkRadius)))
+                        Column(Modifier.weight(1f)) {
+                            Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(entry.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .64f))
+                        }
+                    }
+                }
             }
 
             MiniDancingBars(
                 isPlaying = state.isPlaying,
+                sample = reactiveSample,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = miniChromeAlpha * 0.72f),
                 modifier = Modifier
-                    .width(17.dp)
-                    .height(20.dp)
+                            .width(15.dp)
+                            .height(18.dp)
                     .graphicsLayer { alpha = miniChromeAlpha },
             )
 
             Box(
                 modifier = Modifier
                     .width(controlStageWidth)
-                    .height(44.dp)
+                    .height(36.dp)
                     .zIndex(8f),
             ) {
                 MiniVectorButton(
@@ -288,23 +392,19 @@ fun MeloXIOSMiniPlayer(
 @Composable
 private fun MiniDancingBars(
     isPlaying: Boolean,
+    sample: MeloXAudioReactiveSample,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val transition = if (isPlaying) {
-        rememberInfiniteTransition(label = "mini-dancing-bars")
-    } else null
-    val bars = listOf(.52f, .78f, .38f, .66f).mapIndexed { index, base ->
-        transition?.animateFloat(
-            initialValue = base * .58f,
-            targetValue = base,
-            animationSpec = infiniteRepeatable(
-                animation = tween(270 + index * 23),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "mini-dancing-bar-$index",
-        )?.value ?: base * .62f
-    }
+    val energy = if (isPlaying) sample.energy.coerceIn(0.08f, 1f) else 0.10f
+    val beat = if (isPlaying) sample.beat else 0f
+    val downbeat = if (isPlaying) sample.downbeat else 0f
+    val bars = listOf(
+        energy * (0.58f + downbeat * 0.30f),
+        energy * (0.86f + beat * 0.22f),
+        energy * (0.46f + downbeat * 0.42f),
+        energy * (0.72f + beat * 0.28f),
+    )
     Canvas(modifier) {
         val gap = size.width * .12f
         val barWidth = (size.width - gap * 3f) / 4f
@@ -336,7 +436,7 @@ private fun MiniVectorButton(
     Box(
         modifier = modifier
             .graphicsLayer { alpha = drawAlpha }
-            .size(44.dp)
+            .size(36.dp)
             .clip(CircleShape)
             .clickable(
                 enabled = enabled && drawAlpha > 0.05f,
@@ -344,49 +444,17 @@ private fun MiniVectorButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(if (kind == MiniGlyph.Forward) 25.dp else 23.dp)) {
-            when (kind) {
-                MiniGlyph.Play -> {
-                    val path = Path().apply {
-                        moveTo(size.width * 0.24f, size.height * 0.14f)
-                        lineTo(size.width * 0.82f, size.height * 0.50f)
-                        lineTo(size.width * 0.24f, size.height * 0.86f)
-                        close()
-                    }
-                    drawPath(path, color)
-                }
-                MiniGlyph.Pause -> {
-                    drawRoundRect(
-                        color = color,
-                        topLeft = Offset(size.width * 0.24f, size.height * 0.14f),
-                        size = androidx.compose.ui.geometry.Size(size.width * 0.17f, size.height * 0.72f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width * 0.035f),
-                    )
-                    drawRoundRect(
-                        color = color,
-                        topLeft = Offset(size.width * 0.59f, size.height * 0.14f),
-                        size = androidx.compose.ui.geometry.Size(size.width * 0.17f, size.height * 0.72f),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width * 0.035f),
-                    )
-                }
-                MiniGlyph.Forward -> {
-                    val first = Path().apply {
-                        moveTo(size.width * 0.06f, size.height * 0.16f)
-                        lineTo(size.width * 0.49f, size.height * 0.50f)
-                        lineTo(size.width * 0.06f, size.height * 0.84f)
-                        close()
-                    }
-                    val second = Path().apply {
-                        moveTo(size.width * 0.45f, size.height * 0.16f)
-                        lineTo(size.width * 0.88f, size.height * 0.50f)
-                        lineTo(size.width * 0.45f, size.height * 0.84f)
-                        close()
-                    }
-                    drawPath(first, color)
-                    drawPath(second, color)
-                }
-            }
-        }
+        MeloXSymbolIcon(
+            symbol = when (kind) {
+                MiniGlyph.Play -> MeloXSymbol.Play
+                MiniGlyph.Pause -> MeloXSymbol.Pause
+                MiniGlyph.Forward -> MeloXSymbol.Next
+            },
+            modifier = Modifier.size(22.dp),
+            color = color,
+            variant = if (kind == MiniGlyph.Play || kind == MiniGlyph.Pause) MeloXSymbolVariant.Fill else MeloXSymbolVariant.Regular,
+            iconSize = 22.sp,
+        )
     }
 }
 

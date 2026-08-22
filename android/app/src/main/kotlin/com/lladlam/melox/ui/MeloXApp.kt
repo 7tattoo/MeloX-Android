@@ -3,12 +3,18 @@ package com.lladlam.melox.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
@@ -105,6 +111,7 @@ import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.meloXLiquidTabSelection
 import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import com.lladlam.melox.ui.player.MeloXIOSMiniPlayer
+import com.lladlam.melox.ui.player.MeloXProviderLyricsLoader
 import com.lladlam.melox.ui.player.MeloXIOSNowPlayingSharedHost
 import com.lladlam.melox.ui.player.rememberMeloXPlaybackUiState
 import com.lladlam.melox.ui.provider.ProviderExploreScreen
@@ -280,6 +287,16 @@ fun MeloXApp(
         }
     }
 
+    LaunchedEffect(
+        playbackState.currentIndex,
+        playbackState.queue.map { it.mediaId },
+        MeloXSettingsRuntime.automaticLyricSelectionEnabled,
+    ) {
+        if (playbackState.hasMedia) {
+            MeloXProviderLyricsLoader.preloadQueue(context, playbackState, count = 2)
+        }
+    }
+
     LaunchedEffect(neteaseSession.cookie) {
         if (neteaseSession.isLoggedIn) {
             neteaseSession.refreshProfile()
@@ -369,7 +386,35 @@ fun MeloXApp(
                         .fillMaxSize()
                         .padding(innerPadding),
                 ) {
-                    rootPageState.SaveableStateProvider(selectedTab.name) { when (selectedTab) {
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            when {
+                                initialState in visibleRootTabs && targetState in visibleRootTabs ->
+                                    fadeIn(tween(220)) togetherWith fadeOut(tween(160))
+
+                                initialState == AppTab.Services && targetState == AppTab.Settings ->
+                                    slideInHorizontally(
+                                        animationSpec = tween(300, easing = FastOutSlowInEasing),
+                                        initialOffsetX = { -it / 4 },
+                                    ) togetherWith slideOutHorizontally(
+                                        animationSpec = tween(300, easing = FastOutSlowInEasing),
+                                        targetOffsetX = { it },
+                                    )
+
+                                else -> slideInHorizontally(
+                                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                                    initialOffsetX = { it },
+                                ) togetherWith slideOutHorizontally(
+                                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { -it / 4 },
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        label = "melox-page-transition",
+                    ) { tab ->
+                    rootPageState.SaveableStateProvider(tab.name) { when (tab) {
                         AppTab.Search -> if (selectedSource == MusicSource.Netease) SearchScreen() else ProviderSearchScreen(selectedSource)
                         AppTab.Home -> MeloXHomeScreen(
                             source = selectedSource,
@@ -443,6 +488,7 @@ fun MeloXApp(
                             onBack = { selectedTab = AppTab.Settings },
                         )
                     } }
+                    }
                 }
             }
 
@@ -702,8 +748,8 @@ private fun MeloXBottomChrome(
 
     val navHeight = lerpDp(64.dp, 48.dp, sizeStage)
     val searchSize = lerpDp(64.dp, 48.dp, sizeStage)
-    val expandedChromeHeight = if (hasMedia) 121.dp else 64.dp
-    val chromeHeight = lerpDp(expandedChromeHeight, 58.dp, dropStage)
+    val expandedChromeHeight = if (hasMedia) 124.dp else 64.dp
+    val chromeHeight = lerpDp(expandedChromeHeight, 56.dp, dropStage)
     val labelAlpha = 1f - labelStage
     val expandedLayerAlpha = 1f - smoothStep(progress, 0.43f, 0.72f)
     val compactLayerAlpha = smoothStep(progress, 0.52f, 0.82f)
@@ -733,12 +779,11 @@ private fun MeloXBottomChrome(
             val desiredCompactMiniVisibleWidth =
                 (maxWidth - horizontalMargin * 2 - compactSize * 2 - compactGap * 2)
                     .coerceAtLeast(80.dp)
-            val compactMiniWrapperWidth =
-                (desiredCompactMiniVisibleWidth + 32.dp).coerceAtMost(maxWidth)
-            val compactMiniWrapperX = horizontalMargin + compactSize + compactGap - 16.dp
-            val miniWrapperWidth = lerpDp(maxWidth, compactMiniWrapperWidth, shrinkStage)
-            val miniWrapperX = lerpDp(0.dp, compactMiniWrapperX, shrinkStage)
-            val miniLift = lerpDp(62.dp, 0.dp, shrinkStage)
+            val compactMiniWrapperWidth = desiredCompactMiniVisibleWidth
+            val compactMiniWrapperX = horizontalMargin + compactSize + compactGap
+            val miniWrapperWidth = lerpDp(maxWidth - horizontalMargin * 2, compactMiniWrapperWidth, shrinkStage)
+            val miniWrapperX = lerpDp(horizontalMargin, compactMiniWrapperX, shrinkStage)
+            val miniLift = lerpDp(66.dp, 0.dp, shrinkStage)
 
             if (hasMedia) {
                 Box(
@@ -946,13 +991,6 @@ private fun MeloXBottomChrome(
                                     alpha = selectionTint.alpha * lensVisibility,
                                 ),
                             )
-                            .border(
-                                width = if (dark) 0.9.dp else 0.8.dp,
-                                color = selectionBorder.copy(
-                                    alpha = selectionBorder.alpha * lensVisibility,
-                                ),
-                                shape = Capsule(),
-                            ),
                     )
                 }
             }

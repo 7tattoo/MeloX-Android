@@ -50,6 +50,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.PlaybackTrackIdentity
 import com.lladlam.melox.playback.ProviderPlaybackQualityRuntime
+import com.lladlam.melox.core.music.provider.PlaybackAccountStore
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
 import com.lladlam.melox.ui.glass.MeloXActionIcon
@@ -69,7 +70,7 @@ internal fun MeloXQualitySelectionOverlay(
     val downloads = remember(context) { MeloXDownloadStore.get(context) }
     val client = remember(context) {
         NeteaseQualityClient(
-            cookieProvider = { NeteaseSessionStore.readCookie(context) },
+            cookieProvider = { PlaybackAccountStore.neteaseCookie(context) },
         )
     }
     val identity = remember(state.mediaId) { state.mediaId?.let(PlaybackTrackIdentity::decode) }

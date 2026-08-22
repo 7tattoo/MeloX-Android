@@ -33,7 +33,7 @@ class NeteaseSessionStore(
     val isLoggedIn: Boolean
         get() = cookie.isNotBlank()
 
-    suspend fun acceptAuthenticatedCookie(candidate: String): Result<NeteaseAccountProfile> {
+    suspend fun acceptAuthenticatedCookie(candidate: String, persist: Boolean = true): Result<NeteaseAccountProfile> {
         val normalized = normalizeCookie(candidate)
         if (!containsMusicU(normalized)) {
             return Result.failure(IllegalStateException("未检测到 MUSIC_U 登录 Cookie"))
@@ -43,9 +43,11 @@ class NeteaseSessionStore(
         errorMessage = null
         return runCatching {
             val account = NeteaseSearchClient().accountProfile(normalized)
-            preferences.edit().putString(KEY_COOKIE, normalized).apply()
-            cookie = normalized
-            profile = account
+            if (persist) {
+                preferences.edit().putString(KEY_COOKIE, normalized).apply()
+                cookie = normalized
+                profile = account
+            }
             account
         }.onFailure { error ->
             errorMessage = error.message ?: "网易云账号验证失败"
@@ -91,6 +93,22 @@ class NeteaseSessionStore(
                 .getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_COOKIE, "")
                 .orEmpty()
+
+        fun readPlaybackCookie(context: Context): String =
+            context.applicationContext.getSharedPreferences("netease_playback_session", Context.MODE_PRIVATE)
+                .getString(KEY_COOKIE, "").orEmpty()
+
+        fun writePlaybackCookie(context: Context, cookieHeader: String) {
+            val normalized = normalizeCookie(cookieHeader)
+            require(containsMusicU(normalized)) { "未检测到 MUSIC_U 登录 Cookie" }
+            context.applicationContext.getSharedPreferences("netease_playback_session", Context.MODE_PRIVATE)
+                .edit().putString(KEY_COOKIE, normalized).apply()
+        }
+
+        fun clearPlayback(context: Context) {
+            context.applicationContext.getSharedPreferences("netease_playback_session", Context.MODE_PRIVATE)
+                .edit().clear().apply()
+        }
 
         fun containsMusicU(cookieHeader: String): Boolean =
             parseCookie(cookieHeader)["MUSIC_U"].isNullOrBlank().not()

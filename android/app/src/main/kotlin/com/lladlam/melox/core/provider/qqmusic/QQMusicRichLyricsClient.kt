@@ -6,6 +6,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.ProviderTrackMetadata
 import java.io.IOException
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -27,6 +28,7 @@ class QQMusicRichLyricsClient(
     )
 
     private enum class RequestProfile {
+        Mei,
         Android,
         Web,
         Desktop,
@@ -44,10 +46,15 @@ class QQMusicRichLyricsClient(
         )
 
         var best: LyricsDocument? = null
-        for (profile in listOf(RequestProfile.Android, RequestProfile.Web, RequestProfile.Desktop)) {
-            val parsed = runCatching {
-                requestPlayLyricInfo(identity, session, profile)
-            }.getOrNull() ?: continue
+        val failures = mutableListOf<String>()
+        for (profile in listOf(RequestProfile.Mei, RequestProfile.Android, RequestProfile.Web, RequestProfile.Desktop)) {
+            val result = runCatching {
+                requestPlayLyricInfo(track, identity, session, profile)
+            }
+            val parsed = result.getOrElse { error ->
+                failures += "${profile.name}: ${error.message ?: error::class.java.simpleName}"
+                continue
+            }
             if (parsed.lines.any { it.syllables.isNotEmpty() }) {
                 if (parsed.lines.any { !it.translation.isNullOrBlank() }) return@withContext parsed
                 if (best == null) best = parsed
@@ -59,16 +66,21 @@ class QQMusicRichLyricsClient(
         // shared parser intentionally accepts either representation field-by-field.
         val downloaded = runCatching {
             requestDownloadedLyrics(identity, session)
+        }.onFailure { error ->
+            failures += "Download: ${error.message ?: error::class.java.simpleName}"
         }.getOrNull()
         if (downloaded != null && downloaded.lines.any { it.syllables.isNotEmpty() }) {
             if (downloaded.lines.any { !it.translation.isNullOrBlank() }) return@withContext downloaded
             if (best == null) best = downloaded
         }
 
-        best ?: throw IOException("QQ音乐没有返回可用的逐字歌词")
+        best ?: throw IOException(
+            "QQ音乐没有返回可用的逐字歌词；${failures.joinToString("；")}",
+        )
     }
 
     private fun requestPlayLyricInfo(
+        track: MusicTrack,
         identity: SongIdentity,
         session: QQMusicSession,
         profile: RequestProfile,
@@ -83,14 +95,28 @@ class QQMusicRichLyricsClient(
             .put("roma", 1)
             .put("roma_t", 0)
             .put("needSingingAnnotations", false)
-            .put("type", identity.songType)
-        identity.songId?.let { lyricParam.put("songId", it) }
-            ?: lyricParam.put("songMid", identity.songMid)
+            .put("type", if (profile == RequestProfile.Mei) 0 else identity.songType)
+        if (profile == RequestProfile.Mei) {
+            val songId = identity.songId ?: throw IOException("Mei QRC 协议需要 QQ 数字歌曲 ID")
+            lyricParam
+                .put("albumName", base64(track.album?.name.orEmpty()))
+                .put("singerName", base64(track.artistText))
+                .put("songName", base64(track.title))
+                .put("interval", ((track.durationMs ?: 0L) / 1_000L).coerceAtLeast(0L))
+                .put("ct", 19)
+                .put("cv", 2111)
+                .put("songID", songId)
+        } else {
+            identity.songId?.let { lyricParam.put("songId", it) }
+                ?: lyricParam.put("songMid", identity.songMid)
+        }
+
+        val requestKey = if (profile == RequestProfile.Mei) MeiLyricRequestKey else "req_0"
 
         val payload = JSONObject()
             .put("comm", commonParams(profile, session))
             .put(
-                "req_0",
+                requestKey,
                 JSONObject()
                     .put("module", "music.musichallSong.PlayLyricInfo")
                     .put("method", "GetPlayLyricInfo")
@@ -113,7 +139,9 @@ class QQMusicRichLyricsClient(
             if (!response.isSuccessful) throw IOException("QQ音乐逐字歌词请求失败：HTTP ${response.code}")
             if (body.isBlank()) throw IOException("QQ音乐逐字歌词返回空响应")
             val root = JSONObject(body)
-            val req = root.optJSONObject("req_0") ?: throw IOException("QQ音乐逐字歌词响应缺少 req_0")
+            val req = root.optJSONObject(requestKey)
+                ?: root.optJSONObject("req_0")
+                ?: throw IOException("QQ音乐逐字歌词响应缺少 $requestKey")
             val code = req.optInt("code", 0)
             if (code != 0) {
                 throw IOException(
@@ -139,6 +167,22 @@ class QQMusicRichLyricsClient(
 
     private fun commonParams(profile: RequestProfile, session: QQMusicSession): JSONObject {
         return when (profile) {
+            RequestProfile.Mei -> JSONObject()
+                .put("_channelid", "")
+                .put("_os_version", "6.2.9200-2")
+                .put("authst", "")
+                .put("ct", 11)
+                .put("cv", "1003006")
+                .put("patch", "118")
+                .put("psrf_access_token_expiresAt", 0)
+                .put("psrf_qqaccess_token", "")
+                .put("psrf_qqopenid", "")
+                .put("psrf_qqunionid", "")
+                .put("tmeAppID", "qqmusiclight")
+                .put("tmeLoginType", 0)
+                .put("uin", "")
+                .put("wid", "")
+
             RequestProfile.Android -> JSONObject()
                 .put("ct", AndroidClientType)
                 .put("cv", AndroidClientVersion)
@@ -178,6 +222,7 @@ class QQMusicRichLyricsClient(
     }
 
     private fun userAgent(profile: RequestProfile): String = when (profile) {
+        RequestProfile.Mei -> MeiDesktopUserAgent
         RequestProfile.Android -> "QQMusic $AndroidClientVersion(android 15)"
         RequestProfile.Web,
         RequestProfile.Desktop -> DesktopUserAgent
@@ -295,6 +340,9 @@ class QQMusicRichLyricsClient(
         return (hash and 0x7fffffffL).toInt()
     }
 
+    private fun base64(value: String): String =
+        Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+
     private companion object {
         const val AndroidClientType = 11
         const val AndroidClientVersion = 14_090_008
@@ -302,5 +350,9 @@ class QQMusicRichLyricsClient(
         const val DesktopUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        const val MeiDesktopUserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/91.0.4472.164 Safari/537.36"
+        const val MeiLyricRequestKey = "music.musichallSong.PlayLyricInfo.GetPlayLyricInfo"
     }
 }

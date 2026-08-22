@@ -2,6 +2,7 @@ package com.lladlam.melox.playback
 
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.sin
 
 /** Lightweight process bridge from the playback analyser to Compose visuals. */
 object MeloXAudioReactiveRuntime {
@@ -43,7 +44,16 @@ object MeloXAudioReactiveRuntime {
 
     fun sample(expectedMediaId: String?): MeloXAudioReactiveSample {
         if (expectedMediaId == null || expectedMediaId != mediaId) return MeloXAudioReactiveSample.Idle
-        val localAnalysis = analysis ?: return MeloXAudioReactiveSample(0.18f, 0f, 0f, playing)
+        val localAnalysis = analysis ?: run {
+            if (!playing) return MeloXAudioReactiveSample.Idle
+            val phase = positionMs / 1000f
+            return MeloXAudioReactiveSample(
+                energy = (0.34f + 0.16f * abs(sin(phase * 5.3f))).coerceIn(0f, 1f),
+                beat = ((sin(phase * 8.1f) + 1f) * 0.5f).coerceIn(0f, 1f),
+                downbeat = ((sin(phase * 2.7f) + 1f) * 0.5f).coerceIn(0f, 1f),
+                isPlaying = true,
+            )
+        }
         val time = positionMs
         val frame = localAnalysis.frameAt(time)
         val beat = pulseAt(localAnalysis.beatTimesMs, time, 230L)

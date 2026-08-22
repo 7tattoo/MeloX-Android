@@ -9,6 +9,7 @@ import com.lladlam.melox.core.audio.MusicQuality
 import com.lladlam.melox.core.audio.MusicQualityRuntime
 import com.lladlam.melox.core.audio.NeteaseQualityClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
+import com.lladlam.melox.core.music.provider.PlaybackAccountStore
 import java.io.IOException
 import java.util.LinkedHashMap
 import java.util.concurrent.CompletableFuture

@@ -15,6 +15,7 @@ data class QQMusicSession(
 /** QQ Music login state is stored only in the app's local preferences. */
 object QQMusicSessionStore {
     private const val PreferencesName = "melox_qq_music_session"
+    private const val PlaybackPreferencesName = "melox_qq_music_playback_session"
     private const val KeyCookie = "cookie"
 
     private val LoginCookieDomains = listOf(
@@ -24,19 +25,19 @@ object QQMusicSessionStore {
         "https://qq.com/",
     )
 
-    fun read(context: Context): QQMusicSession =
+    fun read(context: Context, playback: Boolean = false): QQMusicSession =
         parse(
             context.applicationContext
-                .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+                .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
                 .getString(KeyCookie, "")
                 .orEmpty(),
         )
 
-    fun write(context: Context, cookie: String): QQMusicSession {
+    fun write(context: Context, cookie: String, playback: Boolean = false): QQMusicSession {
         val session = parse(cookie)
         require(session.isLoggedIn) { "QQ音乐登录态不完整" }
         context.applicationContext
-            .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+            .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
             .edit()
             .putString(KeyCookie, cookie.trim())
             .apply()
@@ -48,10 +49,10 @@ object QQMusicSessionStore {
      * Cookie removal is scoped by the names from the stored QQ cookie instead
      * of calling removeAllCookies(), so NetEase and other provider logins survive.
      */
-    fun clear(context: Context, clearWebCookies: Boolean = true) {
-        val session = read(context)
+    fun clear(context: Context, clearWebCookies: Boolean = true, playback: Boolean = false) {
+        val session = read(context, playback)
         context.applicationContext
-            .getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+            .getSharedPreferences(if (playback) PlaybackPreferencesName else PreferencesName, Context.MODE_PRIVATE)
             .edit()
             .clear()
             .apply()

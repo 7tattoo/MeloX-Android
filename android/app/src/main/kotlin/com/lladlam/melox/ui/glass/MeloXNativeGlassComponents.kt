@@ -37,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -73,6 +74,7 @@ import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.Capsule
 import kotlinx.coroutines.flow.collectLatest
+import com.lladlam.melox.ui.glass.publicdemo.LiquidDragAnimation
 import com.lladlam.melox.ui.glass.publicdemo.PublicDampedDragAnimation
 import androidx.compose.ui.draw.drawBehind
 import com.lladlam.melox.ui.theme.isMeloXDarkTheme
@@ -186,10 +188,13 @@ fun MeloXGlassToggle(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val travelPx = with(density) { 20.dp.toPx() }
+    val tapThresholdPx = with(density) { 2.dp.toPx() }
     val scope = rememberCoroutineScope()
+    var didDrag by remember { mutableStateOf(false) }
     var fraction by remember { mutableFloatStateOf(if (checked) 1f else 0f) }
-    val animation = remember(scope, enabled) {
-        PublicDampedDragAnimation(
+    val currentChecked by rememberUpdatedState(checked)
+    val animation = remember(scope) {
+        LiquidDragAnimation(
             animationScope = scope,
             initialValue = fraction,
             valueRange = 0f..1f,
@@ -198,18 +203,18 @@ fun MeloXGlassToggle(
             pressedScale = 1.5f,
             onDragStarted = {},
             onDragStopped = {
-                if (!enabled) return@PublicDampedDragAnimation
-                if (!movedDuringGesture) {
-                    val newChecked = !checked
-                    fraction = if (newChecked) 1f else 0f
-                    onCheckedChange(newChecked)
-                } else {
+                if (didDrag) {
                     fraction = if (targetValue >= 0.5f) 1f else 0f
-                    onCheckedChange(fraction == 1f)
+                    didDrag = false
+                } else {
+                    fraction = if (currentChecked) 0f else 1f
                 }
+                onCheckedChange(fraction == 1f)
             },
             onDrag = { _, dragAmount ->
-                if (!enabled) return@PublicDampedDragAnimation
+                if (!didDrag) {
+                    didDrag = kotlin.math.abs(dragAmount.x) > tapThresholdPx
+                }
                 val delta = dragAmount.x / travelPx
                 fraction = if (isLtr) (fraction + delta).coerceIn(0f, 1f)
                 else (fraction - delta).coerceIn(0f, 1f)
@@ -220,8 +225,10 @@ fun MeloXGlassToggle(
         snapshotFlow { fraction }.collectLatest(animation::updateValue)
     }
     LaunchedEffect(checked) {
+        android.util.Log.d("MeloXToggle", "LaunchedEffect(checked) checked=$checked fraction=$fraction")
         val target = if (checked) 1f else 0f
         if (target != fraction) {
+            android.util.Log.d("MeloXToggle", "  -> resetting fraction to $target")
             fraction = target
             animation.animateToValue(target)
         }

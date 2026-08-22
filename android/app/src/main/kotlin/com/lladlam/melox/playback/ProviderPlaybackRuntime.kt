@@ -4,10 +4,12 @@ import android.content.Context
 import com.lladlam.melox.core.account.NeteaseSessionStore
 import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.PlaybackAccountStore
 import com.lladlam.melox.core.music.provider.MusicProviderRegistry
 import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import java.security.MessageDigest
 
 /**
  * Process-local bridge used by Media3's synchronous Resolver callback. No
@@ -26,7 +28,7 @@ object ProviderPlaybackRuntime {
         synchronized(this) {
             if (appContext === application && currentRegistry != null) return
             appContext = application
-            currentRegistry = MeloXMusicProviders.create(application)
+            currentRegistry = MeloXMusicProviders.createPlayback(application)
         }
     }
 
@@ -34,15 +36,17 @@ object ProviderPlaybackRuntime {
 
     fun authKey(source: MusicSource): String {
         val context = appContext ?: return ""
-        return when (source) {
-            MusicSource.Netease -> NeteaseSessionStore.readCookie(context)
-            MusicSource.QQMusic -> QQMusicSessionStore.read(context).cookie
-            MusicSource.Kugou -> KugouSessionStore.read(context).let { session ->
+        val credential = when (source) {
+            MusicSource.Netease -> PlaybackAccountStore.neteaseCookie(context)
+            MusicSource.QQMusic -> PlaybackAccountStore.qqSession(context).cookie
+            MusicSource.Kugou -> PlaybackAccountStore.kugouSession(context).let { session ->
                 listOf(session.userId, session.token, session.vipToken, session.dfid).joinToString("|")
             }
             MusicSource.AppleMusic -> AppleMusicSessionStore.read(context).let { session ->
                 listOf(session.developerToken, session.musicUserToken, session.storefront).joinToString("|")
             }
         }
+        return MessageDigest.getInstance("SHA-256").digest(credential.toByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 }

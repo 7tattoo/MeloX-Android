@@ -73,6 +73,8 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.playback.PlaybackTrackIdentity
 import com.lladlam.melox.playback.ProviderPlaybackQualityRuntime
 import com.lladlam.melox.ui.glass.meloXLiquidButton
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -285,10 +287,11 @@ private fun SceneQualityChip(
                 modifier = Modifier.size(14.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                SceneCupertinoGlyph(
-                    kind = SceneGlyphKind.Waveform,
+                MeloXSymbolIcon(
+                    symbol = MeloXSymbol.AutoMix,
                     modifier = Modifier.size(12.dp),
                     color = Color.White.copy(alpha = 0.86f),
+                    iconSize = 14.sp,
                 )
             }
             Text(
@@ -668,6 +671,37 @@ private fun SceneCupertinoGlyph(
     modifier: Modifier,
     color: Color,
 ) {
+    val sfSymbol = when (kind) {
+        SceneGlyphKind.Backward -> MeloXSymbol.Previous
+        SceneGlyphKind.Forward -> MeloXSymbol.Next
+        SceneGlyphKind.Play -> MeloXSymbol.Play
+        SceneGlyphKind.Pause -> MeloXSymbol.Pause
+        SceneGlyphKind.SpeakerLow -> MeloXSymbol.Volume
+        SceneGlyphKind.SpeakerHigh -> MeloXSymbol.Volume
+        SceneGlyphKind.Queue -> MeloXSymbol.Queue
+        SceneGlyphKind.Lyrics -> MeloXSymbol.Lyrics
+        SceneGlyphKind.Waveform -> MeloXSymbol.AutoMix
+        else -> null
+    }
+    if (sfSymbol != null) {
+        MeloXSymbolIcon(
+            symbol = sfSymbol,
+            modifier = modifier,
+            color = color,
+            variant = if (kind == SceneGlyphKind.Play || kind == SceneGlyphKind.Pause) {
+                com.lladlam.melox.ui.glass.MeloXSymbolVariant.Fill
+            } else {
+                com.lladlam.melox.ui.glass.MeloXSymbolVariant.Regular
+            },
+            iconSize = when (kind) {
+                SceneGlyphKind.Play, SceneGlyphKind.Pause -> 48.sp
+                SceneGlyphKind.Backward, SceneGlyphKind.Forward -> 34.sp
+                SceneGlyphKind.Lyrics, SceneGlyphKind.Queue, SceneGlyphKind.Waveform -> 22.sp
+                else -> 18.sp
+            },
+        )
+        return
+    }
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height

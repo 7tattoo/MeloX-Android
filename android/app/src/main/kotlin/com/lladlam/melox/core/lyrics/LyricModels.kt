@@ -20,6 +20,17 @@ data class LyricAgent(
 
 enum class LyricAgentAlignment { Normal, Flipped }
 
+data class LyricAccompaniment(
+    val timeMs: Long,
+    val durationMs: Long? = null,
+    val text: String,
+    val syllables: List<LyricSyllable> = emptyList(),
+    val translation: String? = null,
+    val romanization: String? = null,
+    val agent: LyricAgent? = null,
+    val timingKind: LyricTimingKind = LyricTimingKind.Precise,
+)
+
 enum class LyricSource { Netease, QQMusic, Kugou, AppleMusic, AmlL, Local }
 
 enum class LyricQuality { Fallback, LineSynchronized, WordSynchronized, Authored }
@@ -34,6 +45,7 @@ data class LyricLine(
     val romanizationSyllables: List<LyricSyllable> = emptyList(),
     val agent: LyricAgent? = null,
     val timingKind: LyricTimingKind = LyricTimingKind.Precise,
+    val accompaniment: List<LyricAccompaniment> = emptyList(),
 )
 
 data class LyricsDocument(
@@ -169,6 +181,28 @@ object NeteaseLyricParser {
         val result = mutableListOf<LyricLine>()
         for (raw in source.lineSequence()) {
             val line = raw.trim()
+            if (line.startsWith("[bg:", ignoreCase = true)) {
+                val close = line.indexOf(']')
+                if (close > 4 && result.isNotEmpty()) {
+                    val timing = line.substring(4, close).split(',')
+                    val start = timing.getOrNull(0)?.toLongOrNull() ?: continue
+                    val duration = timing.getOrNull(1)?.toLongOrNull()?.coerceAtLeast(1L) ?: continue
+                    val content = line.substring(close + 1)
+                    val parsed = parseYrc("[$start,$duration]$content").firstOrNull() ?: continue
+                    val parent = result.last()
+                    result[result.lastIndex] = parent.copy(
+                        accompaniment = parent.accompaniment + LyricAccompaniment(
+                            timeMs = parsed.timeMs,
+                            durationMs = parsed.durationMs,
+                            text = parsed.text,
+                            syllables = parsed.syllables,
+                            agent = parent.agent,
+                            timingKind = parsed.timingKind,
+                        ),
+                    )
+                }
+                continue
+            }
             if (!line.startsWith('[')) continue
             val close = line.indexOf(']')
             if (close <= 1) continue

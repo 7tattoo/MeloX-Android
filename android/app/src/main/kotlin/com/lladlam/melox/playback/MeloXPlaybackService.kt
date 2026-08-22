@@ -266,7 +266,7 @@ class MeloXPlaybackService : MediaSessionService() {
         downloadStore = MeloXDownloadStore.get(this)
         equalizerController = MeloXEqualizerController(this)
         playbackHistoryReporter = MeloXPlaybackHistoryReporter(this)
-        val cookieProvider = { NeteaseSessionStore.readCookie(this@MeloXPlaybackService) }
+        val cookieProvider = { com.lladlam.melox.core.music.provider.PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) }
         playbackResolver = NeteasePlaybackResolver(
             cookieProvider = cookieProvider,
             client = NeteaseSearchClient(cookieProvider = cookieProvider),
@@ -558,7 +558,7 @@ class MeloXPlaybackService : MediaSessionService() {
             val loaded = withContext(Dispatchers.IO) {
                 downloadStore.localLyrics(songId) ?: runCatching {
                     NeteaseSearchClient(
-                        cookieProvider = { NeteaseSessionStore.readCookie(this@MeloXPlaybackService) },
+                        cookieProvider = { com.lladlam.melox.core.music.provider.PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) },
                     ).lyrics(songId)
                 }.getOrNull()
             }
@@ -754,12 +754,14 @@ class MeloXPlaybackService : MediaSessionService() {
                         val incomingDeferred = async { autoMixAnalyzer.analyze(incomingId, incomingUri) }
                         outgoingDeferred.await() to incomingDeferred.await()
                     }
-                    MeloXAutoMixTransitionScorer.plan(settings, outgoing, incomingAnalysis)
+                    val plan = MeloXAutoMixTransitionScorer.plan(settings, outgoing, incomingAnalysis)
                         ?: error("analysis confidence below threshold")
+                    Triple(plan, outgoing, incomingAnalysis)
                 }
             }
             if (preparedMixSourceId == sourceId && mixAnalysisSourceId == sourceId) {
-                result.onSuccess { plan ->
+                result.onSuccess { (plan, outgoing, _) ->
+                    MeloXAudioReactiveRuntime.attach(sourceId, outgoing)
                     analyzedMixPlan = plan
                     Log.i(
                         TAG,

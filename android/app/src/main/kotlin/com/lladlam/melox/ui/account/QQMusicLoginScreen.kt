@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.lladlam.melox.core.provider.qqmusic.QQMusicApiClient
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.music.provider.PlaybackAccountSlot
 import com.lladlam.melox.ui.glass.meloXLiquidButton
 import kotlinx.coroutines.delay
 
@@ -54,6 +55,7 @@ private const val VERIFY_RETRY_COOLDOWN_MS = 8_000L
 fun QQMusicLoginScreen(
     onDismiss: () -> Unit,
     onLoggedIn: () -> Unit,
+    targetSlot: PlaybackAccountSlot = PlaybackAccountSlot.Main,
 ) {
     val context = LocalContext.current.applicationContext
     var webView by remember { mutableStateOf<WebView?>(null) }
@@ -103,7 +105,7 @@ fun QQMusicLoginScreen(
 
                     verifying = false
                     if (result.isSuccess) {
-                        QQMusicSessionStore.write(context, candidate)
+                        QQMusicSessionStore.write(context, candidate, playback = targetSlot == PlaybackAccountSlot.Playback)
                         CookieManager.getInstance().flush()
                         onLoggedIn()
                         return@LaunchedEffect

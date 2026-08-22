@@ -29,11 +29,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -71,9 +75,11 @@ import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.network.NeteaseSocialExtrasClient
 import com.lladlam.melox.playback.MeloXListenTogetherCoordinator
 import com.lladlam.melox.playback.PlaybackCommands
-import com.lladlam.melox.ui.glass.meloXLiquidButton
-import com.lladlam.melox.ui.glass.MeloXGlassSheet
 import com.lladlam.melox.ui.glass.MeloXActionIcon
+import com.lladlam.melox.ui.glass.MeloXIosGroupedList
+import com.lladlam.melox.ui.glass.MeloXIosListRow
+import com.lladlam.melox.ui.glass.MeloXSymbol
+import com.lladlam.melox.ui.glass.MeloXSymbolIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,6 +96,12 @@ private enum class SongActionPage {
     Wiki,
     ListenTogether,
 }
+
+private data class MeloXMoreAction(
+    val title: String,
+    val symbol: MeloXSymbol,
+    val onClick: () -> Unit,
+)
 
 @Composable
 fun MeloXSongActionsOverlay(
@@ -211,12 +223,23 @@ fun MeloXSongActionsOverlay(
         }
     }
 
-    MeloXGlassSheet(
-        visible = visible,
-        onDismiss = onDismiss,
-        // Keep the bottom-anchored action sheet below the song header instead
-        // of letting a long action list turn the glass into an almost full page.
-        modifier = Modifier.fillMaxHeight(0.78f),
+    if (visible) ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 38.dp),
+        dragHandle = {
+            Box(
+                Modifier.fillMaxWidth().height(18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(width = 58.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .24f), RoundedCornerShape(99.dp)),
+                )
+            }
+        },
     ) {
         AnimatedContent(
                     targetState = page,
@@ -227,7 +250,12 @@ fun MeloXSongActionsOverlay(
             modifier = Modifier.fillMaxWidth(),
             label = "song-action-page",
         ) { target ->
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 18.dp)) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 18.dp),
+                    ) {
                         ActionHeader(
                             song,
                             when (target) {
@@ -254,88 +282,81 @@ fun MeloXSongActionsOverlay(
 
                         when (target) {
                             SongActionPage.Main -> {
-                                playbackState?.let { ActionItem("定时关闭", "◷") { page = SongActionPage.Sleep } }
-                                if (playbackState == null) {
-                                    ActionItem("下一首播放", "⇥") {
-                                        PlaybackCommands.playNext(context, song)
+                                Text("更多操作", Modifier.padding(bottom = 10.dp), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                val actions = listOf(
+                                    MeloXMoreAction("定时关闭", MeloXSymbol.Moon) { page = SongActionPage.Sleep },
+                                    MeloXMoreAction("下一首播放", MeloXSymbol.Next) {
+                                        if (playbackState == null) PlaybackCommands.playNext(context, song)
                                         onDismiss()
-                                    }
-                                }
-                                ActionItem("添加到播放队列", "+") {
-                                    if (playbackState != null) playbackState.addCurrentToQueue()
-                                    else PlaybackCommands.addToQueue(context, song)
-                                    onDismiss()
-                                }
-                                when {
-                                    downloads.contains(song.id) -> ActionItem("删除下载", "↓×") { downloads.remove(song.id) }
-                                    downloads.isDownloading(song.id) -> ActionItem("取消下载", "↓×") { downloads.cancel(song.id) }
-                                    else -> ActionItem("下载歌曲", "↓") {
-                                        downloads.start(song, MusicQualityPreferences.read(app), sourcePlaylist)
-                                    }
-                                }
-                                downloads.activeDownloads[song.id]?.let { active ->
-                                    val percent = active.fractionCompleted?.let { (it * 100).toInt() }
-                                    Text(
-                                        percent?.let { "正在下载 $it%" } ?: "正在下载…",
-                                        color = Color.White.copy(alpha = .52f),
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(start = 46.dp, bottom = 4.dp),
-                                    )
-                                }
-                                downloads.errorMessage?.let {
-                                    Text(it, color = Color(0xFFFF8A90), fontSize = 11.sp, modifier = Modifier.padding(start = 46.dp, bottom = 4.dp))
-                                }
-                                ActionItem("添加到歌单", "≡") {
-                                    page = SongActionPage.AddToPlaylist
-                                    scope.launch { loadOwnedPlaylists() }
-                                }
+                                    },
+                                    MeloXMoreAction("添加到播放队列", MeloXSymbol.AddToPlaylist) {
+                                        if (playbackState != null) playbackState.addCurrentToQueue() else PlaybackCommands.addToQueue(context, song)
+                                        onDismiss()
+                                    },
+                                    MeloXMoreAction(if (downloads.contains(song.id)) "删除下载" else "下载歌曲", if (downloads.contains(song.id)) MeloXSymbol.Trash else MeloXSymbol.Download) {
+                                        if (downloads.contains(song.id)) downloads.remove(song.id) else downloads.start(song, MusicQualityPreferences.read(app), sourcePlaylist)
+                                    },
+                                    MeloXMoreAction("添加到歌单", MeloXSymbol.AddToPlaylist) {
+                                        page = SongActionPage.AddToPlaylist
+                                        scope.launch { loadOwnedPlaylists() }
+                                    },
+                                    MeloXMoreAction(if (liked == true) "取消喜爱" else "喜爱", MeloXSymbol.Heart) {
+                                        val desired = liked != true
+                                        busy = true
+                                        scope.launch {
+                                            runCatching { ops.setSongLiked(song.id, desired) }
+                                                .onSuccess { liked = desired }
+                                                .onFailure { message = it.message }
+                                            busy = false
+                                        }
+                                    },
+                                    MeloXMoreAction("系统分享", MeloXSymbol.Share) { shareSong(context, song); onDismiss() },
+                                    MeloXMoreAction("发送给网易云好友", MeloXSymbol.Mail) { page = SongActionPage.ShareContacts; scope.launch { loadShareContacts() } },
+                                    MeloXMoreAction("分享到网易云动态", MeloXSymbol.Message) {
+                                        if (!busy) {
+                                            busy = true
+                                            scope.launch {
+                                                runCatching { social.shareSongToTimeline(song.id) }
+                                                    .onSuccess { message = "已分享到网易云动态" }
+                                                    .onFailure { message = it.message ?: "动态分享失败" }
+                                                busy = false
+                                            }
+                                        }
+                                    },
+                                    MeloXMoreAction("查看评论", MeloXSymbol.Comment) { page = SongActionPage.Comments; scope.launch { loadComments(false) } },
+                                    MeloXMoreAction("我的听歌排行", MeloXSymbol.Clock) { page = SongActionPage.ListeningRank; scope.launch { loadPlayRecords(MeloXUserPlayRecordPeriod.Week) } },
+                                    MeloXMoreAction("歌曲百科", MeloXSymbol.Book) { page = SongActionPage.Wiki; scope.launch { loadWiki() } },
+                                )
                                 sourceOwnedPlaylistId?.let { playlistId ->
                                     ActionItem("从当前歌单移除", "−") {
                                         if (!busy) {
                                             busy = true
                                             scope.launch {
                                                 runCatching { ops.removeSongFromPlaylist(song.id, playlistId) }
-                                                    .onSuccess {
-                                                        onSourcePlaylistChanged?.invoke()
-                                                        onDismiss()
-                                                    }
+                                                    .onSuccess { onSourcePlaylistChanged?.invoke(); onDismiss() }
                                                     .onFailure { message = it.message ?: "移除歌曲失败" }
                                                 busy = false
                                             }
                                         }
                                     }
                                 }
-                                ActionItem(if (liked == true) "取消喜爱" else "喜爱", if (liked == true) "♥" else "♡") {
-                                    val desired = liked != true
-                                    busy = true
-                                    scope.launch {
-                                        runCatching { ops.setSongLiked(song.id, desired) }
-                                            .onSuccess { liked = desired }
-                                            .onFailure { message = it.message }
-                                        busy = false
-                                    }
+                                if (playbackState != null) {
+                                    ActionItem("一起听", "◎") { page = SongActionPage.ListenTogether }
                                 }
-                                ActionItem("系统分享", "↗") { shareSong(context, song); onDismiss() }
-                                ActionItem("发送给网易云好友", "✉") { page = SongActionPage.ShareContacts; scope.launch { loadShareContacts() } }
-                                ActionItem("分享到网易云动态", "◎") { if (!busy) { busy = true; scope.launch { runCatching { social.shareSongToTimeline(song.id) }.onSuccess { message = "已分享到网易云动态" }.onFailure { message = it.message ?: "动态分享失败" }; busy = false } } }
-                                ActionItem("查看评论", "◌") { page = SongActionPage.Comments; scope.launch { loadComments(false) } }
-                                ActionItem("我的听歌排行", "#") {
-                                    page = SongActionPage.ListeningRank
-                                    scope.launch { loadPlayRecords(MeloXUserPlayRecordPeriod.Week) }
-                                }
-                                ActionItem("歌曲百科", "i") {
-                                    page = SongActionPage.Wiki
-                                    scope.launch { loadWiki() }
-                                }
-                                playbackState?.let { ActionItem("一起听", "◎") { page = SongActionPage.ListenTogether } }
                                 if (song.album.isNotBlank() && onNavigateSearch != null) {
-                                    ActionItem("前往专辑：${song.album}", "▣") {
-                                        onDismiss(); onNavigateSearch(song.album, MeloXSearchKind.Albums)
-                                    }
+                                    ActionItem("前往专辑：${song.album}", "▣") { onDismiss(); onNavigateSearch(song.album, MeloXSearchKind.Albums) }
                                 }
                                 if (song.artists.isNotBlank() && onNavigateSearch != null) {
-                                    ActionItem("前往艺人：${song.artists}", "♬") {
-                                        onDismiss(); onNavigateSearch(song.artists.substringBefore(" / "), MeloXSearchKind.Artists)
+                                    ActionItem("前往艺人：${song.artists}", "♬") { onDismiss(); onNavigateSearch(song.artists.substringBefore(" / "), MeloXSearchKind.Artists) }
+                                }
+                                MeloXIosGroupedList(surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                    actions.forEachIndexed { index, action ->
+                                        MeloXIosListRow(
+                                            title = action.title,
+                                            leading = { MeloXSymbolIcon(action.symbol, Modifier.size(22.dp), MaterialTheme.colorScheme.onSurface, iconSize = 21.sp) },
+                                            showTopSeparator = index > 0,
+                                            onClick = action.onClick,
+                                        )
                                     }
                                 }
                             }
@@ -380,13 +401,13 @@ fun MeloXSongActionsOverlay(
                                         )
                                         Spacer(Modifier.size(10.dp))
                                         Column(Modifier.weight(1f)) {
-                                            Text(playlist.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("${playlist.trackCount} 首歌曲", color = Color.White.copy(alpha = .5f), fontSize = 12.sp)
+                                            Text(playlist.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text("${playlist.trackCount} 首歌曲", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), fontSize = 12.sp)
                                         }
                                     }
                                 }
                                 if (!busy && writablePlaylists.isEmpty() && message == null) {
-                                    Text("没有可写入的自建歌单。", color = Color.White.copy(alpha = .55f), modifier = Modifier.padding(12.dp))
+                                    Text("没有可写入的自建歌单。", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f), modifier = Modifier.padding(12.dp))
                                 }
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
                             }
@@ -394,7 +415,7 @@ fun MeloXSongActionsOverlay(
                             SongActionPage.CreatePlaylist -> {
                                 Text(
                                     "创建歌单",
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 21.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
@@ -403,19 +424,19 @@ fun MeloXSongActionsOverlay(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(48.dp)
-                                        .background(Color.White.copy(alpha = .10f), RoundedCornerShape(14.dp))
+                                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .08f), RoundedCornerShape(14.dp))
                                         .padding(horizontal = 14.dp),
                                     contentAlignment = Alignment.CenterStart,
                                 ) {
                                     if (newPlaylistName.isBlank()) {
-                                        Text("歌单名称", color = Color.White.copy(alpha = .42f), fontSize = 16.sp)
+                                        Text("歌单名称", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f), fontSize = 16.sp)
                                     }
                                     BasicTextField(
                                         value = newPlaylistName,
                                         onValueChange = { newPlaylistName = it.take(40) },
                                         enabled = !busy,
                                         singleLine = true,
-                                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 16.sp),
+                                        textStyle = androidx.compose.ui.text.TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp),
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
@@ -445,10 +466,10 @@ fun MeloXSongActionsOverlay(
 
                             SongActionPage.Comments -> {
                                 if (busy && comments.isEmpty()) LoadingRow("正在读取评论")
-                                if (hotComments.isNotEmpty()) Text("热门评论", color = Color.White.copy(alpha = .55f), fontSize = 12.sp)
+                                if (hotComments.isNotEmpty()) Text("热门评论", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f), fontSize = 12.sp)
                                 LazyColumn(Modifier.fillMaxWidth().height(360.dp)) {
                                     items(hotComments, key = { "hot-${it.id}" }) { c -> Column(Modifier.fillMaxWidth().clickable { selectedComment = c; repliesPage = null; page = SongActionPage.CommentReplies; scope.launch { loadReplies(c, false) } }.padding(vertical = 9.dp)) { CommentRow(c) } }
-                                    if (comments.isNotEmpty()) item { Text("最新评论 · ${commentsPage?.totalCount ?: comments.size}", color = Color.White.copy(alpha = .55f), fontSize = 12.sp) }
+                                    if (comments.isNotEmpty()) item { Text("最新评论 · ${commentsPage?.totalCount ?: comments.size}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f), fontSize = 12.sp) }
                                     items(comments, key = { "latest-${it.id}" }) { c -> Column(Modifier.fillMaxWidth().clickable { selectedComment = c; repliesPage = null; page = SongActionPage.CommentReplies; scope.launch { loadReplies(c, false) } }.padding(vertical = 9.dp)) { CommentRow(c) } }
                                 }
                                 if (commentsPage?.hasMore == true) ActionItem("加载更多评论", "+") { if (!busy) scope.launch { loadComments(true) } }
@@ -463,7 +484,7 @@ fun MeloXSongActionsOverlay(
                                 val parent = selectedComment
                                 val replies = repliesPage
                                 if (parent != null) {
-                                    Text("原评论", color = Color.White.copy(alpha = .5f), fontSize = 12.sp)
+                                        Text("原评论", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), fontSize = 12.sp)
                                     CommentRow(replies?.ownerComment ?: parent)
                                 }
                                 if (busy && replies == null) LoadingRow("正在读取回复")
@@ -473,7 +494,7 @@ fun MeloXSongActionsOverlay(
                                 replies?.let {
                                     Text(
                                         if (it.totalCount > 0) "全部回复 · ${it.totalCount}" else "暂无回复",
-                                        color = Color.White.copy(alpha = .5f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f),
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                                     )
@@ -522,15 +543,15 @@ fun MeloXSongActionsOverlay(
                                             )
                                             Spacer(Modifier.size(10.dp))
                                             Column(Modifier.weight(1f)) {
-                                                Text(record.song.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Text(record.song.artists, color = Color.White.copy(alpha = .5f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(record.song.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(record.song.artists, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
-                                            Text("${record.playCount} 次", color = Color.White.copy(alpha = .65f), fontSize = 12.sp)
+                                            Text("${record.playCount} 次", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .65f), fontSize = 12.sp)
                                         }
                                     }
                                 }
                                 if (!busy && playRecords.isEmpty() && message == null) {
-                                    Text("暂无听歌排行数据", color = Color.White.copy(alpha = .5f), modifier = Modifier.padding(12.dp))
+                                    Text("暂无听歌排行数据", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), modifier = Modifier.padding(12.dp))
                                 }
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
                             }
@@ -540,15 +561,15 @@ fun MeloXSongActionsOverlay(
                                 LazyColumn(Modifier.fillMaxWidth().height(360.dp)) {
                                     items(wiki, key = { it.title + it.lines.hashCode() }) { section ->
                                         Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
-                                            Text(section.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(section.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                             section.lines.forEach { line ->
-                                                Text(line, color = Color.White.copy(alpha = .70f), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                                                Text(line, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .70f), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                                             }
                                         }
                                     }
                                 }
                                 if (!busy && wiki.isEmpty() && message == null) {
-                                    Text("暂无百科资料", color = Color.White.copy(alpha = .5f), modifier = Modifier.padding(12.dp))
+                                    Text("暂无百科资料", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f), modifier = Modifier.padding(12.dp))
                                 }
                                 ActionItem("返回", "‹") { page = SongActionPage.Main }
                             }
@@ -558,7 +579,7 @@ fun MeloXSongActionsOverlay(
                                 if (room == null) {
                                     Text(
                                         "一起听会在后台持续同步播放/暂停、切歌、拖动进度和队列；关闭这个面板不会中断会话。",
-                                        color = Color.White.copy(alpha = .62f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
                                         fontSize = 13.sp,
                                         modifier = Modifier.padding(6.dp, 6.dp, 6.dp, 12.dp),
                                     )
@@ -586,11 +607,11 @@ fun MeloXSongActionsOverlay(
                                         decorationBox = { inner ->
                                             Box(
                                                 Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp)
-                                                    .background(Color.White.copy(alpha = .08f), RoundedCornerShape(14.dp))
+                                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = .08f), RoundedCornerShape(14.dp))
                                                     .padding(horizontal = 12.dp, vertical = 11.dp),
                                             ) {
                                                 if (invitationText.isBlank()) {
-                                                    Text("粘贴一起听邀请链接", color = Color.White.copy(alpha = .38f), fontSize = 14.sp)
+                                                    Text("粘贴一起听邀请链接", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .38f), fontSize = 14.sp)
                                                 }
                                                 inner()
                                             }
@@ -613,16 +634,16 @@ fun MeloXSongActionsOverlay(
                                 } else {
                                     Text(
                                         "房间 ${room.id} · ${room.users.size.coerceAtLeast(1)} 位成员",
-                                        color = Color.White.copy(alpha = .72f),
+                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f),
                                         fontSize = 13.sp,
                                         modifier = Modifier.padding(6.dp),
                                     )
                                     room.users.forEach { member ->
-                                        Text("• ${member.name}", color = Color.White.copy(alpha = .58f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
+                                        Text("• ${member.name}", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
                                     }
                                     Text(
                                         when (togetherState.phase) { MeloXListenTogetherCoordinator.Phase.Reconnecting -> "正在重新连接 · ${togetherState.consecutiveFailures} 次失败"; MeloXListenTogetherCoordinator.Phase.Connected -> "后台自动同步已启用 · 1 秒状态同步 · 5 秒心跳"; MeloXListenTogetherCoordinator.Phase.Idle -> "正在恢复房间状态" },
-                                        color = Color.White.copy(alpha = .5f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f),
                                         fontSize = 11.sp,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     )
@@ -645,6 +666,7 @@ fun MeloXSongActionsOverlay(
                         }
         }
     }
+
 }
 
 }
@@ -687,12 +709,12 @@ private fun ActionItem(title: String, symbol: String, onClick: () -> Unit) {
 @Composable
 private fun CommentRow(comment: MeloXMusicComment) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 6.dp)) {
-        Text(comment.user, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        Text(comment.content, color = Color.White.copy(alpha = .9f), fontSize = 14.sp, modifier = Modifier.padding(top = 3.dp))
+        Text(comment.user, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(comment.content, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .9f), fontSize = 14.sp, modifier = Modifier.padding(top = 3.dp))
         if (comment.timeText.isNotBlank() || comment.likedCount > 0L) {
             Text(
                 listOf(comment.timeText.takeIf(String::isNotBlank), "♡ ${comment.likedCount}").filterNotNull().joinToString(" · "),
-                color = Color.White.copy(alpha = .42f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = .42f),
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -709,21 +731,21 @@ private fun RankPeriodButton(
 ) {
     Box(
         modifier
-            .background(Color.White.copy(alpha = if (selected) .18f else .07f), RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) .18f else .07f), RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(title, color = Color.White.copy(alpha = if (selected) 1f else .6f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (selected) 1f else .6f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
 private fun LoadingRow(text: String) {
     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+        CircularProgressIndicator(Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
         Spacer(Modifier.size(10.dp))
-        Text(text, color = Color.White.copy(alpha = .7f))
+        Text(text, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .7f))
     }
 }
 
