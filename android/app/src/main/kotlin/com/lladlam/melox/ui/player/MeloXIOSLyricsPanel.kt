@@ -224,6 +224,7 @@ private fun MeloXAppleMusicLyricsPanel(
     var lyrics by remember(mediaId) { mutableStateOf<LyricsDocument?>(null) }
     var isLoading by remember(mediaId) { mutableStateOf(false) }
     var errorMessage by remember(mediaId) { mutableStateOf<String?>(null) }
+    var shareInitialIndex by remember(mediaId) { mutableStateOf<Int?>(null) }
 
     var anchorPositionMs by remember(mediaId) { mutableLongStateOf(state.positionMs) }
     var anchorRealtimeMs by remember(mediaId) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -887,7 +888,7 @@ private fun MeloXAppleMusicLyricsPanel(
                             onLongClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onInterfaceInteraction()
-                                shareLyric(context, state, line)
+                                shareInitialIndex = index
                             },
                         )
 
@@ -921,6 +922,14 @@ private fun MeloXAppleMusicLyricsPanel(
                     ),
             )
         }
+    }
+    shareInitialIndex?.let { initial ->
+        MeloXLyricShareDialog(
+            state = state,
+            lines = lines,
+            initialIndex = initial,
+            onDismiss = { shareInitialIndex = null },
+        )
     }
 }
 

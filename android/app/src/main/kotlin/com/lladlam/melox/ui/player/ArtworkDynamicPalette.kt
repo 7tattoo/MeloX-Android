@@ -83,6 +83,11 @@ internal object ArtworkDynamicPaletteProvider {
 
     fun clearMemoryCache() = synchronized(cache) { cache.clear() }
 
+    suspend fun bitmapFor(context: Context, source: String?): Bitmap? = withContext(Dispatchers.IO) {
+        val value = source?.takeIf(String::isNotBlank) ?: return@withContext null
+        runCatching { decodeArtwork(context.applicationContext, value) }.getOrNull()
+    }
+
     private fun decodeArtwork(context: Context, source: String): Bitmap {
         val uri = Uri.parse(source)
         return when (uri.scheme?.lowercase()) {
