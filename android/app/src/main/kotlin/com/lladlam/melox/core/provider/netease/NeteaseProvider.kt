@@ -14,6 +14,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
 import com.lladlam.melox.core.music.model.ProviderTrackMetadata
+import com.lladlam.melox.core.music.model.TrackAvailability
 import com.lladlam.melox.core.music.provider.LyricsCapability
 import com.lladlam.melox.core.music.provider.LocalAggregationCapability
 import com.lladlam.melox.core.music.provider.MusicCapability
@@ -94,6 +95,7 @@ class NeteaseProvider(
                 },
                 artworkUrl = song.artworkUrl,
                 durationMs = song.durationMs.takeIf { it > 0L },
+                availability = TrackAvailability.Playable,
                 providerMetadata = ProviderTrackMetadata.Netease(song.id),
             )
         }

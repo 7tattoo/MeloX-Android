@@ -40,6 +40,9 @@ data class MeloXMessageContact(
     val name: String,
     val avatarUrl: String?,
     val signature: String,
+    val latestMessage: String? = null,
+    val latestMessageTimeMs: Long = 0L,
+    val unreadCount: Int = 0,
 )
 data class MeloXPrivateMessage(
     val id: Long,
@@ -47,7 +50,24 @@ data class MeloXPrivateMessage(
     val toUserId: Long,
     val text: String,
     val timeMs: Long,
+    val resource: MeloXPrivateMessageResource? = null,
 )
+enum class MeloXPrivateMessageResourceKind { Song, Playlist, Album }
+data class MeloXPrivateMessageResource(
+    val kind: MeloXPrivateMessageResourceKind,
+    val id: Long,
+    val title: String,
+    val subtitle: String,
+    val artworkUrl: String?,
+)
+private data class MeloXPrivateMessagePayload(
+    val text: String,
+    val resource: MeloXPrivateMessageResource?,
+) {
+    val summary: String get() = text.takeIf(String::isNotBlank)
+        ?: resource?.let { "[${when (it.kind) { MeloXPrivateMessageResourceKind.Song -> "歌曲"; MeloXPrivateMessageResourceKind.Playlist -> "歌单"; MeloXPrivateMessageResourceKind.Album -> "专辑" }}] ${it.title}" }
+        ?: "私信"
+}
 
 internal data class NeteasePlaylistCreateSpec(val name: String, val privacy: Int)
 
@@ -176,7 +196,7 @@ class NeteaseMusicOperationsClient(
             true,
         )
         val blocks = result.optJSONObject("data")?.optJSONArray("blocks") ?: JSONArray()
-        buildList {
+        buildList<MeloXWikiSection> {
             for (i in 0 until blocks.length()) {
                 val block = blocks.optJSONObject(i) ?: continue
                 val title = block.optJSONObject("uiElement")?.optJSONObject("mainTitle")?.optString("title")
@@ -385,19 +405,35 @@ class NeteaseMusicOperationsClient(
         parseMessageContacts(response.optJSONArray("follow"))
     }
 
-    suspend fun privateMessageConversations(limit: Int = 50): List<MeloXMessageContact> = withContext(Dispatchers.IO) {
+    suspend fun privateMessageConversations(currentUserId: Long, limit: Int = 50): List<MeloXMessageContact> = withContext(Dispatchers.IO) {
         ensureLoggedIn()
         val response = socialRead("/api/msg/private/users", JSONObject().put("offset", 0).put("limit", limit.coerceIn(1, 100)).put("total", "true"))
         val messages = response.optJSONArray("msgs") ?: JSONArray()
-        buildList {
+        buildList<MeloXMessageContact> {
             for (index in 0 until messages.length()) {
                 val value = messages.optJSONObject(index) ?: continue
-                val candidates = listOf(value.optJSONObject("fromUser"), value.optJSONObject("toUser"))
-                candidates.mapNotNull(::parseMessageContact).forEach { contact ->
-                    if (none { it.id == contact.id }) add(contact)
-                }
+                val latestMessage = parsePrivateMessagePayload(value.optString("lastMsg")).summary
+                val latestTime = value.optLong("lastMsgTime", value.optLong("time", 0L))
+                val unreadCount = value.optInt(
+                    "newMsgCount",
+                    value.optInt("unreadCount", value.optInt("newCount", 0)),
+                ).coerceAtLeast(0)
+                val from = parseMessageContact(value.optJSONObject("fromUser"))
+                val to = parseMessageContact(value.optJSONObject("toUser"))
+                val participant = from?.takeIf { it.id != currentUserId }
+                    ?: to?.takeIf { it.id != currentUserId }
+                    ?: from
+                    ?: to
+                    ?: continue
+                if (none { it.id == participant.id }) add(
+                    participant.copy(
+                        latestMessage = latestMessage,
+                        latestMessageTimeMs = latestTime,
+                        unreadCount = unreadCount,
+                    ),
+                )
             }
-        }
+        }.sortedByDescending(MeloXMessageContact::latestMessageTimeMs)
     }
 
     suspend fun privateMessageHistory(userId: Long, limit: Int = 100): List<MeloXPrivateMessage> = withContext(Dispatchers.IO) {
@@ -409,17 +445,14 @@ class NeteaseMusicOperationsClient(
                 val value = messages.optJSONObject(index) ?: continue
                 val time = value.optLong("time", 0L)
                 val serialized = value.optString("msg")
-                val payload = runCatching { JSONObject(serialized) }.getOrNull()
-                val text = payload?.optString("msg")?.takeIf(String::isNotBlank)
-                    ?: payload?.optJSONObject("song")?.optString("name")?.takeIf(String::isNotBlank)?.let { "[歌曲] $it" }
-                    ?: payload?.optJSONObject("playlist")?.optString("name")?.takeIf(String::isNotBlank)?.let { "[歌单] $it" }
-                    ?: serialized.ifBlank { "私信" }
+                val payload = parsePrivateMessagePayload(serialized)
                 add(MeloXPrivateMessage(
                     id = value.optLong("id", time),
                     fromUserId = value.optJSONObject("fromUser")?.optLong("userId", 0L) ?: 0L,
                     toUserId = value.optJSONObject("toUser")?.optLong("userId", 0L) ?: 0L,
-                    text = text,
+                    text = payload.text,
                     timeMs = time,
+                    resource = payload.resource,
                 ))
             }
         }.sortedBy(MeloXPrivateMessage::timeMs)
@@ -453,6 +486,45 @@ class NeteaseMusicOperationsClient(
             name = value.optString("remarkName").ifBlank { value.optString("nickname") }.ifBlank { "网易云用户" },
             avatarUrl = secure(value.optString("avatarUrl").takeIf(String::isNotBlank)),
             signature = value.optString("signature"),
+        )
+    }
+
+    private fun parsePrivateMessagePayload(serialized: String): MeloXPrivateMessagePayload {
+        val payload = runCatching { JSONObject(serialized) }.getOrNull()
+        if (payload == null) return MeloXPrivateMessagePayload(serialized, null)
+        val text = payload.optString("msg").trim()
+        val resource = listOf(
+            MeloXPrivateMessageResourceKind.Song to payload.optJSONObject("song"),
+            MeloXPrivateMessageResourceKind.Playlist to payload.optJSONObject("playlist"),
+            MeloXPrivateMessageResourceKind.Album to payload.optJSONObject("album"),
+        ).firstNotNullOfOrNull { (kind, value) -> value?.let { parsePrivateMessageResource(kind, it) } }
+        return MeloXPrivateMessagePayload(text, resource)
+    }
+
+    private fun parsePrivateMessageResource(
+        kind: MeloXPrivateMessageResourceKind,
+        value: JSONObject,
+    ): MeloXPrivateMessageResource? {
+        val id = value.optLong("id", 0L)
+        if (id <= 0L) return null
+        val album = value.optJSONObject("al") ?: value.optJSONObject("album")
+        val artists = value.optJSONArray("ar") ?: value.optJSONArray("artists")
+        val artistText = buildList {
+            if (artists != null) for (index in 0 until artists.length()) {
+                artists.optJSONObject(index)?.optString("name")?.takeIf(String::isNotBlank)?.let(::add)
+            }
+        }.joinToString(" / ")
+        val creator = value.optJSONObject("creator")?.optString("nickname").orEmpty()
+        return MeloXPrivateMessageResource(
+            kind = kind,
+            id = id,
+            title = value.optString("name").ifBlank { "网易云音乐" },
+            subtitle = if (kind == MeloXPrivateMessageResourceKind.Playlist) creator else artistText,
+            artworkUrl = secure(when (kind) {
+                MeloXPrivateMessageResourceKind.Song -> album?.optString("picUrl")
+                MeloXPrivateMessageResourceKind.Playlist -> value.optString("coverImgUrl").ifBlank { value.optString("picUrl") }
+                MeloXPrivateMessageResourceKind.Album -> value.optString("picUrl")
+            }?.takeIf(String::isNotBlank)),
         )
     }
 

@@ -85,7 +85,8 @@ private fun rememberAlternativeLyrics(
         if (MeloXSettingsRuntime.lyricPseudoTimingEnabled) document?.withPseudoTiming() else document
     }
     val lines = rendered?.lines.orEmpty()
-    val advanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+    val trackOffsetMs = rememberBilibiliLyricOffset(mediaId)
+    val advanceMs = effectiveBilibiliLyricAdvance(MeloXSettingsRuntime.lyricAdvanceMs, trackOffsetMs)
     var index by remember(mediaId, rendered) {
         mutableIntStateOf(
             rendered?.highlightedIndex(state.positionMs + advanceMs)
@@ -150,7 +151,8 @@ private fun rememberTextPVLyrics(
     }
 
     val lines = document?.lines.orEmpty()
-    val advanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+    val trackOffsetMs = rememberBilibiliLyricOffset(mediaId)
+    val advanceMs = effectiveBilibiliLyricAdvance(MeloXSettingsRuntime.lyricAdvanceMs, trackOffsetMs)
     var index by remember(mediaId, document) {
         mutableIntStateOf(
             if (lines.isEmpty()) 0 else {
@@ -643,7 +645,12 @@ internal fun MeloXSkylineLyricsPanel(
                     ?: nextLine?.timeMs
                     ?: (line?.timeMs?.plus(3_000L) ?: 1L)
                 val timedProgress = if (line == null || line.syllables.isEmpty()) 0f else {
-                    ((playback.positionMs - line.timeMs).toFloat() / (lineEnd - line.timeMs).coerceAtLeast(1L))
+                    val effectivePosition = playback.positionMs +
+                        effectiveBilibiliLyricAdvance(
+                            MeloXSettingsRuntime.lyricAdvanceMs,
+                            rememberBilibiliLyricOffset(playback.mediaId),
+                        )
+                    ((effectivePosition - line.timeMs).toFloat() / (lineEnd - line.timeMs).coerceAtLeast(1L))
                         .coerceIn(0f, 1f)
                 }
                 val currentScale = 1f +

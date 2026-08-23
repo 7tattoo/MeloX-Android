@@ -34,6 +34,7 @@ import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
 import com.lladlam.melox.ui.account.AppleMusicLoginScreen
+import com.lladlam.melox.ui.account.BilibiliLoginScreen
 import com.lladlam.melox.ui.glass.meloXContentSurface
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
 import com.lladlam.melox.ui.glass.MeloXGlassButton
@@ -66,6 +67,7 @@ fun ProviderSettingsHub(
     neteaseSession: NeteaseSessionStore,
     onNeteaseLogin: () -> Unit,
     onOpenServices: () -> Unit,
+    onOpenMessages: () -> Unit,
     initialRouteRequest: String? = null,
     onInitialRouteConsumed: () -> Unit = {},
 ) {
@@ -78,6 +80,7 @@ fun ProviderSettingsHub(
     var showQQLogin by remember(currentSource) { mutableStateOf(false) }
     var showKugouLogin by remember(currentSource) { mutableStateOf(false) }
     var showAppleMusicLogin by remember(currentSource) { mutableStateOf(false) }
+    var showBilibiliLogin by remember(currentSource) { mutableStateOf(false) }
     var loginRevision by remember(currentSource) { mutableStateOf(0) }
     var pendingAccountAction by remember { mutableStateOf<PendingProviderAccountAction?>(null) }
 
@@ -121,13 +124,22 @@ fun ProviderSettingsHub(
         )
         return
     }
+    if (showBilibiliLogin && currentSource == MusicSource.Bilibili) {
+        BilibiliLoginScreen(
+            onDismiss = { showBilibiliLogin = false },
+            onLoggedIn = { showBilibiliLogin = false; loginRevision++ },
+        )
+        return
+    }
 
     // Music-service navigation belongs to the account row.  Keeping it there
     // avoids a second floating control competing with the canonical Settings UI.
     SettingsScreen(
         session = neteaseSession,
+        source = currentSource,
         onLogin = onNeteaseLogin,
         onOpenServices = onOpenServices,
+        onOpenMessages = onOpenMessages,
         initialRouteRequest = initialRouteRequest,
         onInitialRouteConsumed = onInitialRouteConsumed,
     )
@@ -194,6 +206,7 @@ fun ProviderSettingsHub(
                                     MusicSource.QQMusic -> showQQLogin = true
                                     MusicSource.Kugou -> showKugouLogin = true
                                     MusicSource.AppleMusic -> showAppleMusicLogin = true
+                                    MusicSource.Bilibili -> showBilibiliLogin = true
                                 }
                             }
                         },
@@ -208,6 +221,7 @@ fun ProviderSettingsHub(
                                 MusicSource.QQMusic -> "只清除 QQ音乐登录态后重新打开登录页"
                                 MusicSource.Kugou -> "保留 MID / GUID，只清除用户登录态后重新扫码"
                                 MusicSource.AppleMusic -> "重新配置 Developer Token / Music User Token"
+                                MusicSource.Bilibili -> "清除当前 Bilibili 登录态后重新登录"
                             },
                             onClick = {
                                 showServiceDialog = false
@@ -324,6 +338,7 @@ fun ProviderSettingsHub(
                                 MusicSource.QQMusic -> showQQLogin = true
                                 MusicSource.Kugou -> showKugouLogin = true
                                 MusicSource.AppleMusic -> showAppleMusicLogin = true
+                                MusicSource.Bilibili -> showBilibiliLogin = true
                             }
                         }
                     },

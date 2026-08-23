@@ -6,6 +6,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliSessionStore
 
 /**
  * Small provider-neutral account facade used by settings/experience UI.
@@ -61,6 +62,9 @@ class ProviderAccountManager(
                 accountId = session.storefront.uppercase(),
             )
         }
+        MusicSource.Bilibili -> BilibiliSessionStore.read(appContext).let { session ->
+            AccountState(source, session.isLoggedIn, session.userId.takeIf(String::isNotBlank))
+        }
     }
 
     fun allStates(): List<AccountState> = MusicSource.entries.map(::state)
@@ -78,6 +82,7 @@ class ProviderAccountManager(
             MusicSource.QQMusic -> QQMusicSessionStore.clear(appContext, clearWebCookies = true)
             MusicSource.Kugou -> KugouSessionStore.clearLogin(appContext)
             MusicSource.AppleMusic -> AppleMusicSessionStore.clear(appContext)
+            MusicSource.Bilibili -> BilibiliSessionStore.clear(appContext, clearWebCookies = true)
         }
     }
 

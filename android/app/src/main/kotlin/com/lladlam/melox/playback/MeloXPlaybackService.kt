@@ -80,6 +80,7 @@ class MeloXPlaybackService : MediaSessionService() {
     private var mixAnalysisSourceId: String? = null
     private var analyzedMixPlan: MeloXAutoMixPlan? = null
     private var preparedMixSourceId: String? = null
+    private var preparedMixTargetId: String? = null
     private var autoMixRetrySourceId: String? = null
     private var autoMixRetryAfterRealtimeMs = 0L
     private var mixStartedAt = 0L
@@ -162,7 +163,18 @@ class MeloXPlaybackService : MediaSessionService() {
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             if (updatingSystemLyricsMetadata) return
-            if (mixStartedAt == 0L) cancelPreparedMix()
+            if (mixStartedAt == 0L && preparedMixSourceId != null) {
+                val active = player
+                val currentId = active?.currentMediaItem?.mediaId
+                val nextId = active?.currentMediaItemIndex
+                    ?.plus(1)
+                    ?.takeIf { it in 0 until active.mediaItemCount }
+                    ?.let(active::getMediaItemAt)
+                    ?.mediaId
+                if (currentId != preparedMixSourceId || nextId != preparedMixTargetId) {
+                    cancelPreparedMix()
+                }
+            }
         }
     }
 
@@ -183,6 +195,7 @@ class MeloXPlaybackService : MediaSessionService() {
                 active.currentMediaItem?.mediaId?.toLongOrNull()?.let { current -> if (current == historySongId) historyPositionMs = active.currentPosition.coerceAtLeast(0L) }
                 val uiTransitionActive = MeloXPlayerTransitionState.isActive
                 runCatching {
+                    maybePrepareAutoplay(active)
                     maybeRunAutoMix(active)
                     if (!uiTransitionActive) {
                         maybeUpdateSystemLyrics(active)
@@ -193,7 +206,6 @@ class MeloXPlaybackService : MediaSessionService() {
                         lastMaintenanceRealtimeMs = now
                         if (!uiTransitionActive) {
                             applyLocalArtworkMetadata(active)
-                            maybePrepareAutoplay(active)
                         }
                         PlaybackCommands.prioritizeManualQueue(active)
                         enforceSleepTimer(active)
@@ -324,7 +336,12 @@ class MeloXPlaybackService : MediaSessionService() {
         if (!atTail) return
         val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: return
         val remaining = duration - active.currentPosition
-        if (remaining <= AUTOPLAY_PRELOAD_MS && MeloXNetworkAvailability.isOnline(this)) {
+        val preloadMs = if (MeloXPlaybackModePreferences.autoMix(this)) {
+            maxOf(AUTOPLAY_PRELOAD_MS, currentAutoMixSettings().preloadLeadMs)
+        } else {
+            AUTOPLAY_PRELOAD_MS
+        }
+        if (remaining <= preloadMs && MeloXNetworkAvailability.isOnline(this)) {
             ensureAutoplayRecommendations(forceAdvance = false)
         }
     }
@@ -373,11 +390,19 @@ class MeloXPlaybackService : MediaSessionService() {
     }
 
     private fun maybeRunAutoMix(active: ExoPlayer) {
-        if (!MeloXPlaybackModeRuntime.autoMixEnabled) {
+        val enabled = MeloXPlaybackModePreferences.autoMix(this)
+        if (MeloXPlaybackModeRuntime.autoMixEnabled != enabled) {
+            MeloXPlaybackModeRuntime.autoMixEnabled = enabled
+        }
+        if (!enabled) {
             cancelPreparedMix(releaseStandby = true)
             return
         }
-        if (!active.isPlaying || active.repeatMode == Player.REPEAT_MODE_ONE || !active.hasNextMediaItem()) return
+        if (!active.isPlaying || active.repeatMode == Player.REPEAT_MODE_ONE) return
+        if (!active.hasNextMediaItem()) {
+            if (MeloXPlaybackModePreferences.autoplay(this)) maybePrepareAutoplay(active)
+            return
+        }
         val duration = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: return
         val remaining = duration - active.currentPosition
         val sourceId = active.currentMediaItem?.mediaId ?: return
@@ -723,6 +748,7 @@ class MeloXPlaybackService : MediaSessionService() {
         incoming.prepare()
         incomingPlayer = incoming
         preparedMixSourceId = sourceId
+        preparedMixTargetId = active.getMediaItemAt(nextIndex).mediaId
         mixStartedAt = 0L
     }
 
@@ -804,6 +830,7 @@ class MeloXPlaybackService : MediaSessionService() {
         autoMixRetrySourceId = null
         autoMixRetryAfterRealtimeMs = 0L
         preparedMixSourceId = null
+        preparedMixTargetId = null
         mixAnalysisJob?.cancel()
         mixAnalysisJob = null
         mixAnalysisSourceId = null
@@ -883,6 +910,7 @@ class MeloXPlaybackService : MediaSessionService() {
         }
         if (releaseStandby) incomingPlayer = null
         preparedMixSourceId = null
+        preparedMixTargetId = null
         mixStartedAt = 0L
         mixDurationMs = 0L
         mixOutgoingStartPositionMs = 0L

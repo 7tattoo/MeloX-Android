@@ -41,6 +41,7 @@ import com.lladlam.melox.ui.MeloXBottomContentClearance
 import com.lladlam.melox.ui.account.KugouLoginScreen
 import com.lladlam.melox.ui.account.QQMusicLoginScreen
 import com.lladlam.melox.ui.account.AppleMusicLoginScreen
+import com.lladlam.melox.ui.account.BilibiliLoginScreen
 import com.lladlam.melox.ui.glass.MeloXGlassButton
 import com.lladlam.melox.ui.glass.MeloXGlassButtonStyle
 import com.lladlam.melox.ui.glass.MeloXGlassDialog
@@ -69,6 +70,7 @@ fun ProviderServicesScreen(
     var showQQLogin by remember(currentSource) { mutableStateOf(false) }
     var showKugouLogin by remember(currentSource) { mutableStateOf(false) }
     var showAppleMusicLogin by remember(currentSource) { mutableStateOf(false) }
+    var showBilibiliLogin by remember(currentSource) { mutableStateOf(false) }
     var loginRevision by remember(currentSource) { mutableStateOf(0) }
     var pendingAction by remember { mutableStateOf<Pair<MusicSource, ServicesAccountAction>?>(null) }
     var unifiedEnabled by remember { mutableStateOf(MusicProviderSelectionStore.unifiedEnabled(context)) }
@@ -94,6 +96,13 @@ fun ProviderServicesScreen(
         AppleMusicLoginScreen(
             onDismiss = { showAppleMusicLogin = false },
             onLoggedIn = { showAppleMusicLogin = false; loginRevision++ },
+        )
+        return
+    }
+    if (showBilibiliLogin && currentSource == MusicSource.Bilibili) {
+        BilibiliLoginScreen(
+            onDismiss = { showBilibiliLogin = false },
+            onLoggedIn = { showBilibiliLogin = false; loginRevision++ },
         )
         return
     }
@@ -171,6 +180,7 @@ fun ProviderServicesScreen(
                             MusicSource.QQMusic -> showQQLogin = true
                             MusicSource.Kugou -> showKugouLogin = true
                             MusicSource.AppleMusic -> showAppleMusicLogin = true
+                            MusicSource.Bilibili -> showBilibiliLogin = true
                         }
                     }
                 },
@@ -252,6 +262,7 @@ fun ProviderServicesScreen(
                                 MusicSource.QQMusic -> showQQLogin = true
                                 MusicSource.Kugou -> showKugouLogin = true
                                 MusicSource.AppleMusic -> showAppleMusicLogin = true
+                                MusicSource.Bilibili -> showBilibiliLogin = true
                             }
                         }
                     },

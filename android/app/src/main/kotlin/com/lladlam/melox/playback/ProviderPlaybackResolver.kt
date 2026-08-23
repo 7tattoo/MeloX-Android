@@ -36,21 +36,28 @@ class ProviderPlaybackResolver(
         val authKey: String,
         val quality: AudioQualityTier,
     )
+    private data class ResolvedRequest(
+        val uri: Uri,
+        val headers: Map<String, String>,
+        val expiresAtEpochMs: Long? = null,
+    )
 
     private val cacheLock = Any()
-    private val resolvedUris = object : LinkedHashMap<ResolveKey, Uri>(MAX_RESOLVED_URIS, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ResolveKey, Uri>?): Boolean =
+    private val resolvedUris = object : LinkedHashMap<ResolveKey, ResolvedRequest>(MAX_RESOLVED_URIS, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ResolveKey, ResolvedRequest>?): Boolean =
             size > MAX_RESOLVED_URIS
     }
-    private val inFlight = ConcurrentHashMap<ResolveKey, CompletableFuture<Uri>>()
+    private val inFlight = ConcurrentHashMap<ResolveKey, CompletableFuture<ResolvedRequest>>()
 
     override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
         val uri = dataSpec.uri
         if (uri.scheme != MeloXScheme) return dataSpec
         if (uri.host == LegacySongHost) return neteaseResolver.resolveDataSpec(dataSpec)
         if (uri.host != ProviderTrackHost) return dataSpec
+        val resolved = resolveProviderRequest(uri)
         return dataSpec.buildUpon()
-            .setUri(resolveProviderUri(uri))
+            .setUri(resolved.uri)
+            .setHttpRequestHeaders(dataSpec.httpRequestHeaders + resolved.headers)
             .setKey(dataSpec.key ?: uri.toString())
             .build()
     }
@@ -61,14 +68,14 @@ class ProviderPlaybackResolver(
         if (uri.host != ProviderTrackHost) return uri
         val source = parseSource(uri) ?: return uri
         val quality = currentQuality(uri)
-        return cached(ResolveKey(uri.toString(), authKeyProvider(source), quality)) ?: uri
+        return cached(ResolveKey(uri.toString(), authKeyProvider(source), quality))?.uri ?: uri
     }
 
     internal fun prefetch(uri: Uri) {
-        if (isProviderTrackUri(uri)) resolveProviderUri(uri)
+        if (isProviderTrackUri(uri)) resolveProviderRequest(uri)
     }
 
-    private fun resolveProviderUri(uri: Uri): Uri {
+    private fun resolveProviderRequest(uri: Uri): ResolvedRequest {
         val source = parseSource(uri)
             ?: throw IOException("Invalid MeloX provider source: $uri")
         val resourceValue = uri.pathSegments.getOrNull(1)
@@ -78,7 +85,7 @@ class ProviderPlaybackResolver(
         val quality = currentQuality(uri)
         val key = ResolveKey(uri.toString(), authKeyProvider(source), quality)
         cached(key)?.let { return it }
-        val pending = CompletableFuture<Uri>()
+        val pending = CompletableFuture<ResolvedRequest>()
         val existing = inFlight.putIfAbsent(key, pending)
         if (existing != null) return runCatching { existing.get() }
             .getOrElse { throw IOException("Unable to resolve provider playback source", it.cause ?: it) }
@@ -104,9 +111,9 @@ class ProviderPlaybackResolver(
                         requested = quality,
                         actual = resolution.actualQuality ?: resolution.requestedQuality,
                     )
-                    Uri.parse(resolution.url)
+                    ResolvedRequest(Uri.parse(resolution.url), resolution.requestHeaders, resolution.expiresAtEpochMs)
                 }
-                is PlaybackResolution.Preview -> Uri.parse(resolution.url)
+                is PlaybackResolution.Preview -> ResolvedRequest(Uri.parse(resolution.url), emptyMap())
                 PlaybackResolution.LoginRequired -> throw IOException("${provider.displayName} 需要登录后播放")
                 PlaybackResolution.SubscriptionRequired -> throw IOException("${provider.displayName} 当前歌曲需要对应会员权益")
                 PlaybackResolution.RegionRestricted -> throw IOException("${provider.displayName} 当前地区不可播放")
@@ -126,7 +133,14 @@ class ProviderPlaybackResolver(
         }
     }
 
-    private fun cached(key: ResolveKey): Uri? = synchronized(cacheLock) { resolvedUris[key] }
+    private fun cached(key: ResolveKey): ResolvedRequest? = synchronized(cacheLock) {
+        resolvedUris[key]?.also { cached ->
+            if (cached.expiresAtEpochMs?.let { System.currentTimeMillis() >= it } == true) {
+                resolvedUris.remove(key)
+                return@synchronized null
+            }
+        }
+    }
 
     private fun currentQuality(uri: Uri): AudioQualityTier {
         // The quality selector updates this runtime before Media3 prepare(). That
@@ -164,6 +178,11 @@ class ProviderPlaybackResolver(
             storefront = uri.getQueryParameter(AppleStorefrontQuery).orEmpty().ifBlank { "us" },
             previewUrl = uri.getQueryParameter(ApplePreviewUrlQuery)?.takeIf(String::isNotBlank),
         )
+        MusicSource.Bilibili -> {
+            val (bvid, cid) = com.lladlam.melox.core.provider.bilibili.BilibiliProvider.parseIdentity(id.value)
+                ?: throw IOException("Invalid Bilibili track ID")
+            ProviderTrackMetadata.Bilibili(bvid, cid)
+        }
     }
 
     companion object {
@@ -215,6 +234,7 @@ class ProviderPlaybackResolver(
                             appendQueryParameter(ApplePreviewUrlQuery, it)
                         }
                     }
+                    is ProviderTrackMetadata.Bilibili -> Unit
                     else -> Unit
                 }
             }

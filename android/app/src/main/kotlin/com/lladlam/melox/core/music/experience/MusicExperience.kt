@@ -108,10 +108,21 @@ object MusicExperiences {
         ),
     )
 
+    val bilibili = MusicExperience(
+        source = MusicSource.Bilibili,
+        tabs = listOf(
+            ExperienceTab(ExperienceTabId.Library, "音乐库"),
+            ExperienceTab(ExperienceTabId.Settings, "设置"),
+        ),
+        homeSections = emptyList(),
+        providerNativeCapabilities = setOf(MusicCapability.Library, MusicCapability.Playlists),
+    )
+
     fun forSource(source: MusicSource): MusicExperience = when (source) {
         MusicSource.Netease -> netease
         MusicSource.QQMusic -> qqMusic
         MusicSource.Kugou -> kugou
         MusicSource.AppleMusic -> appleMusic
+        MusicSource.Bilibili -> bilibili
     }
 }

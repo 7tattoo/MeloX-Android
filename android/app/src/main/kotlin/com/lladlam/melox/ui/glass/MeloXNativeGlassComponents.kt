@@ -49,7 +49,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp as colorLerp
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -186,6 +188,7 @@ fun MeloXGlassToggle(
     val accent = if (dark) Color(0xFF30D158) else Color(0xFF34C759)
     val track = if (dark) Color(0xFF787880).copy(alpha = 0.36f) else Color(0xFF787878).copy(alpha = 0.20f)
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val haptics = LocalHapticFeedback.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val travelPx = with(density) { 20.dp.toPx() }
     val tapThresholdPx = with(density) { 2.dp.toPx() }
@@ -210,6 +213,8 @@ fun MeloXGlassToggle(
                     fraction = if (currentChecked) 0f else 1f
                 }
                 onCheckedChange(fraction == 1f)
+                if (com.lladlam.melox.ui.settings.MeloXSettingsRuntime.hapticFeedbackEnabled)
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
             },
             onDrag = { _, dragAmount ->
                 if (!didDrag) {

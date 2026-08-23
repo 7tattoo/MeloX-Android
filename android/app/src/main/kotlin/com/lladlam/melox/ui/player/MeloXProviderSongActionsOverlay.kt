@@ -34,6 +34,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,9 +59,11 @@ import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.PlaylistWriteCapability
 import com.lladlam.melox.core.music.provider.ProviderAccountManager
 import com.lladlam.melox.core.network.MeloXSearchKind
+import com.lladlam.melox.core.provider.bilibili.BilibiliLyricOffsetStore
 import com.lladlam.melox.ui.glass.MeloXActionIcon
 import com.lladlam.melox.ui.glass.MeloXIosGroupedList
 import com.lladlam.melox.ui.glass.MeloXIosListRow
+import com.lladlam.melox.ui.glass.MeloXLiquidSlider
 import com.lladlam.melox.ui.search.MeloXSearchLaunchBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -115,6 +118,9 @@ internal fun MeloXProviderSongActionsOverlay(
     var playlistWriteWorking by remember(identity) { mutableStateOf(false) }
     var actionStatus by remember(identity) { mutableStateOf<String?>(null) }
     var actionError by remember(identity) { mutableStateOf<String?>(null) }
+    val bilibiliOffsetState = if (identity.source == MusicSource.Bilibili) {
+        BilibiliLyricOffsetStore.state(context, identity.value)
+    } else null
 
     BackHandler(enabled = visible) {
         if (page == ProviderSongActionPage.Main) onDismiss() else page = ProviderSongActionPage.Main
@@ -232,7 +238,7 @@ internal fun MeloXProviderSongActionsOverlay(
                                     shareProviderSong(context, state, identity)
                                     onDismiss()
                                 }
-                                if (state.album.isNotBlank() && onNavigateSearch != null) {
+                                if (identity.source != MusicSource.Bilibili && state.album.isNotBlank() && onNavigateSearch != null) {
                                     ProviderActionItem("前往专辑：${state.album}", "▣") {
                                         val target = state.album
                                         MeloXSearchLaunchBus.post(target, MeloXSearchKind.Albums)
@@ -240,7 +246,7 @@ internal fun MeloXProviderSongActionsOverlay(
                                         onNavigateSearch(target, MeloXSearchKind.Albums)
                                     }
                                 }
-                                if (state.artist.isNotBlank() && onNavigateSearch != null) {
+                                if (identity.source != MusicSource.Bilibili && state.artist.isNotBlank() && onNavigateSearch != null) {
                                     ProviderActionItem("前往艺人：${state.artist}", "♬") {
                                         val target = state.artist.substringBefore(" /")
                                         MeloXSearchLaunchBus.post(target, MeloXSearchKind.Artists)
@@ -298,6 +304,40 @@ internal fun MeloXProviderSongActionsOverlay(
                                 ProviderActionItem("返回", "‹") { page = ProviderSongActionPage.Main }
                             }
                         }
+                        }
+                        if (target == ProviderSongActionPage.Main && identity.source == MusicSource.Bilibili) {
+                            val persistedOffset = bilibiliOffsetState?.value ?: 0
+                            var displayedOffset by remember(identity.value, persistedOffset) {
+                                mutableIntStateOf(persistedOffset)
+                            }
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("歌词调试延迟", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        when {
+                                            displayedOffset == 0 -> "同步"
+                                            displayedOffset > 0 -> "+${displayedOffset} ms · 歌词提前"
+                                            else -> "$displayedOffset ms · 歌词延后"
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .62f),
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                                MeloXLiquidSlider(
+                                    value = displayedOffset.toFloat(),
+                                    onTransientValueChange = { raw ->
+                                        displayedOffset = raw.toInt()
+                                    },
+                                    onValueChange = { quantized ->
+                                        displayedOffset = quantized.toInt()
+                                        BilibiliLyricOffsetStore.write(context, identity.value, quantized.toInt())
+                                    },
+                                    valueRange = -5_000f..5_000f,
+                                    stepSize = 100f,
+                                    visibilityThreshold = 1f,
+                                    contentDescription = "歌词调试延迟",
+                                )
+                            }
                         }
                         ProviderActionStatus(actionStatus, actionError)
         }
@@ -404,6 +444,9 @@ private fun shareProviderSong(
         MusicSource.Kugou,
         MusicSource.Netease -> null
         MusicSource.AppleMusic -> "https://music.apple.com/song/${identity.value}"
+        MusicSource.Bilibili -> identity.value.substringBefore(':').takeIf(String::isNotBlank)?.let {
+            "https://www.bilibili.com/video/$it"
+        }
     }
     val text = buildString {
         append(state.title.ifBlank { "正在播放" })

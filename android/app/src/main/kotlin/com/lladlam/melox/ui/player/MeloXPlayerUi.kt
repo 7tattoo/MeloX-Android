@@ -220,6 +220,8 @@ class MeloXPlaybackUiState internal constructor(private val appContext: Context)
         currentIndex = player.currentMediaItemIndex
         repeatMode = player.repeatMode
         shuffleEnabled = MeloXPlaybackModePreferences.shuffle(appContext)
+        autoplayEnabled = MeloXPlaybackModePreferences.autoplay(appContext)
+        autoMixEnabled = MeloXPlaybackModePreferences.autoMix(appContext)
         volume = if (MeloXSettingsRuntime.volumeControlMode == MeloXVolumeControlMode.Player) {
             player.volume
         } else {

@@ -75,6 +75,7 @@ import coil3.compose.AsyncImage
 import com.lladlam.melox.R
 import com.lladlam.melox.BuildConfig
 import com.lladlam.melox.core.account.NeteaseSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliPlaybackAssociationStore
 import com.lladlam.melox.core.music.provider.PlaybackAccountSlot
 import com.lladlam.melox.core.music.provider.PlaybackAccountStore
 import com.lladlam.melox.core.music.model.MusicSource
@@ -97,6 +98,7 @@ import com.lladlam.melox.core.recommendation.LocalRecommendationStore
 import com.lladlam.melox.core.recognition.SongRecognitionClient
 import com.lladlam.melox.core.recognition.SongRecognitionResult
 import com.lladlam.melox.core.update.MeloXRelease
+import com.lladlam.melox.core.update.MeloXUpdateDownloadSource
 import com.lladlam.melox.core.update.MeloXUpdateClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.MeloXAutoMixFadeCurve
@@ -179,7 +181,6 @@ private val SettingsSections = listOf(
     )),
     SettingsSection("关于", listOf(
         SettingsItem(SettingsRoute.About, "版本、项目主页与开源信息", "ⓘ", "GitHub 更新 开源 许可"),
-        SettingsItem(SettingsRoute.Privacy, "本地数据、个性化推荐与算法进度", "◎", "隐私 算法 推荐 本地 数据 同意"),
         SettingsItem(SettingsRoute.Developer, "播放器诊断与迁移状态", "⌘", "BeatNet 节拍 调试 日志"),
         SettingsItem(SettingsRoute.Experimental, "预览尚未稳定的新功能", "✦", "实验 测试 歌词 强绑定"),
     )),
@@ -188,8 +189,10 @@ private val SettingsSections = listOf(
 @Composable
 fun SettingsScreen(
     session: NeteaseSessionStore,
+    source: MusicSource = MusicSource.Netease,
     onLogin: () -> Unit,
     onOpenServices: (() -> Unit)? = null,
+    onOpenMessages: (() -> Unit)? = null,
     initialRouteRequest: String? = null,
     onInitialRouteConsumed: () -> Unit = {},
 ) {
@@ -224,7 +227,7 @@ fun SettingsScreen(
         exit = slideOutHorizontally(tween(260)) { it / 4 } + fadeOut(tween(180)),
     ) {
         route?.let { selectedRoute ->
-            SettingsDetailScreen(route = selectedRoute, onBack = { route = null })
+            SettingsDetailScreen(route = selectedRoute, source = source, onBack = { route = null })
         }
     }
     AnimatedVisibility(
@@ -275,7 +278,13 @@ fun SettingsScreen(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             )
-            SettingsSectionCard(section) { route = it }
+            SettingsSectionCard(section) { selected ->
+                if (selected == SettingsRoute.Messages && onOpenMessages != null) {
+                    onOpenMessages()
+                } else {
+                    route = selected
+                }
+            }
             Spacer(Modifier.height(22.dp))
         }
 
@@ -384,7 +393,7 @@ private fun SettingsSectionCard(section: SettingsSection, onOpen: (SettingsRoute
 }
 
 @Composable
-private fun SettingsDetailScreen(route: SettingsRoute, onBack: () -> Unit) {
+private fun SettingsDetailScreen(route: SettingsRoute, source: MusicSource, onBack: () -> Unit) {
     val context = LocalContext.current
     Column(
         modifier = Modifier
@@ -417,7 +426,7 @@ private fun SettingsDetailScreen(route: SettingsRoute, onBack: () -> Unit) {
             SettingsRoute.About -> AboutSettings(context)
             SettingsRoute.Privacy -> PrivacySettings(context)
             SettingsRoute.Developer -> DeveloperSettings()
-            SettingsRoute.Experimental -> ExperimentalSettings(context)
+            SettingsRoute.Experimental -> ExperimentalSettings(context, source)
         }
     }
 }
@@ -596,14 +605,49 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
 }
 
 @Composable
-private fun ExperimentalSettings(context: android.content.Context) {
+private fun ExperimentalSettings(context: android.content.Context, source: MusicSource) {
     var playbackEnabled by remember { mutableStateOf(PlaybackAccountStore.isEnabled(context)) }
     var showNeteaseLogin by remember { mutableStateOf(false) }
     var showQQLogin by remember { mutableStateOf(false) }
     var showKugouLogin by remember { mutableStateOf(false) }
     var showClearPlaybackConfirmation by remember { mutableStateOf(false) }
     var showClearLyricBindingsConfirmation by remember { mutableStateOf(false) }
+    var showClearBilibiliAssociationsConfirmation by remember { mutableStateOf(false) }
+    var bilibiliLyricAlignment by remember(source) {
+        mutableStateOf(MeloXSettingsPreferences.boolean(context, "bilibili_lyric_audio_alignment", false))
+    }
     var refreshRevision by remember { mutableIntStateOf(0) }
+
+    if (source == MusicSource.Bilibili) {
+        SettingsGlassGroup {
+            SettingsExternalToggleRow(
+                title = "bilibili音源自动与歌词对齐",
+                value = bilibiliLyricAlignment,
+                grouped = true,
+            ) { enabled ->
+                bilibiliLyricAlignment = enabled
+                MeloXSettingsPreferences.setBoolean(context, "bilibili_lyric_audio_alignment", enabled)
+            }
+        }
+        SettingsInfoCard("开启开关可能会导致与实际音频不一致")
+        Spacer(Modifier.height(10.dp))
+        SettingsActionButton("清除 Bilibili 音频关联") { showClearBilibiliAssociationsConfirmation = true }
+        Spacer(Modifier.height(10.dp))
+    }
+
+    if (showClearBilibiliAssociationsConfirmation) {
+        MeloXGlassDialog(visible = true, onDismiss = { showClearBilibiliAssociationsConfirmation = false }) {
+            Text("清除 Bilibili 音频关联？", style = MaterialTheme.typography.titleLarge)
+            Text("已保存的原视频与替代音频对应关系会被删除。", Modifier.padding(top = 8.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SettingsActionButton("取消", Modifier.weight(1f)) { showClearBilibiliAssociationsConfirmation = false }
+                SettingsActionButton("清除", Modifier.weight(1f)) {
+                    BilibiliPlaybackAssociationStore.clear(context)
+                    showClearBilibiliAssociationsConfirmation = false
+                }
+            }
+        }
+    }
 
     if (showNeteaseLogin) {
         val session = remember { NeteaseSessionStore(context) }
@@ -1577,7 +1621,7 @@ private fun MessagesSettings(context: android.content.Context) {
             currentUserId = profile.userId
             val contact = selected
             if (contact == null) {
-                val recent = ops.privateMessageConversations()
+                val recent = ops.privateMessageConversations(profile.userId)
                 val follows = ops.messageContacts(profile.userId)
                 contacts = (recent + follows).filter { it.id != profile.userId }.distinctBy(MeloXMessageContact::id)
             } else {
@@ -1899,6 +1943,7 @@ private fun GeneralSettings(context: android.content.Context) {
         )
         SettingsToggleRow(context, "记住上次标签页", "general_remember_tab", true, grouped = true)
         SettingsToggleRow(context, "识别剪贴板中的网易云链接", "general_clipboard_links", true, "每次回到前台只读取一次；识别歌曲或歌单后会先询问是否打开。", grouped = true)
+        SettingsToggleRow(context, "触感", "general_haptic_feedback", true, grouped = true)
     }
 }
 
@@ -2029,6 +2074,13 @@ private fun AboutSettings(context: android.content.Context) {
     var checking by remember { mutableStateOf(false) }
     var release by remember { mutableStateOf<MeloXRelease?>(null) }
     var updateStatus by remember { mutableStateOf<String?>(null) }
+    var downloadSource by remember {
+        mutableStateOf(runCatching {
+            MeloXUpdateDownloadSource.valueOf(
+                MeloXSettingsPreferences.string(context, "update_download_source", MeloXUpdateDownloadSource.Auto.name),
+            )
+        }.getOrDefault(MeloXUpdateDownloadSource.Auto))
+    }
     SettingsGlassGroup {
         Column(Modifier.padding(18.dp)) {
             Text("MeloX Android", fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -2039,6 +2091,27 @@ private fun AboutSettings(context: android.content.Context) {
     }
     Spacer(Modifier.height(14.dp))
     SettingsToggleRow(context, "自动检查更新", "update_auto_check", true, "应用启动后检查 GitHub 正式版本；不会自动下载安装。")
+    Spacer(Modifier.height(10.dp))
+    MeloXSettingsDropdown(
+        title = "更新下载源",
+        selected = downloadSource,
+        items = listOf(
+            MeloXUpdateDownloadSource.Auto to "自动（CDN 优先）",
+            MeloXUpdateDownloadSource.GitHub to "GitHub Release",
+            MeloXUpdateDownloadSource.JsDelivr to "jsDelivr CDN",
+        ),
+        onSelected = {
+            downloadSource = it
+            MeloXSettingsPreferences.setString(context, "update_download_source", it.name)
+        },
+    )
+    Text(
+        "jsDelivr 只能下载 Git 标签仓库树中的 APK。发布时需将同名 APK 放入 releases/ 目录；不可用时自动模式会回退 GitHub。",
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f),
+    )
     SettingsActionButton(if (checking) "正在检查…" else "检查更新") {
         if (!checking) scope.launch {
             checking = true
@@ -2062,8 +2135,13 @@ private fun AboutSettings(context: android.content.Context) {
     release?.takeIf { updateClient.isNewer(it.version, BuildConfig.VERSION_NAME) }?.let { available ->
         Spacer(Modifier.height(10.dp))
         SettingsActionButton(if (available.apkUrl != null) "下载 ${available.version} APK" else "打开 ${available.version} 发布页") {
-            val target = available.apkUrl ?: available.pageUrl
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+            scope.launch {
+                val target = runCatching { updateClient.downloadUrl(available, downloadSource) }.getOrNull()
+                    ?: if (downloadSource == MeloXUpdateDownloadSource.JsDelivr) null else available.pageUrl
+                if (target == null) updateStatus = "该版本未在 Git 标签的 releases/ 目录提供 APK，jsDelivr 下载不可用"
+                else runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+                    .onFailure { updateStatus = it.message ?: "无法打开下载链接" }
+            }
         }
         if (available.notes.isNotBlank()) {
             Text(available.notes.take(700), modifier = Modifier.padding(top = 10.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))

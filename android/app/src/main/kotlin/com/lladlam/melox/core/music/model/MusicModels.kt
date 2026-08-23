@@ -8,7 +8,8 @@ enum class MusicSource(
     Netease("netease", "网易云音乐"),
     QQMusic("qq_music", "QQ音乐"),
     Kugou("kugou", "酷狗音乐"),
-    AppleMusic("apple_music", "Apple Music");
+    AppleMusic("apple_music", "Apple Music"),
+    Bilibili("bilibili", "Bilibili");
 
     companion object {
         fun fromStorageValue(value: String?): MusicSource =
@@ -105,6 +106,13 @@ sealed interface ProviderTrackMetadata {
         val storefront: String,
         val previewUrl: String? = null,
     ) : ProviderTrackMetadata
+
+    data class Bilibili(
+        val bvid: String,
+        val cid: Long,
+        val aid: Long? = null,
+        val page: Int = 1,
+    ) : ProviderTrackMetadata
 }
 
 data class MusicTrack(
@@ -186,10 +194,12 @@ enum class AudioQualityTier {
 sealed interface PlaybackResolution {
     data class Playable(
         val url: String,
+        val requestHeaders: Map<String, String> = emptyMap(),
         val requestedQuality: AudioQualityTier,
         val actualQuality: AudioQualityTier? = null,
         val bitrate: Int? = null,
         val format: String? = null,
+        val expiresAtEpochMs: Long? = null,
     ) : PlaybackResolution
 
     data class Preview(

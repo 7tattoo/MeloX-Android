@@ -9,6 +9,8 @@ import com.lladlam.melox.core.music.provider.MusicProviderRegistry
 import com.lladlam.melox.core.provider.applemusic.AppleMusicSessionStore
 import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliPlaybackAssociationStore
 import java.security.MessageDigest
 
 /**
@@ -45,6 +47,8 @@ object ProviderPlaybackRuntime {
             MusicSource.AppleMusic -> AppleMusicSessionStore.read(context).let { session ->
                 listOf(session.developerToken, session.musicUserToken, session.storefront).joinToString("|")
             }
+            MusicSource.Bilibili -> BilibiliSessionStore.read(context).cookie + "|" +
+                BilibiliPlaybackAssociationStore.revision(context)
         }
         return MessageDigest.getInstance("SHA-256").digest(credential.toByteArray())
             .joinToString("") { "%02x".format(it) }

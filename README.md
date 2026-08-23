@@ -19,13 +19,13 @@
 
 > MeloX Android 是非官方开源项目，与网易云音乐、小米、Apple 及其关联公司不存在隶属、合作或授权关系。
 
-## 当前版本：0.4.1-Beta
+## 当前版本：0.4.2-Dev
 
-`0.4.1-Beta` 集中完善高级歌词、独立播放账号和 Android 稳定性：支持 AMLL TTML、QQ Music QRC 与网易云 YRC 的逐字、对唱和伴唱歌词，增加自动歌词选择与强绑定；补充网易云、QQ 音乐和酷狗第二播放账号；修复逐字渲染、登录流程、增量 DEX 启动崩溃，并优化 SF Symbols、MiniPlayer、页面过渡与操作弹层。
+`0.4.2-Dev` 集中完善多来源播放、歌词、AutoMix、搜索与私信体验：增加 Bilibili 音乐源与登录能力，改进统一搜索聚合和 QQ 音乐/网易云资源选择；修复 AutoMix 前后台预载、队列补充和开关状态同步；将网易云私信迁移为 Mei 风格的 iOS Grouped List、Liquid Glass 输入栏、资源卡片、消息时间分组和长按复制；更新检查支持 GitHub Release 与 jsDelivr CDN 优先回退策略。
 
-- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.1-Beta)
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.2-Dev)
 - 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
-- 本次版本说明：[0.4.1-Beta Release Notes](docs/releases/0.4.1-Beta.md)
+- 本次版本说明：[0.4.2-Dev Release Notes](docs/releases/0.4.2-Dev.md)
 
 ## 项目说明
 
@@ -207,7 +207,7 @@ DF:CC:A9:86:5B:87:A4:02:D3:41:98:5A:48:EB:13:2B:D8:67:9D:FA:6D:9D:50:2F:36:5D:D1
 可使用 Android SDK Build Tools 验证：
 
 ```bash
-apksigner verify --verbose --print-certs MeloX-Android-0.4.1-Beta.apk
+apksigner verify --verbose --print-certs MeloX-Android-0.4.2-Dev.apk
 ```
 
 ## 项目结构

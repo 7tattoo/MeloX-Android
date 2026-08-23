@@ -18,6 +18,12 @@ import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.provider.LyricsCapability
 import com.lladlam.melox.core.music.provider.MeloXMusicProviders
 import com.lladlam.melox.core.music.provider.SearchCapability
+import com.lladlam.melox.core.provider.bilibili.BilibiliLyricAlignment
+import com.lladlam.melox.core.provider.bilibili.BilibiliLyricSourceResult
+import com.lladlam.melox.core.provider.bilibili.BilibiliTitleCandidate
+import com.lladlam.melox.core.provider.bilibili.BilibiliPlaybackAssociation
+import com.lladlam.melox.core.provider.bilibili.BilibiliPlaybackAssociationStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliProvider
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.playback.PlaybackTrackIdentity
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +37,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
+import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 
 /**
  * Single Now Playing lyric data entry point for every visual lyric style.
@@ -70,12 +77,18 @@ internal object MeloXProviderLyricsLoader {
         val resourceId = PlaybackTrackIdentity.decode(mediaId)
             ?: return LyricsDocument(emptyList())
         val auto = MeloXSettingsRuntime.automaticLyricSelectionEnabled
+        val bilibiliAlignment = resourceId.source == MusicSource.Bilibili &&
+            MeloXSettingsPreferences.boolean(appContext, "bilibili_lyric_audio_alignment", false)
         val binding = if (auto && MeloXSettingsRuntime.lyricStrongBindingEnabled) {
             LyricBindingStore.read(appContext, resourceId)
         } else null
         val cacheKey = buildString {
             append(if (auto) "auto-v$AutomaticSelectionCacheVersion" else "provider")
             append(':').append(resourceId.source.storageValue).append(':').append(resourceId.value)
+            if (resourceId.source == MusicSource.Bilibili) {
+                append(":alignment:").append(bilibiliAlignment)
+                append(":duration-known:").append(state.durationMs > 0L)
+            }
             binding?.let { append(":bound:").append(it.stableKey()) }
         }
         cached(cacheKey)?.let { return it }
@@ -90,6 +103,7 @@ internal object MeloXProviderLyricsLoader {
             artworkUrl = state.artworkUrl,
             durationMs = state.durationMs,
             automaticSelection = auto,
+            bilibiliAlignment = bilibiliAlignment,
             binding = binding,
         )
         return loadSnapshot(appContext, cacheKey, snapshot)
@@ -98,11 +112,16 @@ internal object MeloXProviderLyricsLoader {
     fun preloadQueue(context: Context, state: MeloXPlaybackUiState, count: Int = 2) {
         val appContext = context.applicationContext
         val automaticSelection = MeloXSettingsRuntime.automaticLyricSelectionEnabled
+        val bilibiliAlignment = MeloXSettingsPreferences.boolean(appContext, "bilibili_lyric_audio_alignment", false)
         val snapshots = state.queue
             .drop((state.currentIndex + 1).coerceAtLeast(0))
             .take(count.coerceIn(0, 4))
             .mapNotNull { entry ->
                 val resourceId = PlaybackTrackIdentity.decode(entry.mediaId) ?: return@mapNotNull null
+                // Bilibili alignment depends on the active decoder duration and
+                // can issue several catalog requests. Preloading future videos
+                // both lacks that duration and quickly triggers provider rate limits.
+                if (resourceId.source == MusicSource.Bilibili) return@mapNotNull null
                 LyricTrackSnapshot(
                     resourceId = resourceId,
                     title = entry.title,
@@ -111,6 +130,7 @@ internal object MeloXProviderLyricsLoader {
                     artworkUrl = entry.artworkUrl,
                     durationMs = 0L,
                     automaticSelection = automaticSelection,
+                    bilibiliAlignment = resourceId.source == MusicSource.Bilibili && bilibiliAlignment,
                     binding = if (automaticSelection && MeloXSettingsRuntime.lyricStrongBindingEnabled) {
                         LyricBindingStore.read(appContext, resourceId)
                     } else null,
@@ -156,6 +176,10 @@ internal object MeloXProviderLyricsLoader {
         appContext: Context,
         snapshot: LyricTrackSnapshot,
     ): LyricsDocument {
+        if (snapshot.resourceId.source == MusicSource.Bilibili) {
+            if (!snapshot.bilibiliAlignment) return LyricsDocument(emptyList())
+            return loadBilibiliAligned(appContext, snapshot)
+        }
         if (snapshot.automaticSelection) {
             snapshot.binding?.let { binding ->
                 val bound = loadBinding(appContext, binding)
@@ -167,6 +191,188 @@ internal object MeloXProviderLyricsLoader {
             return loadAutomatic(appContext, snapshot)
         }
         return loadCurrentProvider(appContext, snapshot)
+    }
+
+    private suspend fun loadBilibiliAligned(
+        appContext: Context,
+        snapshot: LyricTrackSnapshot,
+    ): LyricsDocument = coroutineScope {
+        if (snapshot.durationMs <= 0L) return@coroutineScope LyricsDocument(emptyList())
+        val titleCandidates = BilibiliLyricAlignment.extractTitleCandidates(snapshot.title, snapshot.artist)
+        Log.i(
+            "MeloXBilibiliLyrics",
+            "start id=${snapshot.resourceId.value} duration=${snapshot.durationMs} " +
+                "candidates=${titleCandidates.joinToString(" | ") { candidate ->
+                    candidate.title + candidate.artist?.let { " / $it" }.orEmpty()
+                }}",
+        )
+        if (titleCandidates.isEmpty()) return@coroutineScope LyricsDocument(emptyList())
+        val focusedCandidates = titleCandidates.take(3)
+        val registry = MeloXMusicProviders.create(appContext)
+        val neteaseProvider = registry.require(MusicSource.Netease)
+        val qqProvider = registry.require(MusicSource.QQMusic)
+        val neteaseSearch = neteaseProvider as? SearchCapability ?: return@coroutineScope LyricsDocument(emptyList())
+        val neteaseLyrics = neteaseProvider as? LyricsCapability ?: return@coroutineScope LyricsDocument(emptyList())
+        val qqSearch = qqProvider as? SearchCapability ?: return@coroutineScope LyricsDocument(emptyList())
+        val qqLyrics = qqProvider as? LyricsCapability ?: return@coroutineScope LyricsDocument(emptyList())
+
+        // Initial playback may use AMLL or QQ only. NetEase catalog lookup is
+        // needed to address AMLL, but NetEase's own lyric endpoint is reserved
+        // for the later three-provider duration verification.
+        val qqResult = async {
+            val track = findBilibiliLyricCatalogTrack(qqSearch, focusedCandidates) ?: return@async null
+            runCatching { qqLyrics.lyrics(track) }
+                .onFailure { Log.w("MeloXBilibiliLyrics", "QQ primary lyric request failed: ${it.message}") }
+                .getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                ?.let { BilibiliLyricSourceResult("qq", it, track) }
+        }
+        val neteaseTrackResult = async {
+            findBilibiliLyricCatalogTrack(neteaseSearch, focusedCandidates)
+        }
+        val amllResult = async {
+            val track = neteaseTrackResult.await() ?: return@async null
+            val id = track.id.value.toLongOrNull() ?: return@async null
+            runCatching { AmlldbLyricsClient().lyrics(id) }
+                .onFailure { Log.w("MeloXBilibiliLyrics", "AMLL primary lyric failed: ${it.message}") }
+                .getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                ?.let { BilibiliLyricSourceResult("amll", it, track) }
+        }
+        val qq = qqResult.await()
+        val amll = amllResult.await()
+        val primary = amll?.takeIf { it.document.lines.size > 1 }
+            ?: qq?.takeIf { it.document.lines.size > 1 }
+            ?: amll
+            ?: qq
+        Log.i(
+            "MeloXBilibiliLyrics",
+            "primary=${primary?.source ?: "none"} lines=${primary?.document?.lines?.size ?: 0}",
+        )
+        if (primary == null || primary.document.lines.size <= 1) {
+            return@coroutineScope primary?.document ?: LyricsDocument(emptyList())
+        }
+        val primaryDuration = BilibiliLyricAlignment.effectiveDuration(primary.document)
+        val primaryMismatch = primaryDuration != null &&
+            BilibiliLyricAlignment.audioClearlyMismatches(snapshot.durationMs, primaryDuration.durationMs)
+        Log.i(
+            "MeloXBilibiliLyrics",
+            "primaryDuration=${primaryDuration?.durationMs} confidence=${primaryDuration?.confidence} " +
+                "audio=${snapshot.durationMs} mismatch=$primaryMismatch",
+        )
+        if (primaryDuration != null &&
+            !primaryMismatch
+        ) return@coroutineScope primary.document
+
+        // Once AMLL/QQ proves the audio duration is wrong, use the standardized
+        // catalog identity for one NetEase match. Only now is NetEase lyric data
+        // enabled, and all three timelines are compared before any association.
+        val identityTrack = qq?.catalogTrack ?: primary.catalogTrack
+        val canonicalCandidate = BilibiliTitleCandidate(
+            title = identityTrack.title,
+            artist = identityTrack.artistText.takeUnless { it == "未知歌手" },
+        )
+        val initiallyMatchedNetease = neteaseTrackResult.await()
+        val neteaseTrack = initiallyMatchedNetease
+            ?.takeIf { BilibiliLyricAlignment.isSafeCatalogMatch(it, canonicalCandidate) }
+            ?: findBilibiliLyricCatalogTrack(neteaseSearch, listOf(canonicalCandidate))
+        val neteaseResult = async {
+            val track = neteaseTrack ?: return@async null
+            runCatching { neteaseLyrics.lyrics(track) }
+                .onFailure { Log.w("MeloXBilibiliLyrics", "NetEase verification lyric failed: ${it.message}") }
+                .getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                ?.let { BilibiliLyricSourceResult("netease", it, track) }
+        }
+        val verificationAmllResult = async {
+            val track = neteaseTrack ?: return@async null
+            val id = track.id.value.toLongOrNull() ?: return@async null
+            runCatching { AmlldbLyricsClient().lyrics(id) }
+                .onFailure { Log.w("MeloXBilibiliLyrics", "AMLL verification lyric failed: ${it.message}") }
+                .getOrNull()?.takeIf { it.lines.isNotEmpty() }
+                ?.let { BilibiliLyricSourceResult("amll", it, track) }
+        }
+        val netease = neteaseResult.await()
+        val verificationAmll = amll ?: verificationAmllResult.await()
+        val results = listOfNotNull(
+            verificationAmll,
+            qq,
+            netease,
+        ).distinctBy(BilibiliLyricSourceResult::source)
+        val selectedLyrics = BilibiliLyricAlignment.bestLyrics(results.ifEmpty { listOf(primary) })
+        val consensusDuration = BilibiliLyricAlignment.consensus(results)
+        Log.i(
+            "MeloXBilibiliLyrics",
+            "verification=${results.joinToString { result ->
+                val duration = BilibiliLyricAlignment.effectiveDuration(result.document)
+                "${result.source}:${duration?.durationMs ?: "none"}:${duration?.confidence ?: "none"}"
+            }} consensus=$consensusDuration " +
+                "audio=${snapshot.durationMs} selectedLines=${selectedLyrics.lines.size}",
+        )
+        if (consensusDuration != null &&
+            BilibiliLyricAlignment.audioClearlyMismatches(snapshot.durationMs, consensusDuration)
+        ) {
+            val original = BilibiliProvider.parseIdentity(snapshot.resourceId.value)
+            val canonical = canonicalCandidate
+            val bilibili = registry.require(MusicSource.Bilibili) as? BilibiliProvider
+            if (original != null && bilibili != null) {
+                val query = listOf(canonical.title, canonical.artist).filterNotNull().filter(String::isNotBlank).joinToString(" ")
+                val candidates = runCatching { bilibili.searchReplacementCandidates(query, 20) }.getOrDefault(emptyList())
+                BilibiliLyricAlignment.selectReplacement(
+                    candidates = candidates,
+                    originalIdentity = snapshot.resourceId.value,
+                    title = canonical.title,
+                    artist = canonical.artist,
+                    consensusDurationMs = consensusDuration,
+                )?.track?.let { replacement ->
+                    BilibiliProvider.parseIdentity(replacement.id.value)?.let { physical ->
+                        val changed = BilibiliPlaybackAssociationStore.writeIfChanged(
+                            appContext,
+                            BilibiliPlaybackAssociation(
+                                originalBvid = original.first,
+                                originalCid = original.second,
+                                replacementBvid = physical.first,
+                                replacementCid = physical.second,
+                                title = canonical.title,
+                                consensusDurationMs = consensusDuration,
+                                replacementCatalogDurationMs = replacement.durationMs,
+                            ),
+                        )
+                        if (changed) {
+                            Log.i(
+                                "MeloXBilibiliLyrics",
+                                "Saved replacement association for ${snapshot.resourceId.value}; it will apply on the next source open",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        selectedLyrics
+    }
+
+    private suspend fun findBilibiliLyricCatalogTrack(
+        search: SearchCapability,
+        candidates: List<com.lladlam.melox.core.provider.bilibili.BilibiliTitleCandidate>,
+    ): MusicTrack? {
+        for (candidate in candidates) {
+            val query = listOf(candidate.title, candidate.artist).filterNotNull().filter(String::isNotBlank).joinToString(" ")
+            val rawMatches = runCatching { search.searchSongs(query, 1, 12).items }
+                .onFailure {
+                    Log.w("MeloXBilibiliLyrics", "catalog search failed query=$query error=${it.message}")
+                }
+                .getOrDefault(emptyList())
+            val matches = rawMatches
+                .filter { BilibiliLyricAlignment.isSafeCatalogMatch(it, candidate) }
+            Log.i(
+                "MeloXBilibiliLyrics",
+                "catalog query=$query raw=${rawMatches.size} safe=${matches.size} " +
+                    "top=${rawMatches.take(3).joinToString(" | ") { it.title }}",
+            )
+            val best = matches.maxByOrNull { track ->
+                val exact = BilibiliLyricAlignment.normalize(track.title) == BilibiliLyricAlignment.normalize(candidate.title)
+                (if (exact) 100 else 50) + if (track.artists.isNotEmpty()) 10 else 0
+            }
+            if (best != null) return best
+        }
+        return null
     }
 
     private suspend fun loadAutomatic(
@@ -373,10 +579,14 @@ internal object MeloXProviderLyricsLoader {
         val artworkUrl: String?,
         val durationMs: Long,
         val automaticSelection: Boolean,
+        val bilibiliAlignment: Boolean,
         val binding: LyricBinding?,
     ) {
         fun cacheKey(): String =
             "${if (automaticSelection) "auto-v$AutomaticSelectionCacheVersion" else "provider"}:${resourceId.source.storageValue}:${resourceId.value}" +
+                (if (resourceId.source == MusicSource.Bilibili) {
+                    ":alignment:$bilibiliAlignment:duration-known:${durationMs > 0L}"
+                } else "") +
                 binding?.let { ":bound:${it.stableKey()}" }.orEmpty()
     }
 

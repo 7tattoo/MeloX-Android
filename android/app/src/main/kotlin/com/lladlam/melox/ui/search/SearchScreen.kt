@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -208,6 +209,8 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
     }
 
     var query by rememberSaveable(source.name) { mutableStateOf("") }
+    var searchTrigger by rememberSaveable(source.name) { mutableIntStateOf(0) }
+    var skipSearchDebounce by rememberSaveable(source.name) { mutableStateOf(false) }
     var kind by rememberSaveable(source.name) { mutableStateOf(MeloXSearchKind.Songs) }
     var songs by remember(source) { mutableStateOf<List<SearchSong>>(emptyList()) }
     var providerSongs by remember(source) { mutableStateOf<List<MusicTrack>>(emptyList()) }
@@ -251,7 +254,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
         }
     }
 
-    LaunchedEffect(query, kind, source, unifiedEnabled, unifiedSources) {
+    LaunchedEffect(query, kind, source, unifiedEnabled, unifiedSources, searchTrigger) {
         val keyword = query.trim()
         if (keyword.isBlank()) {
             songs = emptyList()
@@ -265,7 +268,8 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
             loading = false
             return@LaunchedEffect
         }
-        delay(350)
+        if (!skipSearchDebounce) delay(1500)
+        skipSearchDebounce = false
         loading = true
         error = null
 
@@ -302,7 +306,7 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
                             )
                         }
                     }.onSuccess { result ->
-                        providerSongs = result.tracks
+                        providerSongs = result.aggregated.mapNotNull { it.recommendation?.track }.ifEmpty { result.tracks }
                         unifiedFailures = result.failures
                     }.onFailure { failure ->
                         providerSongs = emptyList()
@@ -435,7 +439,12 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
     ) {
         MeloXIosTopBar(title = stringResource(R.string.tab_search))
         Spacer(Modifier.height(16.dp))
-        SearchField(query, { query = it }, source)
+        SearchField(
+            value = query,
+            onValueChange = { query = it; skipSearchDebounce = false },
+            onSearch = { skipSearchDebounce = true; searchTrigger += 1 },
+            source = source,
+        )
         if (query.isNotBlank()) {
             SearchScopes(kind = kind, availableKinds = availableKinds, onKind = { kind = it })
         }
@@ -512,7 +521,12 @@ fun SearchScreen(source: MusicSource = MusicSource.Netease) {
 }
 
 @Composable
-private fun SearchField(value: String, onValueChange: (String) -> Unit, source: MusicSource) {
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    source: MusicSource,
+) {
     var focused by remember { mutableStateOf(false) }
     val clearDescription = stringResource(R.string.search_clear)
     MeloXGlassTextField(
@@ -535,32 +549,45 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, source: 
                 fontSize = 17.sp,
             )
         },
-        trailingContent = if (value.isNotBlank()) {
-            {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clickable(role = Role.Button) { onValueChange("") }
-                        .semantics {
-                            contentDescription = clearDescription
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MeloXSymbolIcon(
-                        symbol = MeloXSymbol.Xmark,
-                        modifier = Modifier.size(15.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .56f),
-                    )
+        trailingContent = {
+            Row {
+                if (value.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable(role = Role.Button) { onSearch() }
+                            .semantics { contentDescription = "搜索" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MeloXSymbolIcon(
+                            symbol = MeloXSymbol.Search,
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .56f),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable(role = Role.Button) { onValueChange("") }
+                            .semantics { contentDescription = clearDescription },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MeloXSymbolIcon(
+                            symbol = MeloXSymbol.Xmark,
+                            modifier = Modifier.size(15.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = .56f),
+                        )
+                    }
                 }
             }
-        } else null,
+        },
         textStyle = androidx.compose.ui.text.TextStyle(
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 17.sp,
             lineHeight = 22.sp,
         ),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = {}),
+        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         onFocusChanged = { focused = it },
     )
 }

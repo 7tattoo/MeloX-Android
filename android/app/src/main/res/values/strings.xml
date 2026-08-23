@@ -10,6 +10,7 @@
     <string name="tab_settings">Settings</string>
     <string name="tab_services">Music services</string>
     <string name="tab_search">Search</string>
+    <string name="tab_messages">Messages</string>
     <string name="home_greeting">Good afternoon</string>
     <string name="action_back">Back</string>
     <string name="action_close">Close</string>

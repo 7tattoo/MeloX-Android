@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -269,9 +270,13 @@ private fun MeloXAppleMusicLyricsPanel(
     }
     val lines = renderedDocument?.lines.orEmpty()
     val hasSyllableSync = remember(renderedDocument) { lines.any { it.syllables.isNotEmpty() } }
-    val lyricAdvanceMs = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+    val bilibiliOffsetMs = rememberBilibiliLyricOffset(mediaId)
+    val lyricAdvanceMs = effectiveBilibiliLyricAdvance(MeloXSettingsRuntime.lyricAdvanceMs, bilibiliOffsetMs)
+    val isBilibiliLyrics = remember(mediaId) { isBilibiliMediaId(mediaId) }
     val usesWordByWordPresentation = hasSyllableSync && MeloXSettingsRuntime.lyricWordByWordEnabled
-    val timedAdvanceMs = if (MeloXSettingsRuntime.lyricAdvanceAppliesToWordByWord) lyricAdvanceMs else 0L
+    val timedAdvanceMs = if (isBilibiliLyrics || MeloXSettingsRuntime.lyricAdvanceAppliesToWordByWord) {
+        lyricAdvanceMs
+    } else 0L
     val lineAdvanceMs = if (usesWordByWordPresentation) timedAdvanceMs else lyricAdvanceMs
     var highlightedIndex by remember(document) {
         mutableIntStateOf(
@@ -379,6 +384,23 @@ private fun MeloXAppleMusicLyricsPanel(
     val latestInterfaceHidden = rememberUpdatedState(isInterfaceHidden)
     val latestVisibilityCallback = rememberUpdatedState(onInterfaceVisibilityChange)
     val latestInteractionCallback = rememberUpdatedState(onInterfaceInteraction)
+    var lastCanScrollForward by remember(document) { mutableStateOf(true) }
+    var lastCanScrollBackward by remember(document) { mutableStateOf(true) }
+    LaunchedEffect(document) {
+        snapshotFlow { listState.canScrollForward to listState.canScrollBackward }
+            .collect { (canForward, canBackward) ->
+                if (com.lladlam.melox.ui.settings.MeloXSettingsRuntime.hapticFeedbackEnabled) {
+                    if (lastCanScrollForward && !canForward) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    if (lastCanScrollBackward && !canBackward) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                }
+                lastCanScrollForward = canForward
+                lastCanScrollBackward = canBackward
+            }
+    }
 
     val lyricFontScale = MeloXSettingsRuntime.lyricFontScale
     val lyricSpacingScale = MeloXSettingsRuntime.lyricSpacingScale

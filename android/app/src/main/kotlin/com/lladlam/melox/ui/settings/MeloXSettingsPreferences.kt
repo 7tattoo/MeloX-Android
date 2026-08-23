@@ -100,7 +100,7 @@ object MeloXSettingsRuntime {
         internal set
     var lyricWordByWordEnabled by mutableStateOf(true)
         internal set
-    var lyricPseudoTimingEnabled by mutableStateOf(true)
+    var lyricPseudoTimingEnabled by mutableStateOf(false)
         internal set
     var lyricTapSeekEnabled by mutableStateOf(true)
         internal set
@@ -314,6 +314,8 @@ object MeloXSettingsRuntime {
         internal set
     var clipboardLinksEnabled by mutableStateOf(true)
         internal set
+    var hapticFeedbackEnabled by mutableStateOf(true)
+        internal set
     var previousRestartsAfterFiveSeconds by mutableStateOf(true)
         internal set
     var startsHeartModeOnLaunch by mutableStateOf(false)
@@ -397,7 +399,7 @@ object MeloXSettingsRuntime {
         lyricStrongBindingEnabled = MeloXSettingsPreferences.boolean(app, "experimental_lyric_strong_binding", false)
         showLyricRomanization = MeloXSettingsPreferences.boolean(app, "lyrics_romanization", true)
         lyricWordByWordEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_word_by_word", true)
-        lyricPseudoTimingEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_pseudo_timing", true)
+        lyricPseudoTimingEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_pseudo_timing", false)
         lyricTapSeekEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_tap_seek", true)
         lyricLongPressShareEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_long_press_share", true)
         lyricInterludeCountdownEnabled = MeloXSettingsPreferences.boolean(app, "lyrics_interlude_countdown", true)
@@ -541,6 +543,7 @@ object MeloXSettingsRuntime {
         showPlaylistPlayCount = MeloXSettingsPreferences.boolean(app, "content_playlist_play_count", true)
         showHighQualityPlaylists = MeloXSettingsPreferences.boolean(app, "content_high_quality_playlist", true)
         clipboardLinksEnabled = MeloXSettingsPreferences.boolean(app, "general_clipboard_links", true)
+        hapticFeedbackEnabled = MeloXSettingsPreferences.boolean(app, "general_haptic_feedback", true)
         previousRestartsAfterFiveSeconds = MeloXSettingsPreferences.boolean(app, "playback_previous_restarts", true)
         startsHeartModeOnLaunch = MeloXSettingsPreferences.boolean(app, "playback_heart_mode_on_launch", false)
         volumeControlMode = runCatching {
@@ -663,6 +666,7 @@ object MeloXSettingsPreferences {
             "content_playlist_play_count" -> MeloXSettingsRuntime.showPlaylistPlayCount = value
             "content_high_quality_playlist" -> MeloXSettingsRuntime.showHighQualityPlaylists = value
             "general_clipboard_links" -> MeloXSettingsRuntime.clipboardLinksEnabled = value
+            "general_haptic_feedback" -> MeloXSettingsRuntime.hapticFeedbackEnabled = value
             "playback_previous_restarts" -> MeloXSettingsRuntime.previousRestartsAfterFiveSeconds = value
             "playback_heart_mode_on_launch" -> MeloXSettingsRuntime.startsHeartModeOnLaunch = value
         }

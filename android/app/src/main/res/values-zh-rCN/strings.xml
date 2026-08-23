@@ -10,6 +10,7 @@
     <string name="tab_settings">设置</string>
     <string name="tab_services">音乐服务</string>
     <string name="tab_search">搜索</string>
+    <string name="tab_messages">消息</string>
     <string name="home_greeting">下午好</string>
     <string name="action_back">返回</string>
     <string name="action_close">关闭</string>

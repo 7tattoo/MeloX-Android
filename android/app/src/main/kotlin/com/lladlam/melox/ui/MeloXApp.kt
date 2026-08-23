@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
@@ -70,6 +71,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -93,6 +96,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.shapes.Capsule
 import com.lladlam.melox.ui.library.LibraryScreen
+import com.lladlam.melox.ui.messages.MessagesScreen
 import com.lladlam.melox.ui.podcast.MeloXPodcastScreen
 import com.lladlam.melox.ui.cloud.MeloXCloudMusicScreen
 import com.lladlam.melox.ui.discovery.MeloXExploreScreen
@@ -129,6 +133,7 @@ import com.lladlam.melox.core.network.NeteaseClipboardLink
 import com.lladlam.melox.core.network.NeteaseClipboardTarget
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.update.MeloXRelease
+import com.lladlam.melox.core.update.MeloXUpdateDownloadSource
 import com.lladlam.melox.core.update.MeloXUpdateClient
 import com.lladlam.melox.playback.PlaybackCommands
 import com.lladlam.melox.playback.ProviderPlaybackRuntime
@@ -171,10 +176,17 @@ fun MeloXApp(
     }.getOrDefault(AppTab.Home)
     var selectedTab by remember { mutableStateOf(initialTab) }
     var settingsRouteRequest by remember { mutableStateOf<String?>(null) }
+    var messagesVisible by remember { mutableStateOf(false) }
+    BackHandler(enabled = messagesVisible) { messagesVisible = false }
     var showNeteaseLogin by remember { mutableStateOf(false) }
     var loginReturnTab by remember { mutableStateOf(AppTab.Settings) }
     var tabBarMinimized by remember { mutableStateOf(false) }
     var scrollAccumulator by remember { mutableFloatStateOf(0f) }
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(tabBarMinimized) {
+        if (com.lladlam.melox.ui.settings.MeloXSettingsRuntime.hapticFeedbackEnabled)
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     var libraryModalVisible by remember { mutableStateOf(false) }
     var onboardingPage by remember {
         mutableStateOf(if (MeloXSettingsPreferences.boolean(context, "onboarding_completed", false)) -1 else 0)
@@ -337,7 +349,9 @@ fun MeloXApp(
         }
     }
 
-    val visibleRootTabs = MeloXSettingsRuntime.tabOrder.mapNotNull { runCatching { AppTab.valueOf(it) }.getOrNull() }
+    val visibleRootTabs = (if (selectedSource == MusicSource.Bilibili) {
+        listOf(AppTab.Library, AppTab.Settings)
+    } else MeloXSettingsRuntime.tabOrder.mapNotNull { runCatching { AppTab.valueOf(it) }.getOrNull() })
         .filter {
             when (it) {
                 AppTab.Home -> MeloXSettingsRuntime.homeTabEnabled
@@ -471,6 +485,7 @@ fun MeloXApp(
                                 showNeteaseLogin = true
                             },
                             onOpenServices = { selectedTab = AppTab.Services },
+                            onOpenMessages = { messagesVisible = true },
                             initialRouteRequest = settingsRouteRequest,
                             onInitialRouteConsumed = { settingsRouteRequest = null },
                         )
@@ -492,7 +507,7 @@ fun MeloXApp(
                 }
             }
 
-            if (selectedTab != AppTab.Services) CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
+            if (selectedTab != AppTab.Services && !messagesVisible) CompositionLocalProvider(LocalMeloXBackdrop provides bottomChromeBackdrop) {
                 MeloXBottomChrome(
                     selectedTab = selectedTab,
                     source = selectedSource,
@@ -521,6 +536,23 @@ fun MeloXApp(
                         }
                     },
                 )
+            }
+
+            AnimatedVisibility(
+                visible = messagesVisible,
+                enter = slideInHorizontally(
+                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                    initialOffsetX = { it },
+                ),
+                exit = slideOutHorizontally(
+                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                    targetOffsetX = { it },
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(15f),
+            ) {
+                MessagesScreen(onBack = { messagesVisible = false })
             }
 
             playerTransition.AnimatedVisibility(
@@ -646,7 +678,16 @@ fun MeloXApp(
                 onDismiss = { availableUpdate = null },
                 onConfirm = {
                     availableUpdate = null
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl ?: release.pageUrl))) }
+                    val source = runCatching {
+                        MeloXUpdateDownloadSource.valueOf(
+                            MeloXSettingsPreferences.string(context, "update_download_source", MeloXUpdateDownloadSource.Auto.name),
+                        )
+                    }.getOrDefault(MeloXUpdateDownloadSource.Auto)
+                    playerScope.launch {
+                        val target = runCatching { MeloXUpdateClient().downloadUrl(release, source) }.getOrNull()
+                            ?: release.pageUrl
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+                    }
                 },
             )
         }

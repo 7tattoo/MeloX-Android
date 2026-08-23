@@ -166,6 +166,7 @@ internal fun MeloXQualitySelectionOverlay(
                         source == MusicSource.Netease -> availability.supports(quality.apiLevel) != false
                         source == MusicSource.QQMusic -> quality in QQSelectableQualities
                         source == MusicSource.Kugou -> quality in KugouSelectableQualities
+                        source == MusicSource.Bilibili -> quality in BilibiliSelectableQualities
                         else -> false
                     }
                     val isSelected = quality == selected
@@ -242,6 +243,14 @@ private val KugouSelectableQualities = setOf(
     MusicQuality.High,
     MusicQuality.Lossless,
     MusicQuality.HiResolution,
+)
+
+private val BilibiliSelectableQualities = setOf(
+    MusicQuality.Standard,
+    MusicQuality.High,
+    MusicQuality.Lossless,
+    MusicQuality.HiResolution,
+    MusicQuality.ImmersiveSurround,
 )
 
 private fun AudioQualityTier.displayTitle(): String = when (this) {

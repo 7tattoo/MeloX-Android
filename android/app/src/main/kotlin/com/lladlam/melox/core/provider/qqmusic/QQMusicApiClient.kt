@@ -15,6 +15,7 @@ import com.lladlam.melox.core.music.model.MusicSource
 import com.lladlam.melox.core.music.model.MusicTrack
 import com.lladlam.melox.core.music.model.PlaybackResolution
 import com.lladlam.melox.core.music.model.ProviderTrackMetadata
+import com.lladlam.melox.core.music.model.TrackAvailability
 import java.io.IOException
 import java.util.Base64
 import kotlin.random.Random
@@ -517,6 +518,7 @@ class QQMusicApiClient(
             },
             artworkUrl = artwork,
             durationMs = durationSeconds?.times(1_000L),
+            availability = TrackAvailability.Playable,
             providerMetadata = ProviderTrackMetadata.QQMusic(
                 songMid = songMid,
                 mediaMid = mediaMid,

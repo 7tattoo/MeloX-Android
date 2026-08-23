@@ -151,6 +151,7 @@ private enum class MeloXLibraryPage(val title: String) {
  * same MeloX transitions/backgrounds remain active.
  */
 private fun MeloXLibraryPage.isEnabled(source: MusicSource): Boolean = when {
+    source == MusicSource.Bilibili -> this == MeloXLibraryPage.Playlists || this == MeloXLibraryPage.Downloads
     source != MusicSource.Netease -> this == MeloXLibraryPage.Playlists
     this == MeloXLibraryPage.Podcasts -> MeloXSettingsRuntime.podcastsEnabled && MeloXSettingsRuntime.podcastsLibraryPlacement
     this == MeloXLibraryPage.History -> MeloXSettingsRuntime.listeningHistoryEnabled

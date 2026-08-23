@@ -9,6 +9,10 @@ import androidx.media3.session.SessionToken
 import com.lladlam.melox.core.lyrics.LyricLine
 import com.lladlam.melox.core.lyrics.LyricSyllable
 import com.lladlam.melox.core.lyrics.LyricsDocument
+import com.lladlam.melox.core.music.model.MusicSource
+import com.lladlam.melox.core.provider.bilibili.BilibiliLyricOffsetStore
+import com.lladlam.melox.playback.PlaybackTrackIdentity
+import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.playback.MeloXPlaybackService
 import com.lladlam.melox.ui.player.MeloXPlaybackUiState
 import com.lladlam.melox.ui.player.MeloXProviderLyricsLoader
@@ -121,16 +125,29 @@ object MeloXLyriconBridge {
                                 document.lines.any { !it.romanization.isNullOrBlank() },
                             )
                             lyriconProvider.player.setPlaybackState(state.isPlaying)
-                            lyriconProvider.player.setPosition(state.positionMs.coerceAtLeast(0L))
+                            lyriconProvider.player.setPosition(
+                                lyriconPosition(context, requestedMediaId, state.positionMs),
+                            )
                         }
                     }
                 }
 
                 lyriconProvider.player.setPlaybackState(state.isPlaying)
-                lyriconProvider.player.setPosition(state.positionMs.coerceAtLeast(0L))
+                lyriconProvider.player.setPosition(lyriconPosition(context, mediaId, state.positionMs))
                 delay(if (state.isPlaying) 500L else 1_000L)
             }
         }
+    }
+
+    private fun lyriconPosition(context: Context, mediaId: String?, positionMs: Long): Long {
+        val identity = mediaId?.let(PlaybackTrackIdentity::decode)
+        val offset = if (identity?.source == MusicSource.Bilibili) {
+            BilibiliLyricOffsetStore.read(context, identity.value)
+        } else 0
+        val advance = if (identity?.source == MusicSource.Bilibili) {
+            MeloXSettingsRuntime.lyricAdvanceMs + offset
+        } else 0
+        return (positionMs + advance).coerceAtLeast(0L)
     }
 
     private fun LyricsDocument.toLyriconSong(

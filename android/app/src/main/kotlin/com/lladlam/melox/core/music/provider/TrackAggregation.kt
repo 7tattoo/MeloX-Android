@@ -32,6 +32,7 @@ data class AggregatedTrack(
 
 object TrackAggregation {
     private val punctuation = Regex("[\\p{Punct}\\s]+")
+    private val artistSeparators = Regex("[/,、，&｜\\s]+")
     private val versionTokens = listOf(
         TrackVersionKind.Live to listOf("live", "现场", "演唱会", "巡演"),
         TrackVersionKind.Remix to listOf("remix", "混音", "重混"),
@@ -43,6 +44,10 @@ object TrackAggregation {
 
     fun normalize(value: String): String = value.lowercase().replace(punctuation, "")
 
+    fun normalizeArtist(value: String): String = value.lowercase()
+        .replace(artistSeparators, "")
+        .replace(punctuation, "")
+
     fun versionOf(track: MusicTrack): TrackVersionKind {
         val value = normalize(listOf(track.title, track.album?.name.orEmpty()).joinToString(" "))
         return versionTokens.firstOrNull { (_, tokens) -> tokens.any { value.contains(normalize(it)) } }?.first
@@ -51,8 +56,8 @@ object TrackAggregation {
 
     fun keyOf(track: MusicTrack): UnifiedTrackKey = UnifiedTrackKey(
         title = normalize(track.title),
-        artist = normalize(track.artistText),
-        durationBucket = track.durationMs?.let { it / 2_000L },
+        artist = normalizeArtist(track.artistText),
+        durationBucket = null,
         version = versionOf(track),
     )
 
@@ -76,10 +81,11 @@ object TrackAggregation {
             else -> 0
         }
         val sourceBonus = when (track.id.source) {
+            com.lladlam.melox.core.music.model.MusicSource.QQMusic -> 5
             com.lladlam.melox.core.music.model.MusicSource.Netease -> 3
-            com.lladlam.melox.core.music.model.MusicSource.QQMusic -> 3
             com.lladlam.melox.core.music.model.MusicSource.Kugou -> 2
-            com.lladlam.melox.core.music.model.MusicSource.AppleMusic -> 1
+            com.lladlam.melox.core.music.model.MusicSource.AppleMusic -> 4
+            com.lladlam.melox.core.music.model.MusicSource.Bilibili -> 1
         }
         return AggregatedTrackCandidate(track, identity, version, quality, sourceBonus, identity + version + quality + sourceBonus, "版本 ${key.version} · ${track.id.source.displayName}")
     }
@@ -88,7 +94,7 @@ object TrackAggregation {
         if (versionOf(left) != versionOf(right)) return 0f
         var score = 0f
         if (normalize(left.title) == normalize(right.title)) score += .45f
-        if (normalize(left.artistText) == normalize(right.artistText)) score += .35f
+        if (normalizeArtist(left.artistText) == normalizeArtist(right.artistText)) score += .35f
         val durationDelta = abs((left.durationMs ?: 0L) - (right.durationMs ?: 0L))
         if (durationDelta <= 2_000L) score += .20f
         return score.coerceIn(0f, 1f)

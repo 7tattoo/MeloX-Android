@@ -9,6 +9,10 @@ import com.lladlam.melox.core.provider.kugou.KugouSessionStore
 import com.lladlam.melox.core.provider.netease.NeteaseProvider
 import com.lladlam.melox.core.provider.qqmusic.QQMusicProvider
 import com.lladlam.melox.core.provider.qqmusic.QQMusicSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliProvider
+import com.lladlam.melox.core.provider.bilibili.BilibiliSessionStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliPlaybackAssociationStore
+import com.lladlam.melox.core.provider.bilibili.BilibiliApiCache
 import com.lladlam.melox.core.network.MeloXHttpClient
 import okhttp3.OkHttpClient
 
@@ -40,6 +44,12 @@ object MeloXMusicProviders {
                 QQMusicProvider({ PlaybackAccountStore.qqSession(appContext) }, httpClient),
                 KugouProvider({ PlaybackAccountStore.kugouSession(appContext) }, httpClient),
                 AppleMusicApiClient({ AppleMusicSessionStore.read(appContext) }, httpClient),
+                BilibiliProvider(
+                    { BilibiliSessionStore.read(appContext) }, httpClient,
+                    { bvid, cid -> BilibiliPlaybackAssociationStore.read(appContext, bvid, cid) },
+                    BilibiliApiCache.shared(appContext),
+                    { BilibiliSessionStore.revision(appContext) },
+                ),
             ),
         )
     }
@@ -62,6 +72,13 @@ object MeloXMusicProviders {
                 AppleMusicApiClient(
                     sessionProvider = { AppleMusicSessionStore.read(context) },
                     httpClient = httpClient,
+                ),
+                BilibiliProvider(
+                    sessionProvider = { BilibiliSessionStore.read(context) },
+                    httpClient = httpClient,
+                    associationProvider = { bvid, cid -> BilibiliPlaybackAssociationStore.read(context, bvid, cid) },
+                    apiCache = BilibiliApiCache.shared(context),
+                    sessionRevisionProvider = { BilibiliSessionStore.revision(context) },
                 ),
             ),
         )
