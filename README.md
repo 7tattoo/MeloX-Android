@@ -23,7 +23,7 @@
 
 `0.4.2-Dev` 集中完善多来源播放、歌词、AutoMix、搜索与私信体验：增加 Bilibili 音乐源与登录能力，改进统一搜索聚合和 QQ 音乐/网易云资源选择；修复 AutoMix 前后台预载、队列补充和开关状态同步；将网易云私信迁移为 Mei 风格的 iOS Grouped List、Liquid Glass 输入栏、资源卡片、消息时间分组和长按复制；更新检查支持 GitHub Release 与 jsDelivr CDN 优先回退策略。
 
-- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/android-v0.4.2-Dev)
+- 下载与完整更新日志：[GitHub Releases](https://github.com/lladlam/MeloX-Android/releases/tag/0.4.2-Dev)
 - 详细版本记录：[CHANGELOG.md](CHANGELOG.md)
 - 本次版本说明：[0.4.2-Dev Release Notes](docs/releases/0.4.2-Dev.md)
 

@@ -83,7 +83,10 @@ class MeloXUpdateClient(private val httpClient: OkHttpClient = com.lladlam.melox
     }
 
     fun isNewer(latest: String, current: String): Boolean {
-        fun parts(value: String) = value.trim().removePrefix("v").substringBefore('-')
+        fun parts(value: String) = value.trim()
+            .removePrefix("android-")
+            .removePrefix("v")
+            .substringBefore('-')
             .split('.').map { it.toIntOrNull() ?: 0 }
         val left = parts(latest)
         val right = parts(current)
