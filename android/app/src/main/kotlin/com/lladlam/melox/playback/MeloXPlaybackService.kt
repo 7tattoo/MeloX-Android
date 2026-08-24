@@ -643,15 +643,20 @@ class MeloXPlaybackService : MediaSessionService() {
         val changed = if (!enabled) {
             manager.push()
         } else {
-            val songId = currentItem.mediaId.toLongOrNull() ?: return
-            // 优先使用已加载的系统歌词（避免重复加载）
             val lyrics = systemLyricsDocument
-            val currentLine = if (lyrics != null) {
+            if (lyrics != null) {
+                // 歌词已加载，推送实际歌词
                 val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
                 val index = lyrics.highlightedIndex(active.currentPosition + advance)
-                index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
-            } else null
-            manager.updateLyric(currentLine, lyrics)
+                val currentLine = index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
+                manager.updateLyric(currentLine, lyrics)
+            } else if (systemLyricsJob?.isActive == true) {
+                // 歌词正在加载中，保持 LOADING 状态（不推 -1）
+                manager.setLoading()
+            } else {
+                // 无歌词且无加载任务
+                manager.updateLyric(null, null)
+            }
         }
 
         // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据
