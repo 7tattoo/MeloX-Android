@@ -38,6 +38,8 @@ import com.lladlam.melox.core.network.MeloXNetworkAvailability
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
+import com.lladlam.melox.logic.car.CarLyricsManager
+import com.lladlam.melox.logic.car.CarLyricsConstants
 import com.lladlam.melox.ui.settings.MeloXSettingsPreferences
 import com.lladlam.melox.ui.settings.MeloXSettingsRuntime
 import com.lladlam.melox.ui.settings.MeloXSystemLyricTitleMode
@@ -76,6 +78,7 @@ class MeloXPlaybackService : MediaSessionService() {
     private var systemLyricsLastDispatchRealtimeMs = 0L
     private var systemLyricsLastPlaying = false
     private var updatingSystemLyricsMetadata = false
+    private var carLyricsManager: CarLyricsManager? = null
     private var mixAnalysisJob: Job? = null
     private var mixAnalysisSourceId: String? = null
     private var analyzedMixPlan: MeloXAutoMixPlan? = null
@@ -140,6 +143,8 @@ class MeloXPlaybackService : MediaSessionService() {
             MeloXAudioReactiveRuntime.select(mediaItem?.mediaId)
             mediaItem?.let(downloadStore::recordPlayback)
             if (transitionedId != systemLyricsSongId) resetSystemLyrics(mediaItem)
+            // 车机歌词：切歌时推送"加载中"状态
+            carLyricsManager?.setLoading()
             val active = player
             if (active != null) {
                 applyLocalArtworkMetadata(active)
@@ -199,6 +204,7 @@ class MeloXPlaybackService : MediaSessionService() {
                     maybeRunAutoMix(active)
                     if (!uiTransitionActive) {
                         maybeUpdateSystemLyrics(active)
+                        pushCarLyrics(active)
                         updateAudioReactiveVisuals(active)
                     }
                     val now = SystemClock.elapsedRealtime()
@@ -311,6 +317,7 @@ class MeloXPlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, active)
             .setSessionActivity(sessionActivity)
             .build()
+        carLyricsManager = CarLyricsManager(mediaSession!!)
         createLyricsNotificationChannel()
         handler.post(modeMonitor)
     }
@@ -611,6 +618,65 @@ class MeloXPlaybackService : MediaSessionService() {
         updatingSystemLyricsMetadata = true
         active.replaceMediaItem(index, current.buildUpon().setMediaMetadata(original).build())
         handler.post { updatingSystemLyricsMetadata = false }
+    }
+
+    // ====================================================================
+    // vivo 车联投屏歌词
+    // ====================================================================
+
+    /**
+     * 车机歌词推送入口。
+     * 从 `MeloXSettingsRuntime` 读取开关状态，调用 CarLyricsManager 更新，
+     * 仅在值变化时刷新播放器状态（通过 replacedMediaItem 注入 Channel A 元数据）。
+     *
+     * 注意：Channel A 通过 replaceMediaItem 注入，但受 `updatingSystemLyricsMetadata`
+     * flag 保护，不会触发反馈循环。Channel B 通过 setSessionExtras 安全推送。
+     */
+    private fun pushCarLyrics(active: ExoPlayer) {
+        val manager = carLyricsManager ?: return
+        val currentItem = active.currentMediaItem ?: return
+        val enabled = MeloXSettingsPreferences.boolean(
+            this, CarLyricsConstants.PREF_CAR_LYRICS_ENABLED, true,
+        )
+        manager.enabled = enabled
+
+        val changed = if (!enabled) {
+            manager.push()
+        } else {
+            val songId = currentItem.mediaId.toLongOrNull() ?: return
+            // 优先使用已加载的系统歌词（避免重复加载）
+            val lyrics = systemLyricsDocument
+            val currentLine = if (lyrics != null) {
+                val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
+                val index = lyrics.highlightedIndex(active.currentPosition + advance)
+                index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
+            } else null
+            manager.updateLyric(currentLine, lyrics)
+        }
+
+        // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据
+        if (changed && enabled) {
+            val extras = manager.buildMetadataExtras()
+            if (extras.isEmpty) return
+            val merged = Bundle(currentItem.mediaMetadata.extras ?: Bundle()).apply {
+                putAll(extras)
+            }
+            val metadata = currentItem.mediaMetadata.buildUpon()
+                .setExtras(merged)
+                .build()
+            val updatedItem = currentItem.buildUpon().setMediaMetadata(metadata).build()
+            updatingSystemLyricsMetadata = true
+            active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
+            handler.post { updatingSystemLyricsMetadata = false }
+        } else if (changed && !enabled) {
+            // 开关关闭，清除 Channel A 元数据
+            val metadata = currentItem.mediaMetadata.buildUpon()
+                .setExtras(Bundle()).build()
+            val updatedItem = currentItem.buildUpon().setMediaMetadata(metadata).build()
+            updatingSystemLyricsMetadata = true
+            active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
+            handler.post { updatingSystemLyricsMetadata = false }
+        }
     }
 
     private fun createLyricsNotificationChannel() {

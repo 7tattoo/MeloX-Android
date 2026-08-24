@@ -191,7 +191,7 @@ fun MeloXApp(
     var onboardingPage by remember {
         mutableStateOf(if (MeloXSettingsPreferences.boolean(context, "onboarding_completed", false)) -1 else 0)
     }
-    var availableUpdate by remember { mutableStateOf<MeloXRelease?>(null) }
+    var availableUpdate by remember { mutableStateOf<MeloXRelease?>(null) }  // 更新功能已移除
     var heartModeLaunchAttempted by remember { mutableStateOf(false) }
     val playbackState = rememberMeloXPlaybackUiState()
     val playerTransitionState = remember { SeekableTransitionState(false) }
@@ -239,17 +239,7 @@ fun MeloXApp(
         // Android splash/blank-window interval on a cold process start.
         delay(250L)
         ProviderPlaybackRuntime.initialize(context)
-        if (MeloXSettingsPreferences.boolean(context, "update_auto_check", true)) {
-            val now = System.currentTimeMillis()
-            val last = MeloXSettingsPreferences.string(context, "update_last_check_ms", "0").toLongOrNull() ?: 0L
-            if (now - last >= 24L * 60L * 60L * 1000L) {
-                MeloXSettingsPreferences.setString(context, "update_last_check_ms", now.toString())
-                val client = MeloXUpdateClient()
-                runCatching { client.latestStableRelease() }.getOrNull()?.let { release ->
-                    if (client.isNewer(release.version, BuildConfig.VERSION_NAME)) availableUpdate = release
-                }
-            }
-        }
+        // 更新自动检查已移除
     }
 
     val tabBarMinimizeConnection = remember {

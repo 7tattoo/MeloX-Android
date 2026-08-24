@@ -108,6 +108,7 @@ import com.lladlam.melox.playback.MeloXAutoMixMode
 import com.lladlam.melox.playback.MeloXAutoMixSettings
 import com.lladlam.melox.playback.MeloXEqualizerController
 import com.lladlam.melox.playback.MeloXPlaybackModePreferences
+import com.lladlam.melox.logic.car.CarLyricsConstants
 import com.lladlam.melox.platform.floating.MeloXFloatingLyricsService
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.ui.MeloXBottomContentClearance
@@ -543,6 +544,14 @@ private fun SystemPlaybackSettings(context: android.content.Context) {
         ) {
             systemLyrics = it
             MeloXSettingsPreferences.setBoolean(context, "system_lyrics_enabled", it)
+        }
+        SettingsExternalToggleRow(
+            title = "vivo 车联投屏歌词",
+            value = MeloXSettingsPreferences.boolean(context, CarLyricsConstants.PREF_CAR_LYRICS_ENABLED, true),
+            note = "通过双通道向 vivo JoviInCar / uCar 投屏歌词，默认开启。",
+            grouped = true,
+        ) {
+            MeloXSettingsPreferences.setBoolean(context, CarLyricsConstants.PREF_CAR_LYRICS_ENABLED, it)
         }
         val protocol = remember { HyperOsFocusBridge.protocol(context) }
         MeloXSettingsDropdown(
@@ -2069,89 +2078,22 @@ private fun RecognitionSettings(context: android.content.Context) {
 
 @Composable
 private fun AboutSettings(context: android.content.Context) {
-    val updateClient = remember { MeloXUpdateClient() }
-    val scope = rememberCoroutineScope()
-    var checking by remember { mutableStateOf(false) }
-    var release by remember { mutableStateOf<MeloXRelease?>(null) }
-    var updateStatus by remember { mutableStateOf<String?>(null) }
-    var downloadSource by remember {
-        mutableStateOf(runCatching {
-            MeloXUpdateDownloadSource.valueOf(
-                MeloXSettingsPreferences.string(context, "update_download_source", MeloXUpdateDownloadSource.Auto.name),
-            )
-        }.getOrDefault(MeloXUpdateDownloadSource.Auto))
-    }
     SettingsGlassGroup {
         Column(Modifier.padding(18.dp)) {
             Text("MeloX Android", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("版本 ${BuildConfig.VERSION_NAME} · MeloX 的 Android 原生迁移版。", modifier = Modifier.padding(top=7.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha=.62f))
+            Text("版本 ${BuildConfig.VERSION_NAME} · 车联歌词适配版", modifier = Modifier.padding(top=7.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha=.62f))
             Text("Android 原生迁移与维护：lladlam", modifier = Modifier.padding(top=14.dp), fontWeight=FontWeight.SemiBold)
             Text("上游 iOS 原生项目：youshen2/MeloX（SwiftUI）", modifier = Modifier.padding(top=5.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha=.58f))
         }
     }
     Spacer(Modifier.height(14.dp))
-    SettingsToggleRow(context, "自动检查更新", "update_auto_check", true, "应用启动后检查 GitHub 正式版本；不会自动下载安装。")
-    Spacer(Modifier.height(10.dp))
-    MeloXSettingsDropdown(
-        title = "更新下载源",
-        selected = downloadSource,
-        items = listOf(
-            MeloXUpdateDownloadSource.Auto to "自动（CDN 优先）",
-            MeloXUpdateDownloadSource.GitHub to "GitHub Release",
-            MeloXUpdateDownloadSource.JsDelivr to "jsDelivr CDN",
-        ),
-        onSelected = {
-            downloadSource = it
-            MeloXSettingsPreferences.setString(context, "update_download_source", it.name)
-        },
-    )
-    Text(
-        "jsDelivr 只能下载 Git 标签仓库树中的 APK。发布时需将同名 APK 放入 releases/ 目录；不可用时自动模式会回退 GitHub。",
-        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-        fontSize = 12.sp,
-        lineHeight = 17.sp,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = .5f),
-    )
-    SettingsActionButton(if (checking) "正在检查…" else "检查更新") {
-        if (!checking) scope.launch {
-            checking = true
-            runCatching { updateClient.latestStableRelease() }
-                .onSuccess {
-                    release = it
-                    updateStatus = if (updateClient.isNewer(it.version, BuildConfig.VERSION_NAME)) {
-                        "发现新版本 ${it.version}：${it.name}"
-                    } else {
-                        "当前已是最新版本（${BuildConfig.VERSION_NAME}）"
-                    }
-                }
-                .onFailure { updateStatus = it.message ?: "更新检查失败" }
-            checking = false
-        }
-    }
-    updateStatus?.let { message ->
-        Spacer(Modifier.height(10.dp))
-        Text(message, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
-    }
-    release?.takeIf { updateClient.isNewer(it.version, BuildConfig.VERSION_NAME) }?.let { available ->
-        Spacer(Modifier.height(10.dp))
-        SettingsActionButton(if (available.apkUrl != null) "下载 ${available.version} APK" else "打开 ${available.version} 发布页") {
-            scope.launch {
-                val target = runCatching { updateClient.downloadUrl(available, downloadSource) }.getOrNull()
-                    ?: if (downloadSource == MeloXUpdateDownloadSource.JsDelivr) null else available.pageUrl
-                if (target == null) updateStatus = "该版本未在 Git 标签的 releases/ 目录提供 APK，jsDelivr 下载不可用"
-                else runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
-                    .onFailure { updateStatus = it.message ?: "无法打开下载链接" }
-            }
-        }
-        if (available.notes.isNotBlank()) {
-            Text(available.notes.take(700), modifier = Modifier.padding(top = 10.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .58f))
-        }
+    SettingsActionButton("版本信息") {
+        // 更新功能已移除
     }
     Spacer(Modifier.height(14.dp))
     Spacer(Modifier.height(10.dp))
     SettingsActionButton("恢复推荐的播放器设置") {
         MeloXSettingsPreferences.resetRecommendedPlayerSettings(context)
-        updateStatus = "已恢复推荐播放器、歌词与 AutoMix 配置"
     }
     Spacer(Modifier.height(14.dp))
     SettingsGlassGroup {

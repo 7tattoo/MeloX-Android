@@ -9,11 +9,11 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.lladlam.melox.android"
+        applicationId = "com.luna.music.car"
         minSdk = 26
         targetSdk = 37
-        versionCode = 10
-        versionName = "0.4.2-Dev"
+        versionCode = 1
+        versionName = "1.0.0-Car"
     }
 
     // Release credentials are supplied from the command line or CI secrets;
