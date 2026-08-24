@@ -37,6 +37,11 @@ import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.network.MeloXNetworkAvailability
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.lyrics.LyricsDocument
+import com.lladlam.melox.core.music.model.MusicResourceId
+import com.lladlam.melox.core.music.model.MusicTrack
+import com.lladlam.melox.core.music.provider.LyricsCapability
+import com.lladlam.melox.core.music.provider.MeloXMusicProviders
+import com.lladlam.melox.core.music.provider.PlaybackAccountStore
 import com.lladlam.melox.platform.xiaomi.HyperOsFocusBridge
 import com.lladlam.melox.logic.car.CarLyricsManager
 import com.lladlam.melox.logic.car.CarLyricsConstants
@@ -79,6 +84,10 @@ class MeloXPlaybackService : MediaSessionService() {
     private var systemLyricsLastPlaying = false
     private var updatingSystemLyricsMetadata = false
     private var carLyricsManager: CarLyricsManager? = null
+    // 车联歌词独立加载状态（多源，不依赖系统歌词的网易云路径）
+    private var carLyricsResourceKey: String? = null
+    private var carLyricsDocument: LyricsDocument? = null
+    private var carLyricsJob: Job? = null
     private var mixAnalysisJob: Job? = null
     private var mixAnalysisSourceId: String? = null
     private var analyzedMixPlan: MeloXAutoMixPlan? = null
@@ -143,7 +152,8 @@ class MeloXPlaybackService : MediaSessionService() {
             MeloXAudioReactiveRuntime.select(mediaItem?.mediaId)
             mediaItem?.let(downloadStore::recordPlayback)
             if (transitionedId != systemLyricsSongId) resetSystemLyrics(mediaItem)
-            // 车机歌词：切歌时推送"加载中"状态
+            // 车机歌词：切歌时重置并推送"加载中"状态
+            resetCarLyrics(mediaItem)
             carLyricsManager?.setLoading()
             val active = player
             if (active != null) {
@@ -588,14 +598,81 @@ class MeloXPlaybackService : MediaSessionService() {
         systemLyricsOriginalMetadata = item.mediaMetadata
         systemLyricsJob = serviceScope.launch {
             val loaded = withContext(Dispatchers.IO) {
-                downloadStore.localLyrics(songId) ?: runCatching {
-                    NeteaseSearchClient(
-                        cookieProvider = { com.lladlam.melox.core.music.provider.PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) },
-                    ).lyrics(songId)
-                }.getOrNull()
+                // 1) 本地下载的歌词
+                downloadStore.localLyrics(songId)
+                    // 2) 多源在线歌词（QQ音乐/网易云/酷狗等，按歌曲来源自动匹配）
+                    ?: loadLyricsFromAnySource(item)
+                    // 3) 兜底：用网易云 ID 直接查（兼容纯数字 ID 场景）
+                    ?: runCatching {
+                        NeteaseSearchClient(
+                            cookieProvider = { PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) },
+                        ).lyrics(songId)
+                    }.getOrNull()
             }
             if (systemLyricsSongId == songId) systemLyricsDocument = loaded
             systemLyricsJob = null
+        }
+    }
+
+    /**
+     * 按歌曲来源加载多源歌词。
+     * MeloX 支持网易云/QQ音乐/酷狗/AppleMusic/Bilibili 等音源，
+     * 通过 MusicResourceId 识别来源，再调用对应 provider 的 LyricsCapability。
+     */
+    private fun loadLyricsFromAnySource(item: MediaItem): LyricsDocument? {
+        val resourceId = PlaybackTrackIdentity.fromMediaItem(item) ?: return null
+        if (resourceId.source == com.lladlam.melox.core.music.model.MusicSource.Netease) {
+            // 网易云纯数字 ID 已在 loadSystemLyrics 兜底处理
+            return null
+        }
+        return runCatching {
+            val registry = MeloXMusicProviders.create(this)
+            val provider = registry[resourceId.source] ?: return null
+            val lyricsCapability = provider as? LyricsCapability ?: return null
+            val track = MusicTrack(
+                id = resourceId,
+                title = item.mediaMetadata.title?.toString().orEmpty(),
+                artists = listOfNotNull(
+                    item.mediaMetadata.artist?.toString()?.takeIf(String::isNotBlank)
+                ).map { name ->
+                    com.lladlam.melox.core.music.model.MusicArtistRef(name = name)
+                },
+                album = item.mediaMetadata.albumTitle?.toString()?.takeIf(String::isNotBlank)
+                    ?.let { com.lladlam.melox.core.music.model.MusicAlbumRef(name = it) },
+                durationMs = player?.duration?.takeIf { it != C.TIME_UNSET && it > 0L },
+            )
+            lyricsCapability.lyrics(track).takeIf { it.lines.isNotEmpty() }
+        }.getOrNull()
+    }
+
+    /**
+     * 车联歌词独立加载器：多源歌词，优先本地缓存，其次在线多源。
+     * 加载完成写入 [carLyricsDocument]，由 [pushCarLyrics] 定时轮询推送。
+     */
+    private fun loadCarLyrics(item: MediaItem) {
+        carLyricsJob = serviceScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                // 1) 本地下载的歌词
+                PlaybackTrackIdentity.neteaseNumericId(item)?.let { downloadStore.localLyrics(it) }
+                    // 2) 多源在线歌词（按歌曲来源自动匹配）
+                    ?: loadLyricsFromAnySource(item)
+                    // 3) 兜底：网易云 ID 直接查（兼容纯数字 ID 场景）
+                    ?: PlaybackTrackIdentity.neteaseNumericId(item)?.let { songId ->
+                        runCatching {
+                            NeteaseSearchClient(
+                                cookieProvider = { PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) },
+                            ).lyrics(songId)
+                        }.getOrNull()
+                    }
+            }
+            // 防止切歌竞态：仅在当前歌曲仍匹配时写入
+            val currentKey = PlaybackTrackIdentity.fromMediaItem(active?.currentMediaItem)?.let { rid ->
+                "${rid.source.storageValue}:${rid.value}"
+            } ?: active?.currentMediaItem?.mediaId
+            if (currentKey == carLyricsResourceKey) {
+                carLyricsDocument = loaded?.takeIf { it.lines.isNotEmpty() }
+            }
+            carLyricsJob = null
         }
     }
 
@@ -607,6 +684,14 @@ class MeloXPlaybackService : MediaSessionService() {
         systemLyricsOriginalMetadata = item?.mediaMetadata
         systemLyricsLastIndex = Int.MIN_VALUE
         systemLyricsLastDispatchRealtimeMs = 0L
+    }
+
+    /** 车联歌词状态重置（切歌时调用） */
+    private fun resetCarLyrics(item: MediaItem?) {
+        carLyricsJob?.cancel()
+        carLyricsJob = null
+        carLyricsResourceKey = null
+        carLyricsDocument = null
     }
 
     private fun restoreSystemLyricsMetadata(active: ExoPlayer) {
@@ -643,19 +728,31 @@ class MeloXPlaybackService : MediaSessionService() {
         val changed = if (!enabled) {
             manager.push()
         } else {
-            val lyrics = systemLyricsDocument
+            val lyrics = carLyricsDocument
             if (lyrics != null) {
                 // 歌词已加载，推送实际歌词
                 val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
                 val index = lyrics.highlightedIndex(active.currentPosition + advance)
                 val currentLine = index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
                 manager.updateLyric(currentLine, lyrics)
-            } else if (systemLyricsJob?.isActive == true) {
-                // 歌词正在加载中，保持 LOADING 状态（不推 -1）
-                manager.setLoading()
             } else {
-                // 无歌词且无加载任务
-                manager.updateLyric(null, null)
+                // 车联歌词：独立多源加载（支持 QQ音乐/网易云/酷狗等全部音源）
+                val resourceKey = PlaybackTrackIdentity.fromMediaItem(currentItem)?.let { rid ->
+                    "${rid.source.storageValue}:${rid.value}"
+                } ?: currentItem.mediaId
+                if (carLyricsResourceKey != resourceKey) {
+                    // 新歌曲：触发多源歌词加载，期间推 LOADING（不推 -1）
+                    carLyricsResourceKey = resourceKey
+                    carLyricsDocument = null
+                    loadCarLyrics(currentItem)
+                    manager.setLoading()
+                } else if (carLyricsJob?.isActive == true) {
+                    // 歌词正在加载中
+                    manager.setLoading()
+                } else {
+                    // 已尝试加载但失败/无歌词 → NO_LYRICS
+                    manager.updateLyric(null, null)
+                }
             }
         }
 
@@ -1001,6 +1098,8 @@ class MeloXPlaybackService : MediaSessionService() {
         handler.removeCallbacks(modeMonitor)
         recommendationJob?.cancel()
         systemLyricsJob?.cancel()
+        carLyricsJob?.cancel()
+        carLyricsJob = null
         getSystemService(NotificationManager::class.java).cancel(LYRICS_NOTIFICATION_ID)
         serviceScope.cancel()
         cancelPreparedMix(releaseStandby = true)
