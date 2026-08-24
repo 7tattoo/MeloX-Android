@@ -619,7 +619,7 @@ class MeloXPlaybackService : MediaSessionService() {
      * MeloX 支持网易云/QQ音乐/酷狗/AppleMusic/Bilibili 等音源，
      * 通过 MusicResourceId 识别来源，再调用对应 provider 的 LyricsCapability。
      */
-    private fun loadLyricsFromAnySource(item: MediaItem): LyricsDocument? {
+    private suspend fun loadLyricsFromAnySource(item: MediaItem): LyricsDocument? {
         val resourceId = PlaybackTrackIdentity.fromMediaItem(item) ?: return null
         if (resourceId.source == com.lladlam.melox.core.music.model.MusicSource.Netease) {
             // 网易云纯数字 ID 已在 loadSystemLyrics 兜底处理
@@ -666,9 +666,9 @@ class MeloXPlaybackService : MediaSessionService() {
                     }
             }
             // 防止切歌竞态：仅在当前歌曲仍匹配时写入
-            val currentKey = PlaybackTrackIdentity.fromMediaItem(active?.currentMediaItem)?.let { rid ->
+            val currentKey = PlaybackTrackIdentity.fromMediaItem(player?.currentMediaItem)?.let { rid ->
                 "${rid.source.storageValue}:${rid.value}"
-            } ?: active?.currentMediaItem?.mediaId
+            } ?: player?.currentMediaItem?.mediaId
             if (currentKey == carLyricsResourceKey) {
                 carLyricsDocument = loaded?.takeIf { it.lines.isNotEmpty() }
             }
