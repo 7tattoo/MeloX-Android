@@ -84,6 +84,9 @@ class MeloXPlaybackService : MediaSessionService() {
     private var systemLyricsLastPlaying = false
     private var updatingSystemLyricsMetadata = false
     private var carLyricsManager: CarLyricsManager? = null
+    // 记录上一次 transition 对应的 mediaId，用于区分「真正切歌」与
+    // pushCarLyrics 注入 Channel A 元数据引起的 replaceMediaItem transition。
+    private var carLyricsTransitionMediaId: String? = null
     // 车联歌词独立加载状态（多源，不依赖系统歌词的网易云路径）
     private var carLyricsResourceKey: String? = null
     private var carLyricsDocument: LyricsDocument? = null
@@ -156,9 +159,16 @@ class MeloXPlaybackService : MediaSessionService() {
             MeloXAudioReactiveRuntime.select(mediaItem?.mediaId)
             mediaItem?.let(downloadStore::recordPlayback)
             if (transitionedId != systemLyricsSongId) resetSystemLyrics(mediaItem)
-            // 车机歌词：切歌时重置并推送"加载中"状态
-            resetCarLyrics(mediaItem)
-            carLyricsManager?.setLoading()
+            // 车机歌词：仅在「真正切歌」时重置。pushCarLyrics 注入 Channel A
+            // 元数据会触发 replaceMediaItem → 误触发本 transition，而 mediaId
+            // 不变；若此处无条件 reset，会把正在加载/已加载的歌词清空，
+            // 造成整首歌一直显示「暂无歌词」（切回来又突然恢复）。
+            val transitionMediaId = mediaItem?.mediaId
+            if (transitionMediaId != carLyricsTransitionMediaId) {
+                carLyricsTransitionMediaId = transitionMediaId
+                resetCarLyrics(mediaItem)
+                carLyricsManager?.setLoading()
+            }
             val active = player
             if (active != null) {
                 applyLocalArtworkMetadata(active)
@@ -796,7 +806,9 @@ class MeloXPlaybackService : MediaSessionService() {
             }
         }
 
-        // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据
+        // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据。
+        // 注意：此 replaceMediaItem 会触发 onMediaItemTransition，好在已通过
+        // mediaId 判断避免误 reset 歌词状态。
         if (changed && enabled) {
             val extras = manager.buildMetadataExtras()
             if (extras.isEmpty) return
