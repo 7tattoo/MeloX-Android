@@ -88,6 +88,10 @@ class MeloXPlaybackService : MediaSessionService() {
     private var carLyricsResourceKey: String? = null
     private var carLyricsDocument: LyricsDocument? = null
     private var carLyricsJob: Job? = null
+    // 加载结果分类：区分「真无歌词」与「网络/接口失败需重试」，避免一次失败就判死
+    private var carLyricsFailed: Boolean = false
+    private var carLyricsAttempts: Int = 0
+    private var carLyricsLastAttemptRealtimeMs: Long = 0L
     private var mixAnalysisJob: Job? = null
     private var mixAnalysisSourceId: String? = null
     private var analyzedMixPlan: MeloXAutoMixPlan? = null
@@ -648,8 +652,15 @@ class MeloXPlaybackService : MediaSessionService() {
     /**
      * 车联歌词独立加载器：多源歌词，优先本地缓存，其次在线多源。
      * 加载完成写入 [carLyricsDocument]，由 [pushCarLyrics] 定时轮询推送。
+     *
+     * 竞态处理：根据传入的 [item] 计算归属 key，而不是读 `player?.currentMediaItem`
+     * （协程挂起期间可能已切歌），确保写回的是本次发起请求的那首歌。
      */
     private fun loadCarLyrics(item: MediaItem) {
+        // 先按传入 item 计算归属 key：作为本次加载的唯一标识
+        val requestedKey = PlaybackTrackIdentity.fromMediaItem(item)?.let { rid ->
+            "${rid.source.storageValue}:${rid.value}"
+        } ?: item.mediaId
         carLyricsJob = serviceScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 // 1) 本地下载的歌词
@@ -665,12 +676,12 @@ class MeloXPlaybackService : MediaSessionService() {
                         }.getOrNull()
                     }
             }
-            // 防止切歌竞态：仅在当前歌曲仍匹配时写入
-            val currentKey = PlaybackTrackIdentity.fromMediaItem(player?.currentMediaItem)?.let { rid ->
-                "${rid.source.storageValue}:${rid.value}"
-            } ?: player?.currentMediaItem?.mediaId
-            if (currentKey == carLyricsResourceKey) {
-                carLyricsDocument = loaded?.takeIf { it.lines.isNotEmpty() }
+            // 防止切歌竞态：仅在当前仍处理同一首歌时写入结果
+            if (requestedKey == carLyricsResourceKey) {
+                val doc = loaded?.takeIf { it.lines.isNotEmpty() }
+                carLyricsDocument = doc
+                // 有歌词 → 成功；无歌词且请求已完整走完 → 标记为失败（可重试）
+                carLyricsFailed = (doc == null)
             }
             carLyricsJob = null
         }
@@ -692,6 +703,9 @@ class MeloXPlaybackService : MediaSessionService() {
         carLyricsJob = null
         carLyricsResourceKey = null
         carLyricsDocument = null
+        carLyricsFailed = false
+        carLyricsAttempts = 0
+        carLyricsLastAttemptRealtimeMs = 0L
     }
 
     private fun restoreSystemLyricsMetadata(active: ExoPlayer) {
@@ -740,18 +754,44 @@ class MeloXPlaybackService : MediaSessionService() {
                 val resourceKey = PlaybackTrackIdentity.fromMediaItem(currentItem)?.let { rid ->
                     "${rid.source.storageValue}:${rid.value}"
                 } ?: currentItem.mediaId
-                if (carLyricsResourceKey != resourceKey) {
-                    // 新歌曲：触发多源歌词加载，期间推 LOADING（不推 -1）
-                    carLyricsResourceKey = resourceKey
-                    carLyricsDocument = null
-                    loadCarLyrics(currentItem)
-                    manager.setLoading()
-                } else if (carLyricsJob?.isActive == true) {
-                    // 歌词正在加载中
-                    manager.setLoading()
-                } else {
-                    // 已尝试加载但失败/无歌词 → NO_LYRICS
-                    manager.updateLyric(null, null)
+                when {
+                    carLyricsResourceKey != resourceKey -> {
+                        // 新歌曲：触发多源歌词加载，期间推 LOADING（不推 -1）
+                        carLyricsResourceKey = resourceKey
+                        carLyricsDocument = null
+                        carLyricsFailed = false
+                        carLyricsAttempts = 1
+                        carLyricsLastAttemptRealtimeMs = SystemClock.elapsedRealtime()
+                        loadCarLyrics(currentItem)
+                        manager.setLoading()
+                    }
+                    carLyricsJob?.isActive == true -> {
+                        // 歌词正在加载中，保持 LOADING（不要误判为无歌词）
+                        manager.setLoading()
+                    }
+                    carLyricsFailed -> {
+                        // 上一次加载未成功（接口慢/超时/返回空），限速重试，
+                        // 而不是一次性判死为「暂无歌词」。
+                        val now = SystemClock.elapsedRealtime()
+                        val canRetry = now - carLyricsLastAttemptRealtimeMs >=
+                            CAR_LYRICS_RETRY_DELAY_MS
+                        if (canRetry && carLyricsAttempts < CAR_LYRICS_MAX_ATTEMPTS) {
+                            carLyricsAttempts += 1
+                            carLyricsLastAttemptRealtimeMs = now
+                            loadCarLyrics(currentItem)
+                            manager.setLoading()
+                        } else if (canRetry) {
+                            // 已达重试上限，确认无歌词
+                            manager.updateLyric(null, null)
+                        } else {
+                            // 还没到下次重试时间，继续 LOADING 等待
+                            manager.setLoading()
+                        }
+                    }
+                    else -> {
+                        // 无失败标记但也没在加载：视为尚无歌词
+                        manager.updateLyric(null, null)
+                    }
                 }
             }
         }
@@ -1125,6 +1165,8 @@ class MeloXPlaybackService : MediaSessionService() {
         const val PAUSED_MONITOR_INTERVAL_MS = 500L
         const val IDLE_MONITOR_INTERVAL_MS = 2_000L
         const val SETTINGS_SNAPSHOT_INTERVAL_MS = 1_000L
+        const val CAR_LYRICS_RETRY_DELAY_MS = 1_200L
+        const val CAR_LYRICS_MAX_ATTEMPTS = 8
         const val SLEEP_TIMER_END_KEY = "playback_sleep_timer_end_epoch_ms"
         const val SYSTEM_ORIGINAL_TITLE_KEY = "melox.system.original_title"
         const val SYSTEM_ORIGINAL_ARTIST_KEY = "melox.system.original_artist"
