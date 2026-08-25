@@ -403,6 +403,40 @@ class MeloXPlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * 决定性自检：用系统 MediaController（手机端 App 同款读取方式）通过
+     * platformToken 直连我们的 MediaSession，读 metadata 看 ucar 字段是否
+     * 真的广播到了系统 MediaSession 层。
+     */
+    private fun platformTokenCheck() {
+        val ms = mediaSession ?: return
+        try {
+            val platformToken = ms.platformToken
+            val controller = android.media.session.MediaController(this, platformToken)
+            val md = controller.metadata
+            carLog("PLATFORM-TOKEN pkg=${controller.packageName} metadata=${md != null}")
+            if (md != null) {
+                carLog("PLATFORM-TOKEN LYRICS_LINE=${md.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
+                val st = if (md.containsKey(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)) {
+                    md.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)
+                } else {
+                    -999L
+                }
+                carLog("PLATFORM-TOKEN STATUS=$st")
+                carLog("PLATFORM-TOKEN TITLE=${md.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)}")
+                carLog("PLATFORM-TOKEN keys=${md.keySet().toString().take(400)}")
+            }
+            val extras = controller.extras
+            carLog("PLATFORM-TOKEN extras=${extras?.keySet()?.toString()?.take(300)}")
+            if (extras != null) {
+                carLog("PLATFORM-TOKEN extras.LYRIC=${extras.getString(CarLyricsConstants.EXTRAS_KEY_LYRIC)}")
+            }
+            // 不注销（自检临时 controller 会随作用域释放）
+        } catch (e: Exception) {
+            carLog("PLATFORM-TOKEN error: ${e.message}")
+        }
+    }
+
     // ====================================================================
     // 播放状态持久化（重启/杀后台后恢复上次播放）
     // ====================================================================
@@ -1147,6 +1181,7 @@ class MeloXPlaybackService : MediaSessionService() {
                 carLog("TIMELINE-ITEM line=${item.mediaMetadata.extras?.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
             }, 500L)
             // 自检：确认系统 MediaSession 是否真的广播了歌词字段
+            handler.postDelayed({ platformTokenCheck() }, 400L)
             handler.postDelayed({ selfCheckSystemMetadata() }, 300L)
         } else if (changed && !enabled) {
             // 开关关闭，清除 Channel A 元数据
