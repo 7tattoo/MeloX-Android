@@ -165,9 +165,12 @@ class MeloXPlaybackService : MediaSessionService() {
             // 造成整首歌一直显示「暂无歌词」（切回来又突然恢复）。
             val transitionMediaId = mediaItem?.mediaId
             if (transitionMediaId != carLyricsTransitionMediaId) {
+                Log.d(TAG, "CAR_LYRIC transition: mediaId $carLyricsTransitionMediaId -> $transitionMediaId (reset)")
                 carLyricsTransitionMediaId = transitionMediaId
                 resetCarLyrics(mediaItem)
                 carLyricsManager?.setLoading()
+            } else {
+                Log.d(TAG, "CAR_LYRIC transition: same mediaId=$transitionMediaId (skip reset)")
             }
             val active = player
             if (active != null) {
@@ -671,13 +674,17 @@ class MeloXPlaybackService : MediaSessionService() {
         val requestedKey = PlaybackTrackIdentity.fromMediaItem(item)?.let { rid ->
             "${rid.source.storageValue}:${rid.value}"
         } ?: item.mediaId
+        Log.d(TAG, "CAR_LYRIC loadCarLyrics start: key=$requestedKey mediaId=${item.mediaId} " +
+            "neteaseId=${PlaybackTrackIdentity.neteaseNumericId(item)}")
         carLyricsJob = serviceScope.launch {
             val loaded = withContext(Dispatchers.IO) {
                 // 1) 本地下载的歌词
-                PlaybackTrackIdentity.neteaseNumericId(item)?.let { downloadStore.localLyrics(it) }
+                val local = PlaybackTrackIdentity.neteaseNumericId(item)?.let { downloadStore.localLyrics(it) }
+                Log.d(TAG, "CAR_LYRIC step1 local=$local (lines=${local?.lines?.size})")
+                val any = local
                     // 2) 多源在线歌词（按歌曲来源自动匹配）
                     ?: loadLyricsFromAnySource(item)
-                    // 3) 兜底：网易云 ID 直接查（兼容纯数字 ID 场景）
+                    // 3) 兜底：网易云 ID 直接查
                     ?: PlaybackTrackIdentity.neteaseNumericId(item)?.let { songId ->
                         runCatching {
                             NeteaseSearchClient(
@@ -685,13 +692,18 @@ class MeloXPlaybackService : MediaSessionService() {
                             ).lyrics(songId)
                         }.getOrNull()
                     }
+                any
             }
+            Log.d(TAG, "CAR_LYRIC loaded=$loaded lines=${loaded?.lines?.size} " +
+                "requestedKey=$requestedKey carLyricsResourceKey=$carLyricsResourceKey")
             // 防止切歌竞态：仅在当前仍处理同一首歌时写入结果
             if (requestedKey == carLyricsResourceKey) {
                 val doc = loaded?.takeIf { it.lines.isNotEmpty() }
                 carLyricsDocument = doc
-                // 有歌词 → 成功；无歌词且请求已完整走完 → 标记为失败（可重试）
                 carLyricsFailed = (doc == null)
+                Log.d(TAG, "CAR_LYRIC writeback doc=${doc != null} failed=$carLyricsFailed")
+            } else {
+                Log.w(TAG, "CAR_LYRIC writeback SKIPPED key mismatch!")
             }
             carLyricsJob = null
         }
@@ -767,6 +779,7 @@ class MeloXPlaybackService : MediaSessionService() {
                 when {
                     carLyricsResourceKey != resourceKey -> {
                         // 新歌曲：触发多源歌词加载，期间推 LOADING（不推 -1）
+                        Log.d(TAG, "CAR_LYRIC push: NEW key=$resourceKey (old=${carLyricsResourceKey})")
                         carLyricsResourceKey = resourceKey
                         carLyricsDocument = null
                         carLyricsFailed = false
@@ -786,12 +799,14 @@ class MeloXPlaybackService : MediaSessionService() {
                         val canRetry = now - carLyricsLastAttemptRealtimeMs >=
                             CAR_LYRICS_RETRY_DELAY_MS
                         if (canRetry && carLyricsAttempts < CAR_LYRICS_MAX_ATTEMPTS) {
+                            Log.d(TAG, "CAR_LYRIC push: RETRY $carLyricsAttempts/$CAR_LYRICS_MAX_ATTEMPTS")
                             carLyricsAttempts += 1
                             carLyricsLastAttemptRealtimeMs = now
                             loadCarLyrics(currentItem)
                             manager.setLoading()
                         } else if (canRetry) {
                             // 已达重试上限，确认无歌词
+                            Log.d(TAG, "CAR_LYRIC push: GIVE_UP -> NO_LYRICS")
                             manager.updateLyric(null, null)
                         } else {
                             // 还没到下次重试时间，继续 LOADING 等待
@@ -800,6 +815,7 @@ class MeloXPlaybackService : MediaSessionService() {
                     }
                     else -> {
                         // 无失败标记但也没在加载：视为尚无歌词
+                        Log.w(TAG, "CAR_LYRIC push: else-branch -> NO_LYRICS (failed=$carLyricsFailed job=$carLyricsJob)")
                         manager.updateLyric(null, null)
                     }
                 }
