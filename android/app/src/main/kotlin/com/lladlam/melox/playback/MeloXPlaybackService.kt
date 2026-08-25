@@ -548,8 +548,13 @@ class MeloXPlaybackService : MediaSessionService() {
         val currentItem = active.currentMediaItem ?: return
         val metadataEnabled = MeloXSettingsRuntime.systemLyricsEnabled
         val notificationEnabled = MeloXSettingsRuntime.lyricNotificationsEnabled
+        val carEnabled = MeloXSettingsPreferences.boolean(
+            this, CarLyricsConstants.PREF_CAR_LYRICS_ENABLED, true,
+        )
         val songId = currentItem.mediaId.toLongOrNull() ?: return
-        if (!metadataEnabled && !notificationEnabled) {
+        // 只要有任何一处需要歌词（系统歌词 / 歌词通知 / 车载歌词），就加载。
+        // 车载歌词复用这份已稳定加载的结果，避免独立链路引入竞态。
+        if (!metadataEnabled && !notificationEnabled && !carEnabled) {
             restoreSystemLyricsMetadata(active)
             (getSystemService(NotificationManager::class.java)).cancel(LYRICS_NOTIFICATION_ID)
             return
@@ -557,6 +562,13 @@ class MeloXPlaybackService : MediaSessionService() {
         if (systemLyricsSongId != songId) resetSystemLyrics(currentItem)
         if (systemLyricsDocument == null && systemLyricsJob?.isActive != true) loadSystemLyrics(songId, currentItem)
         val document = systemLyricsDocument ?: return
+        // 车载歌词：直接复用刚加载好的歌词文档
+        if (carEnabled && carLyricsDocument == null) {
+            carLyricsDocument = document
+            carLyricsFailed = false
+            carLyricsJob?.cancel()
+            carLyricsJob = null
+        }
         val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
         val index = document.highlightedIndex(active.currentPosition + advance) ?: return
         val now = SystemClock.elapsedRealtime()
