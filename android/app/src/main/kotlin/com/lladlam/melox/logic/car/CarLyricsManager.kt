@@ -28,6 +28,9 @@ class CarLyricsManager(
 ) {
     var enabled: Boolean = true
 
+    /** 当前播放歌曲 ID（写入 vivomusicmix.extra.key.meidia_id） */
+    var currentMediaId: String? = null
+
     /** 当前状态（供系统 session 同步读取） */
     val currentStatus: Long get() = status
     val currentLineText: String? get() = currentLine
@@ -103,6 +106,14 @@ class CarLyricsManager(
             putBoolean(EXTRAS_KEY_LYRIC_ALLOWED, true)
             if (!lineToPush.isNullOrEmpty()) putString(EXTRAS_KEY_LYRIC, lineToPush)
             putBoolean(EXTRAS_KEY_NOTICE_CAR, true)
+            // vivomusicmix 歌词协议（vivo 车联手机端 App 读取的键）：
+            // 手机端 onExtrasChanged 校验 action==lrc_change 后，
+            // 读取 meidia_id + lyric 并推送完整歌词到车机。
+            putString("vivomusicmix.meida.extra.key.action", "vivomusicmix.extra.lrc_change")
+            if (!wholeToPush.isNullOrEmpty() && wholeToPush != "-1") {
+                putString("vivomusicmix.extra.key.lyric", wholeToPush)
+            }
+            currentMediaId?.let { putString("vivomusicmix.extra.key.meidia_id", it) }
         }
         mediaSession.setSessionExtras(extras)
         return changed

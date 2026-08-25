@@ -381,6 +381,14 @@ class MeloXPlaybackService : MediaSessionService() {
                 putBoolean(CarLyricsConstants.EXTRAS_KEY_LYRIC_ALLOWED, true)
                 if (!line.isNullOrBlank()) putString(CarLyricsConstants.EXTRAS_KEY_LYRIC, line)
                 putBoolean(CarLyricsConstants.EXTRAS_KEY_NOTICE_CAR, true)
+                // vivomusicmix 歌词协议（vivo 车联手机端 App 读取的键）
+                putString("vivomusicmix.meida.extra.key.action", "vivomusicmix.extra.lrc_change")
+                if (!whole.isNullOrBlank() && whole != "-1") {
+                    putString("vivomusicmix.extra.key.lyric", whole)
+                }
+                carLyricsManager?.currentMediaId?.let {
+                    putString("vivomusicmix.extra.key.meidia_id", it)
+                }
             }
             session.setExtras(extras)
             val state = android.media.session.PlaybackState.Builder()
@@ -1074,6 +1082,7 @@ class MeloXPlaybackService : MediaSessionService() {
             this, CarLyricsConstants.PREF_CAR_LYRICS_ENABLED, true,
         )
         manager.enabled = enabled
+        manager.currentMediaId = currentItem.mediaId
 
         val changed = if (!enabled) {
             carLog("pushCarLyrics: DISABLED (mediaId=${currentItem.mediaId})")
