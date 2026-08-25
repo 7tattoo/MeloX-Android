@@ -28,6 +28,11 @@ class CarLyricsManager(
 ) {
     var enabled: Boolean = true
 
+    /** 当前状态（供系统 session 同步读取） */
+    val currentStatus: Long get() = status
+    val currentLineText: String? get() = currentLine
+    val currentWholeText: String? get() = wholeLrc
+
     /** 日志回调（调试用）：每次 push 时报告推送内容和变化检测结果 */
     var onPushLog: ((line: String?, whole: String?, status: Long, changed: Boolean) -> Unit)? = null
 

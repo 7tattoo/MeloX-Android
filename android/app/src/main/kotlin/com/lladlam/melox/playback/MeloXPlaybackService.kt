@@ -89,6 +89,11 @@ class MeloXPlaybackService : MediaSessionService() {
     private var systemLyricsLastPlaying = false
     private var updatingSystemLyricsMetadata = false
     private var carLyricsManager: CarLyricsManager? = null
+    // 系统 MediaSession 直连广播（NeriPlayer 实机验证方案）：
+    // Media3 的 replaceMediaItem/setSessionExtras 广播到 legacy(MediaControllerCompat)
+    // 客户端有疑点，车机端读不到歌词字段。用系统 android.media.session.MediaSession
+    // 直接 setMetadata/setExtras，车机端(系统 MediaController 同款读取)确定能读到。
+    private var carSystemSession: android.media.session.MediaSession? = null
     // 记录上一次 transition 对应的 mediaId，用于区分「真正切歌」与
     // pushCarLyrics 注入 Channel A 元数据引起的 replaceMediaItem transition。
     private var carLyricsTransitionMediaId: String? = null
@@ -346,6 +351,58 @@ class MeloXPlaybackService : MediaSessionService() {
         }
     }
 
+    /**
+     * 把歌词/播放状态同步到系统 MediaSession（车机端直读通道）。
+     * 系统 MediaMetadata 直接透传自定义键，车机端(MediaControllerCompat/系统
+     * MediaController)能读到 ucar.media.metadata.* 字段。
+     */
+    private fun syncCarLyricsToSystemSession(
+        line: String?,
+        whole: String?,
+        status: Long,
+        title: String?,
+        artist: String?,
+        positionMs: Long,
+        durationMs: Long,
+        isPlaying: Boolean,
+    ) {
+        val session = carSystemSession ?: return
+        try {
+            val mdBuilder = android.media.MediaMetadata.Builder()
+                .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title ?: "")
+                .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, artist ?: "")
+                .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, "")
+                .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, durationMs.coerceAtLeast(0L))
+                .putString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE, line ?: "")
+                .putString(CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE, whole ?: "-1")
+                .putLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, status)
+            session.setMetadata(mdBuilder.build())
+            val extras = Bundle().apply {
+                putBoolean(CarLyricsConstants.EXTRAS_KEY_LYRIC_ALLOWED, true)
+                if (!line.isNullOrBlank()) putString(CarLyricsConstants.EXTRAS_KEY_LYRIC, line)
+                putBoolean(CarLyricsConstants.EXTRAS_KEY_NOTICE_CAR, true)
+            }
+            session.setExtras(extras)
+            val state = android.media.session.PlaybackState.Builder()
+                .setActions(
+                    android.media.session.PlaybackState.ACTION_PLAY or
+                        android.media.session.PlaybackState.ACTION_PAUSE or
+                        android.media.session.PlaybackState.ACTION_PLAY_PAUSE,
+                )
+                .setState(
+                    if (isPlaying) android.media.session.PlaybackState.STATE_PLAYING
+                    else android.media.session.PlaybackState.STATE_PAUSED,
+                    positionMs.coerceAtLeast(0L),
+                    1f,
+                )
+                .build()
+            session.setPlaybackState(state)
+            session.isActive = true
+        } catch (e: Exception) {
+            carLog("syncSystemSession error: ${e.message}")
+        }
+    }
+
     // ====================================================================
     // 播放状态持久化（重启/杀后台后恢复上次播放）
     // ====================================================================
@@ -535,6 +592,12 @@ class MeloXPlaybackService : MediaSessionService() {
         carLyricsManager?.onPushLog = { line, whole, status, changed ->
             carLog("manager.push: line=${line?.take(24)} wholeLen=${whole?.length} status=$status changed=$changed")
         }
+        // 系统 MediaSession：车联歌词直连广播通道
+        runCatching {
+            carSystemSession = android.media.session.MediaSession(this, "MeloXCarLyrics")
+            // 不抢媒体按钮/蓝牙控制，仅作歌词广播
+            carSystemSession?.setFlags(0)
+        }.onFailure { e -> carLog("system session init error: ${e.message}") }
         createLyricsNotificationChannel()
         handler.post(modeMonitor)
         // 恢复上次播放状态（延迟一拍，避免与 modeMonitor 首轮竞争）
@@ -1044,6 +1107,19 @@ class MeloXPlaybackService : MediaSessionService() {
             }
         }
 
+        // 每次推送后，把最新歌词同步到系统 MediaSession（车机端直读通道）
+        val managerStatus = manager.currentStatus
+        syncCarLyricsToSystemSession(
+            line = manager.currentLineText,
+            whole = manager.currentWholeText,
+            status = managerStatus,
+            title = currentItem.mediaMetadata.title?.toString(),
+            artist = currentItem.mediaMetadata.artist?.toString(),
+            positionMs = active.currentPosition,
+            durationMs = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L,
+            isPlaying = active.isPlaying,
+        )
+
         // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据。
         // 注意：此 replaceMediaItem 会触发 onMediaItemTransition，好在已通过
         // mediaId 判断避免误 reset 歌词状态。
@@ -1060,6 +1136,16 @@ class MeloXPlaybackService : MediaSessionService() {
             updatingSystemLyricsMetadata = true
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
             handler.post { updatingSystemLyricsMetadata = false }
+            // 直接读 player 层（非 controller 缓存），定位 metadata 更新断点
+            handler.postDelayed({
+                val p = player ?: return@postDelayed
+                val pmd = p.mediaMetadata
+                carLog("PLAYER-MD extras=${pmd.extras?.keySet()?.toString()?.take(400)}")
+                carLog("PLAYER-MD line=${pmd.extras?.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
+                val item = p.getMediaItemAt(p.currentMediaItemIndex)
+                carLog("TIMELINE-ITEM extras=${item.mediaMetadata.extras?.keySet()?.toString()?.take(400)}")
+                carLog("TIMELINE-ITEM line=${item.mediaMetadata.extras?.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
+            }, 500L)
             // 自检：确认系统 MediaSession 是否真的广播了歌词字段
             handler.postDelayed({ selfCheckSystemMetadata() }, 300L)
         } else if (changed && !enabled) {
@@ -1393,6 +1479,8 @@ class MeloXPlaybackService : MediaSessionService() {
         systemLyricsJob?.cancel()
         carLyricsJob?.cancel()
         carLyricsJob = null
+        runCatching { carSystemSession?.release() }
+        carSystemSession = null
         getSystemService(NotificationManager::class.java).cancel(LYRICS_NOTIFICATION_ID)
         serviceScope.cancel()
         cancelPreparedMix(releaseStandby = true)
