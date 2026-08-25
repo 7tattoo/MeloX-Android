@@ -36,6 +36,7 @@ import com.lladlam.melox.core.audio.MusicQualityPreferences
 import com.lladlam.melox.core.download.MeloXDownloadStore
 import com.lladlam.melox.core.library.NeteaseLibraryClient
 import com.lladlam.melox.core.network.MeloXNetworkAvailability
+import com.lladlam.melox.core.network.NeteaseUniversalSearchClient
 import com.lladlam.melox.core.network.NeteaseSearchClient
 import com.lladlam.melox.core.lyrics.LyricsDocument
 import com.lladlam.melox.core.music.model.MusicResourceId
@@ -115,6 +116,7 @@ class MeloXPlaybackService : MediaSessionService() {
     private var mixPlan = MeloXAutoMixPlan(0L, 0L)
     private val mixEqualizerEnvelope = MeloXAutoMixEqualizerEnvelope()
     private var lastMaintenanceRealtimeMs = 0L
+    private var lastPlaybackStatePersistRealtimeMs = 0L
 
     private val audioAttributes = AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
@@ -154,6 +156,8 @@ class MeloXPlaybackService : MediaSessionService() {
             recommendationSeed = null
             autoMixRetrySourceId = null
             autoMixRetryAfterRealtimeMs = 0L
+            // 切歌后立即保存新歌曲/新位置（播放刚开始，位置接近 0）
+            persistPlaybackState()
             val transitionedId = mediaItem?.mediaId?.toLongOrNull(); val previousHistoryId = historySongId
             if (previousHistoryId != null && previousHistoryId != transitionedId) playbackHistoryReporter.recordDuration(previousHistoryId, elapsedMs = historyPositionMs)
             if (transitionedId != null && transitionedId != previousHistoryId) { historySongId = transitionedId; historyPositionMs = 0L; playbackHistoryReporter.recordStart(transitionedId) }
@@ -245,6 +249,11 @@ class MeloXPlaybackService : MediaSessionService() {
                         enforceSleepTimer(active)
                         equalizerController.applySettings()
                     }
+                    // 定期持久化播放状态（防抖，低频落盘）
+                    if (now - lastPlaybackStatePersistRealtimeMs >= PLAYBACK_STATE_PERSIST_INTERVAL_MS) {
+                        lastPlaybackStatePersistRealtimeMs = now
+                        persistPlaybackState()
+                    }
                 }.onFailure { error ->
                     Log.e(TAG, "Playback monitor recovered from failure", error)
                     recoverAutoMixFailure()
@@ -276,6 +285,93 @@ class MeloXPlaybackService : MediaSessionService() {
             val f = File(dir, "car_lyrics.log")
             f.appendText("[${System.currentTimeMillis()}] $msg\n")
         } catch (_: Exception) {
+        }
+    }
+
+    // ====================================================================
+    // 播放状态持久化（重启/杀后台后恢复上次播放）
+    // ====================================================================
+
+    /**
+     * 保存当前播放状态：队列（仅网易云纯数字 ID）、当前索引、播放位置、
+     * 播放/暂停。队列含 provider 歌曲（非纯数字 mediaId）时跳过保存，
+     * 避免恢复时索引错位。
+     */
+    private fun persistPlaybackState() {
+        val active = player ?: return
+        if (active.mediaItemCount <= 0 || active.currentMediaItemIndex !in 0 until active.mediaItemCount) return
+        val songIds = List(active.mediaItemCount) { index ->
+            active.getMediaItemAt(index).mediaId.toLongOrNull()
+        }
+        // 队列里存在 provider 歌曲：暂不支持恢复，跳过
+        if (songIds.any { it == null }) return
+        val ids = songIds.map { it!! }
+        val index = active.currentMediaItemIndex
+        val position = active.currentPosition.coerceAtLeast(0L)
+        MeloXPlaybackStateStore.save(
+            this,
+            MeloXPlaybackStateStore.Snapshot(
+                songIds = ids,
+                index = index,
+                positionMs = position,
+                playWhenReady = active.playWhenReady,
+                at = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /**
+     * 服务创建后尝试恢复上次播放状态。仅当播放器队列为空时执行，
+     * 避免覆盖用户正在进行的播放操作。离线时不恢复（无法拉取歌曲详情）。
+     */
+    private fun maybeRestorePlayback() {
+        val active = player ?: return
+        if (active.mediaItemCount > 0) return
+        if (!MeloXNetworkAvailability.isOnline(this)) return
+        val snapshot = MeloXPlaybackStateStore.load(this) ?: return
+        if (!snapshot.isValid()) {
+            MeloXPlaybackStateStore.clear(this)
+            return
+        }
+        val quality = MusicQualityPreferences.read(this)
+        carLog("restore: ${snapshot.songIds.size} songs, index=${snapshot.index}, pos=${snapshot.positionMs}ms, play=${snapshot.playWhenReady}")
+        serviceScope.launch {
+            val client = NeteaseUniversalSearchClient(
+                cookieProvider = { com.lladlam.melox.core.music.provider.PlaybackAccountStore.neteaseCookie(this@MeloXPlaybackService) },
+            )
+            val songs = withContext(Dispatchers.IO) {
+                runCatching { client.songDetails(snapshot.songIds) }.getOrDefault(emptyList())
+            }
+            if (songs.isEmpty()) {
+                carLog("restore: song detail fetch failed/empty")
+                return@launch
+            }
+            // 竞态保护：拉取详情期间用户可能已主动建立队列，此时放弃恢复
+            if (active.mediaItemCount > 0) {
+                carLog("restore: skipped, user queue already present")
+                return@launch
+            }
+            // 按快照顺序对齐（详情接口可能缺失个别歌曲）
+            val byId = songs.associateBy { it.id }
+            val items = snapshot.songIds.mapNotNull { byId[it] }.mapIndexed { offset, song ->
+                PlaybackCommands.mediaItemFor(
+                    song = song,
+                    quality = quality,
+                    queueOrigin = PlaybackCommands.QUEUE_ORIGIN_BASE,
+                    originalIndex = offset,
+                )
+            }
+            if (items.isEmpty()) return@launch
+            val restoreIndex = snapshot.index.coerceIn(0, items.lastIndex)
+            val restorePosition = if (snapshot.index == restoreIndex) snapshot.positionMs else 0L
+            runCatching {
+                active.setMediaItems(items, restoreIndex, restorePosition)
+                active.prepare()
+                if (snapshot.playWhenReady) active.play()
+            }.onFailure { error ->
+                carLog("restore: failed ${error.message}")
+            }
+            carLog("restore: restored ${items.size} songs at index=$restoreIndex pos=$restorePosition")
         }
     }
 
@@ -362,6 +458,8 @@ class MeloXPlaybackService : MediaSessionService() {
         }
         createLyricsNotificationChannel()
         handler.post(modeMonitor)
+        // 恢复上次播放状态（延迟一拍，避免与 modeMonitor 首轮竞争）
+        handler.postDelayed({ maybeRestorePlayback() }, 300L)
     }
 
     private fun buildPlayer(
@@ -1198,6 +1296,7 @@ class MeloXPlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         historySongId?.let { playbackHistoryReporter.recordDuration(it, elapsedMs = historyPositionMs) }; historySongId = null; playbackHistoryReporter.close()
+        persistPlaybackState()
         handler.removeCallbacks(modeMonitor)
         recommendationJob?.cancel()
         systemLyricsJob?.cancel()
@@ -1228,6 +1327,7 @@ class MeloXPlaybackService : MediaSessionService() {
         const val PAUSED_MONITOR_INTERVAL_MS = 500L
         const val IDLE_MONITOR_INTERVAL_MS = 2_000L
         const val SETTINGS_SNAPSHOT_INTERVAL_MS = 1_000L
+        const val PLAYBACK_STATE_PERSIST_INTERVAL_MS = 10_000L
         const val CAR_LYRICS_RETRY_DELAY_MS = 1_200L
         const val CAR_LYRICS_MAX_ATTEMPTS = 8
         const val SLEEP_TIMER_END_KEY = "playback_sleep_timer_end_epoch_ms"

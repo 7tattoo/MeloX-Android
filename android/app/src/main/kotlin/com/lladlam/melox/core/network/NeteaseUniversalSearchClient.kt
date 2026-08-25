@@ -347,6 +347,19 @@ class NeteaseUniversalSearchClient(
         parseSong(result.optJSONArray("songs")?.optJSONObject(0))
     }
 
+    /** 批量查询歌曲详情（一次请求），用于恢复上次播放队列 */
+    suspend fun songDetails(songIds: List<Long>): List<SearchSong> = withContext(Dispatchers.IO) {
+        val ids = songIds.distinct().filter { it > 0L }
+        if (ids.isEmpty()) return@withContext emptyList()
+        val arr = JSONArray()
+        ids.forEach { arr.put(JSONObject().put("id", it)) }
+        val result = eapi("/api/v3/song/detail", JSONObject().put("c", arr.toString()))
+        val songs = result.optJSONArray("songs") ?: JSONArray()
+        buildList {
+            for (i in 0 until songs.length()) parseSong(songs.optJSONObject(i))?.let(::add)
+        }
+    }
+
     suspend fun cloudSongs(limit: Int = 200, offset: Int = 0): MeloXCloudPage = withContext(Dispatchers.IO) {
         if (!NeteaseSessionStore.containsMusicU(cookieProvider())) throw IOException("请先登录网易云音乐")
         val response = eapi(
