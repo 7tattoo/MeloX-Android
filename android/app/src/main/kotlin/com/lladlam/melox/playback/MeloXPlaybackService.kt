@@ -293,6 +293,27 @@ class MeloXPlaybackService : MediaSessionService() {
     // ====================================================================
 
     /**
+     * 车机端（vivo 智慧车联）只在「真实切歌（onMediaItemTransition reason=SEEK/AUTO）」
+     * 时刷新歌词 metadata；播放过程中的 replaceMediaItem 注入（reason=PLAYLIST_CHANGED）
+     * 它不感知。因此在歌词加载成功等关键状态变化时，触发一次极短的播放状态脉冲
+     * （pause→resume），让车机端通过 onPlaybackStateChanged 重新拉取 metadata。
+     */
+    private var lastPlaybackStatePulseRealtimeMs = 0L
+
+    private fun pulsePlaybackState() {
+        val active = player ?: return
+        if (!active.playWhenReady) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastPlaybackStatePulseRealtimeMs < 2_000L) return
+        lastPlaybackStatePulseRealtimeMs = now
+        active.pause()
+        handler.postDelayed({
+            val p = player ?: return@postDelayed
+            p.play()
+        }, 120L)
+    }
+
+    /**
      * 保存当前播放状态：队列（仅网易云纯数字 ID）、当前索引、播放位置、
      * 播放/暂停。队列含 provider 歌曲（非纯数字 mediaId）时跳过保存，
      * 避免恢复时索引错位。
@@ -688,6 +709,8 @@ class MeloXPlaybackService : MediaSessionService() {
             carLyricsFailed = false
             carLyricsJob?.cancel()
             carLyricsJob = null
+            // 歌词就绪：延迟后触发播放状态脉冲，强制车机端刷新歌词 metadata
+            handler.postDelayed({ pulsePlaybackState() }, 200L)
         }
         val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
         val index = document.highlightedIndex(active.currentPosition + advance) ?: return
@@ -834,6 +857,10 @@ class MeloXPlaybackService : MediaSessionService() {
                 carLyricsDocument = doc
                 carLyricsFailed = (doc == null)
                 carLog("loadCarLyrics writeback doc=${doc != null} failed=$carLyricsFailed")
+                // 歌词就绪：延迟后触发播放状态脉冲，强制车机端刷新歌词 metadata。
+                // 延迟 200ms 让 modeMonitor 先把 SUCCESS+whole+line 注入完成，
+                // 车机端在 play(状态变化) 时读到最终歌词状态。
+                if (doc != null) handler.postDelayed({ pulsePlaybackState() }, 200L)
             } else {
                 carLog("loadCarLyrics writeback SKIPPED key mismatch!")
             }
