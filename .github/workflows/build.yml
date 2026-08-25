@@ -31,8 +31,24 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: melox-car-debug
           path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Build Release APK
+        run: |
+          chmod +x gradlew
+          base64 -d melox-release.keystore.b64 > melox-release.keystore
+          ./gradlew assembleRelease \
+            -PmeloxReleaseStoreFile=$PWD/melox-release.keystore \
+            -PmeloxReleaseStorePassword="melox-car-2026" \
+            -PmeloxReleaseKeyAlias=melox \
+            -PmeloxReleaseKeyPassword="melox-car-2026"
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: melox-car-release
+          path: android/app/build/outputs/apk/release/*.apk
