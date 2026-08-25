@@ -3,6 +3,7 @@ package com.lladlam.melox.playback
 import android.app.PendingIntent
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
@@ -26,8 +27,10 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionToken
 import androidx.core.app.NotificationCompat
 import com.lladlam.melox.MainActivity
 import com.lladlam.melox.MeloXAppVisibility
@@ -285,6 +288,61 @@ class MeloXPlaybackService : MediaSessionService() {
             val f = File(dir, "car_lyrics.log")
             f.appendText("[${System.currentTimeMillis()}] $msg\n")
         } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 自检：验证注入的歌词字段是否真的广播到了 MediaSession。
+     * 1) Media3 MediaController 视角：读 player 派生的 mediaMetadata.extras
+     * 2) 系统 SessionManager 视角：读活跃 session 的 metadata（需权限，失败则跳过）
+     */
+    private fun selfCheckSystemMetadata() {
+        try {
+            // 1) Media3 controller 视角
+            val token = androidx.media3.session.SessionToken(
+                this,
+                ComponentName(this, MeloXPlaybackService::class.java),
+            )
+            val controllerFuture = androidx.media3.session.MediaController.Builder(this, token).buildAsync()
+            controllerFuture.addListener({
+                try {
+                    val controller = controllerFuture.get()
+                    val md = controller.mediaMetadata
+                    val extras = md.extras
+                    carLog("M3-CHECK mediaMetadata.extras=${extras?.keySet()?.toString()?.take(400)}")
+                    if (extras != null) {
+                        carLog("M3-CHECK LYRICS_LINE=${extras.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)} STATUS=${extras.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, -999)}")
+                    }
+                    controller.release()
+                } catch (e: Exception) {
+                    carLog("M3-CHECK error: ${e.message}")
+                }
+            }, mainExecutor)
+        } catch (e: Exception) {
+            carLog("M3-CHECK init error: ${e.message}")
+        }
+        try {
+            // 2) 系统 SessionManager 视角（可能需要 MEDIA_CONTENT_CONTROL 权限）
+            val manager = getSystemService(android.media.session.MediaSessionManager::class.java) ?: return
+            val sessions = manager.getActiveSessions(null)
+            for (session in sessions) {
+                if (session.packageName != packageName) continue
+                val md = session.metadata
+                carLog("SYS-CHECK pkg=${session.packageName}")
+                if (md == null) {
+                    carLog("SYS-CHECK metadata=NULL")
+                } else {
+                    val status = if (md.containsKey(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)) {
+                        md.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)
+                    } else {
+                        -999L
+                    }
+                    carLog("SYS-CHECK LYRICS_LINE=${md.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)} STATUS=$status")
+                    carLog("SYS-CHECK keys=${md.keySet().toString().take(400)}")
+                }
+            }
+        } catch (e: Exception) {
+            carLog("SYS-CHECK error: ${e.message}")
         }
     }
 
@@ -1002,6 +1060,8 @@ class MeloXPlaybackService : MediaSessionService() {
             updatingSystemLyricsMetadata = true
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
             handler.post { updatingSystemLyricsMetadata = false }
+            // 自检：确认系统 MediaSession 是否真的广播了歌词字段
+            handler.postDelayed({ selfCheckSystemMetadata() }, 300L)
         } else if (changed && !enabled) {
             // 开关关闭，清除 Channel A 元数据
             val metadata = currentItem.mediaMetadata.buildUpon()
