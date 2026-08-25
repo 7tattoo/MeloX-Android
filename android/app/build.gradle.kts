@@ -12,8 +12,8 @@ android {
         applicationId = "com.luna.music.car"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0-Car"
+        versionCode = 2
+        versionName = "1.0.2"
     }
 
     // Release credentials are supplied from the command line or CI secrets;

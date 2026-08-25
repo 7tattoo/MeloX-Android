@@ -4,9 +4,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,11 +40,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MeloXTheme {
-                MeloXApp(
-                    openNowPlayingRequest = openNowPlayingRequest,
-                    clipboardLinkRequest = clipboardLinkRequest,
-                    onClipboardLinkConsumed = { clipboardLinkRequest = null },
-                )
+                // 投屏（车机横屏）适配：车机屏幕宽（>600dp）且横屏时，整体缩小 UI
+                // 密度（density × 0.8），使主页面/播放页部件变小、布局按比例重排。
+                val configuration = LocalConfiguration.current
+                val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val isWide = configuration.screenWidthDp >= 600
+                val baseDensity = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(
+                        density = baseDensity.density * if (isLandscape && isWide) CAR_UI_SCALE else 1f,
+                        fontScale = baseDensity.fontScale,
+                    ),
+                ) {
+                    MeloXApp(
+                        openNowPlayingRequest = openNowPlayingRequest,
+                        clipboardLinkRequest = clipboardLinkRequest,
+                        onClipboardLinkConsumed = { clipboardLinkRequest = null },
+                    )
+                }
             }
         }
 
@@ -94,5 +112,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_NOW_PLAYING =
             "com.lladlam.melox.action.OPEN_NOW_PLAYING"
+        /** 横屏(车机投屏)时 UI 整体缩放因子。1.0 为原始尺寸，0.8 缩小 20% 更适配车机。 */
+        const val CAR_UI_SCALE = 0.8f
     }
 }
