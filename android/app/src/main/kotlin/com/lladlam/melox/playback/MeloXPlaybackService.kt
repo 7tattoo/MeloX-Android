@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import java.io.File
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -285,70 +284,9 @@ class MeloXPlaybackService : MediaSessionService() {
         MeloXAudioReactiveRuntime.publish(item.mediaId, active.currentPosition, active.isPlaying)
     }
 
-    /** 车联歌词调试日志：同时输出 logcat 与文件（免 adb 抓取） */
+    /** 车联歌词日志（输出 logcat，不再写文件） */
     private fun carLog(msg: String) {
         Log.d(TAG, "CAR_LYRIC $msg")
-        try {
-            val dir = getExternalFilesDir(null) ?: return
-            val f = File(dir, "car_lyrics.log")
-            f.appendText("[${System.currentTimeMillis()}] $msg\n")
-        } catch (_: Exception) {
-        }
-    }
-
-    /**
-     * 自检：验证注入的歌词字段是否真的广播到了 MediaSession。
-     * 1) Media3 MediaController 视角：读 player 派生的 mediaMetadata.extras
-     * 2) 系统 SessionManager 视角：读活跃 session 的 metadata（需权限，失败则跳过）
-     */
-    private fun selfCheckSystemMetadata() {
-        try {
-            // 1) Media3 controller 视角
-            val token = androidx.media3.session.SessionToken(
-                this,
-                ComponentName(this, MeloXPlaybackService::class.java),
-            )
-            val controllerFuture = androidx.media3.session.MediaController.Builder(this, token).buildAsync()
-            controllerFuture.addListener({
-                try {
-                    val controller = controllerFuture.get()
-                    val md = controller.mediaMetadata
-                    val extras = md.extras
-                    carLog("M3-CHECK mediaMetadata.extras=${extras?.keySet()?.toString()?.take(400)}")
-                    if (extras != null) {
-                        carLog("M3-CHECK LYRICS_LINE=${extras.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)} STATUS=${extras.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, -999)}")
-                    }
-                    controller.release()
-                } catch (e: Exception) {
-                    carLog("M3-CHECK error: ${e.message}")
-                }
-            }, mainExecutor)
-        } catch (e: Exception) {
-            carLog("M3-CHECK init error: ${e.message}")
-        }
-        try {
-            // 2) 系统 SessionManager 视角（可能需要 MEDIA_CONTENT_CONTROL 权限）
-            val manager = getSystemService(android.media.session.MediaSessionManager::class.java) ?: return
-            val sessions = manager.getActiveSessions(null)
-            for (session in sessions) {
-                if (session.packageName != packageName) continue
-                val md = session.metadata
-                carLog("SYS-CHECK pkg=${session.packageName}")
-                if (md == null) {
-                    carLog("SYS-CHECK metadata=NULL")
-                } else {
-                    val status = if (md.containsKey(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)) {
-                        md.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)
-                    } else {
-                        -999L
-                    }
-                    carLog("SYS-CHECK LYRICS_LINE=${md.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)} STATUS=$status")
-                    carLog("SYS-CHECK keys=${md.keySet().toString().take(400)}")
-                }
-            }
-        } catch (e: Exception) {
-            carLog("SYS-CHECK error: ${e.message}")
-        }
     }
 
     /**
@@ -409,65 +347,6 @@ class MeloXPlaybackService : MediaSessionService() {
         } catch (e: Exception) {
             carLog("syncSystemSession error: ${e.message}")
         }
-    }
-
-    /**
-     * 决定性自检：用系统 MediaController（手机端 App 同款读取方式）通过
-     * platformToken 直连我们的 MediaSession，读 metadata 看 ucar 字段是否
-     * 真的广播到了系统 MediaSession 层。
-     */
-    private fun platformTokenCheck() {
-        val ms = mediaSession ?: return
-        try {
-            val platformToken = ms.platformToken
-            val controller = android.media.session.MediaController(this, platformToken)
-            val md = controller.metadata
-            carLog("PLATFORM-TOKEN pkg=${controller.packageName} metadata=${md != null}")
-            if (md != null) {
-                carLog("PLATFORM-TOKEN LYRICS_LINE=${md.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
-                val st = if (md.containsKey(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)) {
-                    md.getLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS)
-                } else {
-                    -999L
-                }
-                carLog("PLATFORM-TOKEN STATUS=$st")
-                carLog("PLATFORM-TOKEN TITLE=${md.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)}")
-                carLog("PLATFORM-TOKEN keys=${md.keySet().toString().take(400)}")
-            }
-            val extras = controller.extras
-            carLog("PLATFORM-TOKEN extras=${extras?.keySet()?.toString()?.take(300)}")
-            if (extras != null) {
-                carLog("PLATFORM-TOKEN extras.LYRIC=${extras.getString(CarLyricsConstants.EXTRAS_KEY_LYRIC)}")
-            }
-            // 不注销（自检临时 controller 会随作用域释放）
-        } catch (e: Exception) {
-            carLog("PLATFORM-TOKEN error: ${e.message}")
-        }
-    }
-
-    // ====================================================================
-    // 播放状态持久化（重启/杀后台后恢复上次播放）
-    // ====================================================================
-
-    /**
-     * 车机端（vivo 智慧车联）只在「真实切歌（onMediaItemTransition reason=SEEK/AUTO）」
-     * 时刷新歌词 metadata；播放过程中的 replaceMediaItem 注入（reason=PLAYLIST_CHANGED）
-     * 它不感知。因此在歌词加载成功等关键状态变化时，触发一次极短的播放状态脉冲
-     * （pause→resume），让车机端通过 onPlaybackStateChanged 重新拉取 metadata。
-     */
-    private var lastPlaybackStatePulseRealtimeMs = 0L
-
-    private fun pulsePlaybackState() {
-        val active = player ?: return
-        if (!active.playWhenReady) return
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastPlaybackStatePulseRealtimeMs < 2_000L) return
-        lastPlaybackStatePulseRealtimeMs = now
-        active.pause()
-        handler.postDelayed({
-            val p = player ?: return@postDelayed
-            p.play()
-        }, 120L)
     }
 
     /**
@@ -631,9 +510,6 @@ class MeloXPlaybackService : MediaSessionService() {
             .setSessionActivity(sessionActivity)
             .build()
         carLyricsManager = CarLyricsManager(mediaSession!!)
-        carLyricsManager?.onPushLog = { line, whole, status, changed ->
-            carLog("manager.push: line=${line?.take(24)} wholeLen=${whole?.length} status=$status changed=$changed")
-        }
         // 系统 MediaSession：车联歌词直连广播通道
         runCatching {
             carSystemSession = android.media.session.MediaSession(this, "MeloXCarLyrics")
@@ -872,8 +748,6 @@ class MeloXPlaybackService : MediaSessionService() {
             carLyricsFailed = false
             carLyricsJob?.cancel()
             carLyricsJob = null
-            // 歌词就绪：延迟后触发播放状态脉冲，强制车机端刷新歌词 metadata
-            handler.postDelayed({ pulsePlaybackState() }, 200L)
         }
         val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
         val index = document.highlightedIndex(active.currentPosition + advance) ?: return
@@ -1020,10 +894,6 @@ class MeloXPlaybackService : MediaSessionService() {
                 carLyricsDocument = doc
                 carLyricsFailed = (doc == null)
                 carLog("loadCarLyrics writeback doc=${doc != null} failed=$carLyricsFailed")
-                // 歌词就绪：延迟后触发播放状态脉冲，强制车机端刷新歌词 metadata。
-                // 延迟 200ms 让 modeMonitor 先把 SUCCESS+whole+line 注入完成，
-                // 车机端在 play(状态变化) 时读到最终歌词状态。
-                if (doc != null) handler.postDelayed({ pulsePlaybackState() }, 200L)
             } else {
                 carLog("loadCarLyrics writeback SKIPPED key mismatch!")
             }
@@ -1179,19 +1049,6 @@ class MeloXPlaybackService : MediaSessionService() {
             updatingSystemLyricsMetadata = true
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
             handler.post { updatingSystemLyricsMetadata = false }
-            // 直接读 player 层（非 controller 缓存），定位 metadata 更新断点
-            handler.postDelayed({
-                val p = player ?: return@postDelayed
-                val pmd = p.mediaMetadata
-                carLog("PLAYER-MD extras=${pmd.extras?.keySet()?.toString()?.take(400)}")
-                carLog("PLAYER-MD line=${pmd.extras?.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
-                val item = p.getMediaItemAt(p.currentMediaItemIndex)
-                carLog("TIMELINE-ITEM extras=${item.mediaMetadata.extras?.keySet()?.toString()?.take(400)}")
-                carLog("TIMELINE-ITEM line=${item.mediaMetadata.extras?.getString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE)}")
-            }, 500L)
-            // 自检：确认系统 MediaSession 是否真的广播了歌词字段
-            handler.postDelayed({ platformTokenCheck() }, 400L)
-            handler.postDelayed({ selfCheckSystemMetadata() }, 300L)
         } else if (changed && !enabled) {
             // 开关关闭，清除 Channel A 元数据
             val metadata = currentItem.mediaMetadata.buildUpon()

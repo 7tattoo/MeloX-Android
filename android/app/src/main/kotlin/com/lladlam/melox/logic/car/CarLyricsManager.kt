@@ -36,9 +36,6 @@ class CarLyricsManager(
     val currentLineText: String? get() = currentLine
     val currentWholeText: String? get() = wholeLrc
 
-    /** 日志回调（调试用）：每次 push 时报告推送内容和变化检测结果 */
-    var onPushLog: ((line: String?, whole: String?, status: Long, changed: Boolean) -> Unit)? = null
-
     private var currentLine: String? = null
     private var wholeLrc: String? = null
     private var status: Long = LYRICS_STATUS_NO_LYRICS
@@ -94,8 +91,6 @@ class CarLyricsManager(
         lastPushedLine = lineToPush
         lastPushedWhole = wholeToPush
         lastPushedStatus = statusToPush
-
-        onPushLog?.invoke(lineToPush, wholeToPush, statusToPush, changed)
 
         // Channel B: Extras
         if (!enabled) {
