@@ -63,7 +63,7 @@ class CarLyricsManager(
     fun updateLyric(currentLine: String?, lyrics: LyricsDocument?): Boolean {
         this.currentLine = currentLine?.takeIf { it.isNotBlank() }
         wholeLrc = lyrics?.toLrcString()
-        status = if (wholeLrc != null) LYRICS_STATUS_SUCCESS else LYRICS_STATUS_NO_LYRICS
+        status = if (!wholeLrc.isNullOrBlank()) LYRICS_STATUS_SUCCESS else LYRICS_STATUS_NO_LYRICS
         return push()
     }
 

@@ -903,6 +903,10 @@ class MeloXPlaybackService : MediaSessionService() {
                 val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
                 val index = lyrics.highlightedIndex(active.currentPosition + advance)
                 val currentLine = index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
+                    // 前奏期（position 早于第一行歌词）highlightedIndex 返回 null；
+                    // 若此时 line 推 null，车机端会显示「暂无歌词」（它只看 LYRICS_LINE）。
+                    // 回退到第一行非空歌词，让车机立即显示歌词，前奏结束后正常滚动。
+                    ?: lyrics.lines.firstOrNull { it.text.isNotBlank() }?.text?.trim()
                 manager.updateLyric(currentLine, lyrics)
             } else {
                 // 车联歌词：独立多源加载（支持 QQ音乐/网易云/酷狗等全部音源）
