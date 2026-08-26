@@ -9,11 +9,11 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.luna.music.car"
+        applicationId = "cn.aqzscn.stream_music"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.0.2"
+        versionCode = 3
+        versionName = "1.0.3"
     }
 
     // Release credentials are supplied from the command line or CI secrets;
