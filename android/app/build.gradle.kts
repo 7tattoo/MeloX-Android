@@ -12,8 +12,8 @@ android {
         applicationId = "cn.aqzscn.stream_music"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.0.3"
+        versionCode = 4
+        versionName = "1.0.4"
     }
 
     // Release credentials are supplied from the command line or CI secrets;

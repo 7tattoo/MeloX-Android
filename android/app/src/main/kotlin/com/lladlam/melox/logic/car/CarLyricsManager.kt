@@ -145,7 +145,7 @@ class CarLyricsManager(
         return extras
     }
 
-    /** LyricsDocument 转标准 LRC 字符串 */
+    /** LyricsDocument 转标准 LRC 字符串（仅原歌词行，不含翻译行） */
     private fun LyricsDocument.toLrcString(): String {
         val sb = StringBuilder()
         for (line in lines) {
@@ -155,10 +155,9 @@ class CarLyricsManager(
             val min = (time / 60000).toInt()
             val sec = (time % 60000 / 1000).toInt()
             val ms = (time % 1000).toInt() / 10
+            // 只写原歌词行：翻译行若作为独立 LRC 行（时间戳与原行相同），
+            // 车机端滚动匹配时会高亮翻译行而非原行（外语歌曲 bug）。
             sb.appendLine(String.format("[%02d:%02d.%02d]%s", min, sec, ms, text))
-            line.translation?.takeIf { it.isNotBlank() }?.let { trans ->
-                sb.appendLine(String.format("[%02d:%02d.%02d]%s", min, sec, ms, trans))
-            }
         }
         return sb.toString()
     }
