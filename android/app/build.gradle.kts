@@ -9,7 +9,8 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "cn.aqzscn.stream_music"
+        val appIdOverride = providers.gradleProperty("appIdOverride").orNull
+        applicationId = appIdOverride ?: "cn.aqzscn.stream_music"
         minSdk = 26
         targetSdk = 37
         versionCode = 5

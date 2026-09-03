@@ -1,0 +1,101 @@
+name: Multi-Package Release
+
+on:
+  push:
+    tags:
+      - 'multi-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - package: com.tencent.ibg.joox
+            label: joox
+          - package: com.spotify.music
+            label: spotify
+          - package: com.apple.android.music
+            label: apple
+          - package: com.luna.music.car
+            label: luna
+          - package: com.kugou.android.auto
+            label: kugou
+          - package: cn.kuwo.kwmusiccar
+            label: kuwo
+          - package: com.qidian.QDReader
+            label: qidian
+          - package: com.tencent.weread
+            label: weread
+          - package: cn.aqzscn.stream_music
+            label: aqzscn
+          - package: com.tencent.wecarflow
+            label: wecarflow
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        run: |
+          cd android
+          base64 -d melox-release.keystore.b64 > melox-release.keystore
+
+      - name: Build Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease \
+            -PappIdOverride=${{ matrix.package }} \
+            -PmeloxReleaseStoreFile=$PWD/melox-release.keystore \
+            -PmeloxReleaseStorePassword="melox-car-2026" \
+            -PmeloxReleaseKeyAlias=melox \
+            -PmeloxReleaseKeyPassword="melox-car-2026"
+
+      - name: Rename APK
+        run: |
+          APK_FILE=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          mv "$APK_FILE" "MeloX_${{ matrix.label }}_${{ matrix.package }}.apk"
+          ls -la MeloX_*.apk
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/MeloX_${{ matrix.label }}_${{ matrix.package }}.apk
+          tag_name: ${{ github.ref_name }}
+          name: MeloX Multi-Package Release
+          body: |
+            MeloX Android 10 包名合构版本
+
+            所有版本基于同一代码，仅 applicationId 不同，可同时安装互不冲突。
+
+            **包名列表：**
+            - com.tencent.ibg.joox (JOOX)
+            - com.spotify.music (Spotify)
+            - com.apple.android.music (Apple Music)
+            - com.luna.music.car (汽水音乐车机版)
+            - com.kugou.android.auto (酷狗车机版)
+            - cn.kuwo.kwmusiccar (酷我车机版)
+            - com.qidian.QDReader (QQ 阅读)
+            - com.tencent.weread (微信读书)
+            - cn.aqzscn.stream_music (汽水音乐)
+            - com.tencent.wecarflow (腾讯车联)
+
+            **签名：** 使用仓库内 melox-release.keystore（release 签名）。
