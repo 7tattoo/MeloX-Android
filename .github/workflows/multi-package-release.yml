@@ -55,12 +55,10 @@ jobs:
 
       - name: Decode keystore
         run: |
-          cd android
           base64 -d melox-release.keystore.b64 > melox-release.keystore
 
       - name: Build Release APK
         run: |
-          cd android
           chmod +x gradlew
           ./gradlew assembleRelease \
             -PappIdOverride=${{ matrix.package }} \
@@ -71,14 +69,14 @@ jobs:
 
       - name: Rename APK
         run: |
-          APK_FILE=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          APK_FILE=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
           mv "$APK_FILE" "MeloX_${{ matrix.label }}_${{ matrix.package }}.apk"
           ls -la MeloX_*.apk
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android/MeloX_${{ matrix.label }}_${{ matrix.package }}.apk
+          files: MeloX_${{ matrix.label }}_${{ matrix.package }}.apk
           tag_name: ${{ github.ref_name }}
           name: MeloX Multi-Package Release
           body: |
