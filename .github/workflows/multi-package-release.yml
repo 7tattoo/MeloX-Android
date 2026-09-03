@@ -76,7 +76,7 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: MeloX_${{ matrix.label }}_${{ matrix.package }}.apk
+          files: android/MeloX_${{ matrix.label }}_${{ matrix.package }}.apk
           tag_name: ${{ github.ref_name }}
           name: MeloX Multi-Package Release
           body: |
