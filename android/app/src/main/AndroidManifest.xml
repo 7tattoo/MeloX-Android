@@ -75,6 +75,8 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
+                <!-- vivo 原子随身听歌词协议入口（文档要求，action 名固定） -->
+                <action android:name="com.vivo.musicwidgetmix.support.service" />
             </intent-filter>
         </service>
 

@@ -1,27 +1,19 @@
 package com.lladlam.melox.logic.car
 
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.media3.session.MediaSession
 import com.lladlam.melox.core.lyrics.LyricsDocument
-import com.lladlam.melox.logic.car.CarLyricsConstants.EXTRAS_KEY_LYRIC
-import com.lladlam.melox.logic.car.CarLyricsConstants.EXTRAS_KEY_LYRIC_ALLOWED
-import com.lladlam.melox.logic.car.CarLyricsConstants.EXTRAS_KEY_NOTICE_CAR
-import com.lladlam.melox.logic.car.CarLyricsConstants.LYRICS_STATUS_FAIL
-import com.lladlam.melox.logic.car.CarLyricsConstants.LYRICS_STATUS_LOADING
-import com.lladlam.melox.logic.car.CarLyricsConstants.LYRICS_STATUS_NO_LYRICS
-import com.lladlam.melox.logic.car.CarLyricsConstants.LYRICS_STATUS_SUCCESS
-import com.lladlam.melox.logic.car.CarLyricsConstants.METADATA_KEY_LYRICS_LINE
-import com.lladlam.melox.logic.car.CarLyricsConstants.METADATA_KEY_LYRICS_STATUS
-import com.lladlam.melox.logic.car.CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE
 
 /**
  * vivo 车联歌词状态管理器（MeloX 适配版）。
  *
- * 职责：
- *   1. 维护当前歌词状态
- *   2. 构建双通道数据（Channel A / Channel B）
- *   3. 内置变化检测
- *   4. lyricInfo 镜像键
+ * 协议要点（vivo 车机滚动歌词适配开发文档）：
+ *   1. 整段滚动：车机按 PlaybackState 自行滚动，应用只提供完整 LRC；
+ *      LYRICS_LINE 与 music.media.extras.* 均为单行信号，禁止写入。
+ *   2. 没有完整 LRC 时不写任何歌词字段，不得推空歌词或 1/2/3 负状态。
+ *   3. 原子随身听：lrc_change 事件携带完整 LRC；官方拼写 meida/meidia_id 必须保留。
+ *   4. 无事件时不得发送空 Bundle（会清掉车机已显示的歌词）。
  */
 class CarLyricsManager(
     private val mediaSession: MediaSession,
@@ -31,118 +23,64 @@ class CarLyricsManager(
     /** 当前播放歌曲 ID（写入 vivomusicmix.extra.key.meidia_id） */
     var currentMediaId: String? = null
 
-    /** 当前状态（供系统 session 同步读取） */
-    val currentStatus: Long get() = status
-    val currentLineText: String? get() = currentLine
+    /** 当前完整 LRC（未就绪为 null） */
     val currentWholeText: String? get() = wholeLrc
 
-    private var currentLine: String? = null
     private var wholeLrc: String? = null
-    private var status: Long = LYRICS_STATUS_NO_LYRICS
+    private var lastDocRef: LyricsDocument? = null
 
-    private var lastPushedLine: String? = null
-    private var lastPushedWhole: String? = null
-    private var lastPushedStatus: Long = LYRICS_STATUS_NO_LYRICS
+    /** 上次原子事件发送时间（elapsedRealtime）；0 = 尚未发送，切歌时重置 */
+    private var lastAtomEventRealtimeMs: Long = 0L
 
-    /** 进入加载中状态 */
-    fun setLoading(): Boolean {
-        currentLine = null
-        wholeLrc = null
-        status = LYRICS_STATUS_LOADING
-        return push()
+    /** 歌词加载完成：缓存完整 LRC（无歌词则清空，不触碰车机） */
+    fun updateLyric(lyrics: LyricsDocument?) {
+        if (lyrics === lastDocRef) return
+        lastDocRef = lyrics
+        wholeLrc = lyrics?.takeIf { it.lines.isNotEmpty() }
+            ?.toLrcString()?.takeIf { it.isNotBlank() }
     }
 
-    /** 设置加载失败 */
-    fun setFail(): Boolean {
-        currentLine = null
+    /** 切歌重置：清状态 + 重置原子事件计时（歌词就绪后下一拍立即发送新事件） */
+    fun reset() {
         wholeLrc = null
-        status = LYRICS_STATUS_FAIL
-        return push()
+        lastDocRef = null
+        lastAtomEventRealtimeMs = 0L
     }
 
     /**
-     * 更新歌词状态（歌词加载完成后调用）。
-     * @param currentLine 当前歌词行文本
-     * @param lyrics 完整歌词文档（可为 null）
+     * 原子 lrc_change 事件：歌词就绪后首次调用立即发送，之后约 25 秒兜底重发
+     * （覆盖车机/原子组件晚于播放开始才连接的情况）。
+     * 返回本次事件 Bundle（已同步推给 Media3 session），无事件时返回 null——
+     * 调用方对 null 不得发送空 extras。
      */
-    fun updateLyric(currentLine: String?, lyrics: LyricsDocument?): Boolean {
-        this.currentLine = currentLine?.takeIf { it.isNotBlank() }
-        wholeLrc = lyrics?.toLrcString()
-        status = if (!wholeLrc.isNullOrBlank()) LYRICS_STATUS_SUCCESS else LYRICS_STATUS_NO_LYRICS
-        return push()
+    fun atomEventIfDue(): Bundle? {
+        if (!enabled) return null
+        val lrc = wholeLrc ?: return null
+        val now = SystemClock.elapsedRealtime()
+        if (lastAtomEventRealtimeMs != 0L &&
+            now - lastAtomEventRealtimeMs < ATOM_EVENT_RESEND_INTERVAL_MS
+        ) return null
+        lastAtomEventRealtimeMs = now
+        val event = Bundle().apply {
+            putString(CarLyricsConstants.ATOM_ACTION_KEY, CarLyricsConstants.ATOM_ACTION_LRC_CHANGE)
+            putString(CarLyricsConstants.ATOM_LYRIC_KEY, lrc)
+            currentMediaId?.let { putString(CarLyricsConstants.ATOM_MEDIA_ID_KEY, it) }
+        }
+        mediaSession.setSessionExtras(event)
+        return event
     }
 
-    /** 统一推送入口，含变化检测与 Channel B 推送 */
-    fun push(): Boolean {
-        val lineToPush = if (enabled) currentLine else null
-        val wholeToPush = if (enabled) {
-            when (status) {
-                LYRICS_STATUS_SUCCESS -> wholeLrc ?: "-1"
-                LYRICS_STATUS_LOADING -> ""
-                else -> "-1"
-            }
-        } else null
-        val statusToPush = if (enabled) status else LYRICS_STATUS_NO_LYRICS
-
-        val changed = lineToPush != lastPushedLine
-            || wholeToPush != lastPushedWhole
-            || statusToPush != lastPushedStatus
-
-        lastPushedLine = lineToPush
-        lastPushedWhole = wholeToPush
-        lastPushedStatus = statusToPush
-
-        // Channel B: Extras
-        if (!enabled) {
-            mediaSession.setSessionExtras(Bundle())
-            return changed
+    /**
+     * 车载 metadata extras：support_event=31 常驻（原子随身听支持位）；
+     * 有完整 LRC 时才追加 LYRICS_WHOLE + 状态 0。禁止写入 LYRICS_LINE。
+     */
+    fun buildMetadataExtras(): Bundle = Bundle().apply {
+        putLong(CarLyricsConstants.METADATA_KEY_SUPPORT_EVENT, CarLyricsConstants.SUPPORT_EVENT_DEFAULT)
+        val lrc = wholeLrc
+        if (!lrc.isNullOrBlank()) {
+            putString(CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE, lrc)
+            putLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, CarLyricsConstants.LYRICS_STATUS_SUCCESS)
         }
-        val extras = Bundle().apply {
-            putBoolean(EXTRAS_KEY_LYRIC_ALLOWED, true)
-            if (!lineToPush.isNullOrEmpty()) putString(EXTRAS_KEY_LYRIC, lineToPush)
-            putBoolean(EXTRAS_KEY_NOTICE_CAR, true)
-            // vivomusicmix 歌词协议（vivo 车联手机端 App 读取的键）：
-            // 手机端 onExtrasChanged 校验 action==lrc_change 后，
-            // 读取 meidia_id + lyric 并推送完整歌词到车机。
-            putString("vivomusicmix.meida.extra.key.action", "vivomusicmix.extra.lrc_change")
-            if (!wholeToPush.isNullOrEmpty() && wholeToPush != "-1") {
-                putString("vivomusicmix.extra.key.lyric", wholeToPush)
-            }
-            currentMediaId?.let { putString("vivomusicmix.extra.key.meidia_id", it) }
-        }
-        mediaSession.setSessionExtras(extras)
-        return changed
-    }
-
-    /** 构建 Channel A 元数据 extras（含 lyricInfo 镜像） */
-    fun buildMetadataExtras(): Bundle {
-        val extras = Bundle()
-        if (!enabled) return extras
-
-        val lineToPush = currentLine
-        if (!lineToPush.isNullOrEmpty()) {
-            extras.putString(METADATA_KEY_LYRICS_LINE, lineToPush)
-        }
-        when (status) {
-            LYRICS_STATUS_SUCCESS -> {
-                extras.putString(METADATA_KEY_LYRICS_WHOLE, wholeLrc ?: "-1")
-                extras.putLong(METADATA_KEY_LYRICS_STATUS, status)
-            }
-            LYRICS_STATUS_LOADING -> {
-                extras.putString(METADATA_KEY_LYRICS_WHOLE, "")
-                extras.putLong(METADATA_KEY_LYRICS_STATUS, status)
-            }
-            else -> {
-                extras.putString(METADATA_KEY_LYRICS_WHOLE, "-1")
-                extras.putLong(METADATA_KEY_LYRICS_STATUS, status)
-            }
-        }
-        // lyricInfo 镜像：status|wholeLrcHash|lineHash
-        extras.putString(
-            CarLyricsConstants.METADATA_KEY_LYRIC_INFO,
-            "$status|${wholeLrc?.hashCode()}|${lineToPush?.hashCode()}"
-        )
-        return extras
     }
 
     /** LyricsDocument 转标准 LRC 字符串（仅原歌词行，不含翻译行） */
@@ -160,5 +98,10 @@ class CarLyricsManager(
             sb.appendLine(String.format("[%02d:%02d.%02d]%s", min, sec, ms, text))
         }
         return sb.toString()
+    }
+
+    private companion object {
+        /** 原子事件兜底重发间隔（文档：约 25 秒） */
+        const val ATOM_EVENT_RESEND_INTERVAL_MS = 25_000L
     }
 }

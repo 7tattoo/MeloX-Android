@@ -180,7 +180,8 @@ class MeloXPlaybackService : MediaSessionService() {
                 carLog("transition: mediaId $carLyricsTransitionMediaId -> $transitionMediaId reason=$reason (reset)")
                 carLyricsTransitionMediaId = transitionMediaId
                 resetCarLyrics(mediaItem)
-                carLyricsManager?.setLoading()
+                // 切歌即重置原子事件计时：新歌词就绪后下一拍立即发送 lrc_change
+                carLyricsManager?.reset()
             } else {
                 carLog("transition: same mediaId=$transitionMediaId reason=$reason (skip reset)")
             }
@@ -291,18 +292,22 @@ class MeloXPlaybackService : MediaSessionService() {
 
     /**
      * 把歌词/播放状态同步到系统 MediaSession（车机端直读通道）。
-     * 系统 MediaMetadata 直接透传自定义键，车机端(MediaControllerCompat/系统
-     * MediaController)能读到 ucar.media.metadata.* 字段。
+     * 协议（vivo 车机滚动歌词适配开发文档）：
+     *   - 整段滚动：只写 LYRICS_WHOLE（完整 LRC），禁止 LYRICS_LINE 单行键；
+     *     没有完整 LRC 时原样保留车机可见 metadata，不写空歌词/负状态。
+     *   - support_event=31 常驻（原子随身听支持位）。
+     *   - 原子 lrc_change 事件仅在歌词就绪或兜底到期时发送（atomEventIfDue），
+     *     无事件绝不调用 setExtras（空 Bundle 会清掉车机已显示歌词）。
+     * 滚动由车机根据 PlaybackState 自行完成。
      */
     private fun syncCarLyricsToSystemSession(
-        line: String?,
         whole: String?,
-        status: Long,
         title: String?,
         artist: String?,
         positionMs: Long,
         durationMs: Long,
         isPlaying: Boolean,
+        carEnabled: Boolean,
     ) {
         val session = carSystemSession ?: return
         try {
@@ -311,24 +316,19 @@ class MeloXPlaybackService : MediaSessionService() {
                 .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, artist ?: "")
                 .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, "")
                 .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, durationMs.coerceAtLeast(0L))
-                .putString(CarLyricsConstants.METADATA_KEY_LYRICS_LINE, line ?: "")
-                .putString(CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE, whole ?: "-1")
-                .putLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, status)
-            session.setMetadata(mdBuilder.build())
-            val extras = Bundle().apply {
-                putBoolean(CarLyricsConstants.EXTRAS_KEY_LYRIC_ALLOWED, true)
-                if (!line.isNullOrBlank()) putString(CarLyricsConstants.EXTRAS_KEY_LYRIC, line)
-                putBoolean(CarLyricsConstants.EXTRAS_KEY_NOTICE_CAR, true)
-                // vivomusicmix 歌词协议（vivo 车联手机端 App 读取的键）
-                putString("vivomusicmix.meida.extra.key.action", "vivomusicmix.extra.lrc_change")
-                if (!whole.isNullOrBlank() && whole != "-1") {
-                    putString("vivomusicmix.extra.key.lyric", whole)
-                }
-                carLyricsManager?.currentMediaId?.let {
-                    putString("vivomusicmix.extra.key.meidia_id", it)
+            if (carEnabled) {
+                // 原子随身听支持位常驻；有完整 LRC 才写歌词字段（状态 0）
+                mdBuilder.putLong(CarLyricsConstants.METADATA_KEY_SUPPORT_EVENT, CarLyricsConstants.SUPPORT_EVENT_DEFAULT)
+                    .putString(CarLyricsConstants.METADATA_KEY_UCAR_TITLE, title ?: "")
+                    .putString(CarLyricsConstants.METADATA_KEY_UCAR_ARTIST, artist ?: "")
+                if (!whole.isNullOrBlank()) {
+                    mdBuilder.putString(CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE, whole)
+                    mdBuilder.putLong(CarLyricsConstants.METADATA_KEY_LYRICS_STATUS, CarLyricsConstants.LYRICS_STATUS_SUCCESS)
                 }
             }
-            session.setExtras(extras)
+            session.setMetadata(mdBuilder.build())
+            // 原子事件：就绪首发 + 约 25s 兜底重发；无事件不发送（不推空 Bundle）
+            if (carEnabled) carLyricsManager?.atomEventIfDue()
             val state = android.media.session.PlaybackState.Builder()
                 .setActions(
                     android.media.session.PlaybackState.ACTION_PLAY or
@@ -920,6 +920,7 @@ class MeloXPlaybackService : MediaSessionService() {
         carLyricsFailed = false
         carLyricsAttempts = 0
         carLyricsLastAttemptRealtimeMs = 0L
+        carLyricsManager?.reset()
     }
 
     private fun restoreSystemLyricsMetadata(active: ExoPlayer) {
@@ -953,22 +954,11 @@ class MeloXPlaybackService : MediaSessionService() {
         )
         manager.enabled = enabled
         manager.currentMediaId = currentItem.mediaId
-
-        val changed = if (!enabled) {
-            carLog("pushCarLyrics: DISABLED (mediaId=${currentItem.mediaId})")
-            manager.push()
-        } else {
+        if (enabled) {
             val lyrics = carLyricsDocument
             if (lyrics != null) {
-                // 歌词已加载，推送实际歌词
-                val advance = MeloXSettingsRuntime.lyricAdvanceMs.toLong()
-                val index = lyrics.highlightedIndex(active.currentPosition + advance)
-                val currentLine = index?.let { lyrics.lines.getOrNull(it)?.text?.trim() }
-                    // 前奏期（position 早于第一行歌词）highlightedIndex 返回 null；
-                    // 若此时 line 推 null，车机端会显示「暂无歌词」（它只看 LYRICS_LINE）。
-                    // 回退到第一行非空歌词，让车机立即显示歌词，前奏结束后正常滚动。
-                    ?: lyrics.lines.firstOrNull { it.text.isNotBlank() }?.text?.trim()
-                manager.updateLyric(currentLine, lyrics)
+                // 歌词已加载：缓存完整 LRC（首发原子事件在下方 sync 时发出）
+                manager.updateLyric(lyrics)
             } else {
                 // 车联歌词：独立多源加载（支持 QQ音乐/网易云/酷狗等全部音源）
                 val resourceKey = PlaybackTrackIdentity.fromMediaItem(currentItem)?.let { rid ->
@@ -976,7 +966,7 @@ class MeloXPlaybackService : MediaSessionService() {
                 } ?: currentItem.mediaId
                 when {
                     carLyricsResourceKey != resourceKey -> {
-                        // 新歌曲：触发多源歌词加载，期间推 LOADING（不推 -1）
+                        // 新歌曲：触发多源歌词加载，期间对车机静默（不推空歌词/负状态）
                         carLog("pushCarLyrics: NEW key=$resourceKey (old=${carLyricsResourceKey})")
                         carLyricsResourceKey = resourceKey
                         carLyricsDocument = null
@@ -984,11 +974,10 @@ class MeloXPlaybackService : MediaSessionService() {
                         carLyricsAttempts = 1
                         carLyricsLastAttemptRealtimeMs = SystemClock.elapsedRealtime()
                         loadCarLyrics(currentItem)
-                        manager.setLoading()
+                        // 加载中不触碰车机：不推空歌词/负状态，保留车机现有显示
                     }
                     carLyricsJob?.isActive == true -> {
-                        // 歌词正在加载中，保持 LOADING（不要误判为无歌词）
-                        manager.setLoading()
+                        // 歌词正在加载中：同上，保持静默
                     }
                     carLyricsFailed -> {
                         // 上一次加载未成功（接口慢/超时/返回空），限速重试，
@@ -1001,47 +990,45 @@ class MeloXPlaybackService : MediaSessionService() {
                             carLyricsAttempts += 1
                             carLyricsLastAttemptRealtimeMs = now
                             loadCarLyrics(currentItem)
-                            manager.setLoading()
-                        } else if (canRetry) {
-                            // 已达重试上限，确认无歌词
-                            carLog("pushCarLyrics: GIVE_UP -> NO_LYRICS")
-                            manager.updateLyric(null, null)
-                        } else {
-                            // 还没到下次重试时间，继续 LOADING 等待
-                            manager.setLoading()
                         }
+                        // 未就绪一律静默：不给车机推「无歌词」
                     }
                     else -> {
-                        // 无失败标记但也没在加载：视为尚无歌词
-                        carLog("pushCarLyrics: else-branch -> NO_LYRICS (failed=$carLyricsFailed job=$carLyricsJob)")
-                        manager.updateLyric(null, null)
+                        // 无失败标记但也没在加载：静默等待，不写负状态
+                        carLog("pushCarLyrics: no lyrics yet (failed=$carLyricsFailed job=$carLyricsJob)")
                     }
                 }
             }
         }
 
         // 每次推送后，把最新歌词同步到系统 MediaSession（车机端直读通道）
-        val managerStatus = manager.currentStatus
         syncCarLyricsToSystemSession(
-            line = manager.currentLineText,
             whole = manager.currentWholeText,
-            status = managerStatus,
             title = currentItem.mediaMetadata.title?.toString(),
             artist = currentItem.mediaMetadata.artist?.toString(),
             positionMs = active.currentPosition,
             durationMs = active.duration.takeIf { it != C.TIME_UNSET && it > 0L } ?: 0L,
             isPlaying = active.isPlaying,
+            carEnabled = enabled,
         )
 
-        // Channel A 注入：仅当值变化时通过 replaceMediaItem 注入元数据。
+        // Channel A 注入：extras 与目标不一致时 replaceMediaItem（值比较，防止重复注入）。
         // 注意：此 replaceMediaItem 会触发 onMediaItemTransition，好在已通过
         // mediaId 判断避免误 reset 歌词状态。
-        if (changed && enabled) {
-            val extras = manager.buildMetadataExtras()
-            if (extras.isEmpty) return
-            val merged = Bundle(currentItem.mediaMetadata.extras ?: Bundle()).apply {
-                putAll(extras)
-            }
+        val targetExtras = if (enabled) manager.buildMetadataExtras() else Bundle()
+        val currentExtras = currentItem.mediaMetadata.extras ?: Bundle()
+        val carKeys = listOf(
+            CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE,
+            CarLyricsConstants.METADATA_KEY_LYRICS_STATUS,
+            CarLyricsConstants.METADATA_KEY_UCAR_TITLE,
+            CarLyricsConstants.METADATA_KEY_UCAR_ARTIST,
+            CarLyricsConstants.METADATA_KEY_SUPPORT_EVENT,
+            CarLyricsConstants.METADATA_KEY_LYRICS_LINE,
+            CarLyricsConstants.METADATA_KEY_LYRIC_INFO,
+        )
+        val needsUpdate = carKeys.any { k -> targetExtras.get(k) != currentExtras.get(k) }
+        if (needsUpdate && enabled) {
+            val merged = Bundle(currentExtras).apply { putAll(targetExtras) }
             val metadata = currentItem.mediaMetadata.buildUpon()
                 .setExtras(merged)
                 .build()
@@ -1049,17 +1036,12 @@ class MeloXPlaybackService : MediaSessionService() {
             updatingSystemLyricsMetadata = true
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
             handler.post { updatingSystemLyricsMetadata = false }
-        } else if (changed && !enabled) {
+        } else if (needsUpdate && !enabled) {
             // 开关关闭，从 Channel A 元数据中移除车联歌词自己的键。
             // ponytail: 不能整包 setExtras(Bundle())——会把 item 上其他功能的键
             // （如系统歌词的 SYSTEM_ORIGINAL_TITLE_KEY）一起清掉，导致标题永远无法还原。
-            val cleaned = Bundle(currentItem.mediaMetadata.extras ?: Bundle())
-            listOf(
-                CarLyricsConstants.METADATA_KEY_LYRICS_LINE,
-                CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE,
-                CarLyricsConstants.METADATA_KEY_LYRICS_STATUS,
-                CarLyricsConstants.METADATA_KEY_LYRIC_INFO,
-            ).forEach { cleaned.remove(it) }
+            val cleaned = Bundle(currentExtras)
+            carKeys.forEach { cleaned.remove(it) }
             val metadata = currentItem.mediaMetadata.buildUpon()
                 .setExtras(cleaned).build()
             val updatedItem = currentItem.buildUpon().setMediaMetadata(metadata).build()
