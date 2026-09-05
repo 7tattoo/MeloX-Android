@@ -1050,9 +1050,18 @@ class MeloXPlaybackService : MediaSessionService() {
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)
             handler.post { updatingSystemLyricsMetadata = false }
         } else if (changed && !enabled) {
-            // 开关关闭，清除 Channel A 元数据
+            // 开关关闭，从 Channel A 元数据中移除车联歌词自己的键。
+            // ponytail: 不能整包 setExtras(Bundle())——会把 item 上其他功能的键
+            // （如系统歌词的 SYSTEM_ORIGINAL_TITLE_KEY）一起清掉，导致标题永远无法还原。
+            val cleaned = Bundle(currentItem.mediaMetadata.extras ?: Bundle())
+            listOf(
+                CarLyricsConstants.METADATA_KEY_LYRICS_LINE,
+                CarLyricsConstants.METADATA_KEY_LYRICS_WHOLE,
+                CarLyricsConstants.METADATA_KEY_LYRICS_STATUS,
+                CarLyricsConstants.METADATA_KEY_LYRIC_INFO,
+            ).forEach { cleaned.remove(it) }
             val metadata = currentItem.mediaMetadata.buildUpon()
-                .setExtras(Bundle()).build()
+                .setExtras(cleaned).build()
             val updatedItem = currentItem.buildUpon().setMediaMetadata(metadata).build()
             updatingSystemLyricsMetadata = true
             active.replaceMediaItem(active.currentMediaItemIndex, updatedItem)

@@ -139,7 +139,7 @@ class CarLyricsManager(
         }
         // lyricInfo 镜像：status|wholeLrcHash|lineHash
         extras.putString(
-            "lyricInfo",
+            CarLyricsConstants.METADATA_KEY_LYRIC_INFO,
             "$status|${wholeLrc?.hashCode()}|${lineToPush?.hashCode()}"
         )
         return extras

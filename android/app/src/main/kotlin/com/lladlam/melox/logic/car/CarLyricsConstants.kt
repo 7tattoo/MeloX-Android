@@ -11,6 +11,8 @@ object CarLyricsConstants {
     const val METADATA_KEY_LYRICS_LINE   = "ucar.media.metadata.LYRICS_LINE"
     const val METADATA_KEY_LYRICS_WHOLE  = "ucar.media.metadata.LYRICS_WHOLE"
     const val METADATA_KEY_LYRICS_STATUS = "ucar.media.metadata.LYRICS_STATUS"
+    // lyricInfo 镜像（status|wholeHash|lineHash），供车机快速判变化
+    const val METADATA_KEY_LYRIC_INFO    = "lyricInfo"
 
     // ---- Channel B: Extras（手机端智慧车联 App 转发）----
     const val EXTRAS_KEY_LYRIC        = "music.media.extras.LYRIC"
